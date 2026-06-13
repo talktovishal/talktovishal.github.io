@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>When Count Tables Need Help - LLM Soup to Nuts</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="chapter2.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="Back to Chapter 1">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>
+        <strong>LLM Soup to Nuts</strong>
+        <small>Chapter 2</small>
+      </span>
+    </a>
+    <nav class="topnav" aria-label="Chapter sections">
+      <a href="index.html">Chapter 1</a>
+      <a href="#limits">Why counts break</a>
+      <a href="#neural">Learning words</a>
+      <a href="#embeddings">Word vectors</a>
+      <a href="#sequences">Memory</a>
+      <a href="#tokens">Tokenization</a>
+      <a href="#references">References</a>
+    </nav>
+  </header>
+
+  <aside class="lesson-toc" aria-label="Table of contents">
+    <p>Chapter 2</p>
+    <nav>
+      <a href="#overview"><span>00</span>Overview</a>
+      <a href="#limits"><span>07</span>Limits of n-grams</a>
+      <a href="#neural"><span>08</span>Learning word vectors</a>
+      <a href="#embeddings"><span>09</span>Explore embeddings</a>
+      <a href="#sequences"><span>10</span>Longer memory</a>
+      <a href="#tokens"><span>11</span>Token choices</a>
+      <a href="#algorithms"><span>12</span>Tokenizer algorithms</a>
+      <a href="#edges"><span>13</span>Tokenization edge cases</a>
+      <a href="#references"><span>14</span>References</a>
+    </nav>
+  </aside>
+
+  <main id="top">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title">
+      <div class="workbench">
+        <article class="intro-copy">
+          <p class="eyebrow">Learning by doing</p>
+          <h1 id="page-title">When Count Tables Need Help.</h1>
+          <p class="lead">
+            In Chapter 1, our model remembered exact word windows. That was useful.
+            It was also strict. If the exact window was missing, the model had very
+            little to say.
+          </p>
+          <p>
+            Suppose the text has seen <code>the cat slept</code>, but not
+            <code>the dog slept</code>. A count table treats those as two unrelated
+            cases. You and I see the connection right away: cats and dogs tend to
+            show up in the same kinds of places. What we want is for the model to
+            learn a little of that connection too.
+          </p>
+          <p>
+            This chapter is about that next step. We still ask the same practical
+            question: what word might come next? First we will watch exact counts
+            fail. Then we will build a new kind of evidence, slowly, from the words
+            around each word. After that, longer memory and better token choices
+            will feel less mysterious.
+          </p>
+          <p class="example-note">
+            <em>Guiding question:</em> can a model use evidence from similar words,
+            not just identical word windows? That is the bridge from n-grams to
+            neural language models.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section id="limits" class="band" aria-labelledby="limits-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">7. Limits of n-grams</p>
+          <h2 id="limits-title">The count table breaks when exact evidence disappears.</h2>
+          <p>
+            N-grams are a great first model: they count word windows, then lean on
+            those counts to guess the next word. But the rule is very literal. If the
+            exact context is missing, the model has no real way to borrow help from a
+            similar context it has already seen.
+          </p>
+          <p>
+            Try the small lab below. Type one two-word phrase per line. The model
+            first looks for that exact two-word phrase. If it cannot find it, the
+            table shows a simpler fallback: it keeps only the last word and asks what
+            usually came after that word.
+          </p>
+          <p class="example-note">
+            <em>Start simple.</em> Compare <code>the dog</code> and
+            <code>the man</code>. The exact two-word phrases may both be missing.
+            But the fallback words are different: <code>dog</code> and
+            <code>man</code>. That is why the fallback guesses can differ.
+          </p>
+        </div>
+
+        <div class="two-column">
+          <div class="panel">
+            <label class="field-label" for="contextCompareInput">Type two-word phrases to test</label>
+            <textarea id="contextCompareInput" class="corpus-input compact-textarea" spellcheck="false">said the
+the dog
+the man</textarea>
+            <p class="microcopy">Edit this box. Put one phrase on each line, such as <code>the queen</code> or <code>asked the</code>.</p>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>What the count table finds</h3>
+              <span id="sparsitySummary" class="pill">current corpus</span>
+            </div>
+            <p class="microcopy">Read each row left to right. If the exact phrase has 0 hits, the model drops the first word and tries the fallback word.</p>
+            <div id="sparsityPanel" class="evidence-table" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="neural" class="band band-muted" aria-labelledby="neural-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">8. Neural probabilistic language models</p>
+          <h2 id="neural-title">First, give each word a small row of numbers.</h2>
+          <p>
+            Section 7 showed the problem. A count table only trusts exact phrases.
+            If it has seen <code>the cat slept</code> but not <code>the dog slept</code>,
+            it has no built-in reason to let <code>cat</code> help <code>dog</code>.
+            Neural language models changed that by giving each word a learned
+            representation.
+          </p>
+          <p>
+            A representation can sound fancy, so let's make it plain. A word vector
+            is just a short list of numbers for one word. At the start, those numbers
+            are almost random. During training, the model nudges them. Words that
+            show up in similar neighborhoods get nudged toward similar numbers.
+          </p>
+          <p>
+            This browser demo now uses <strong>36 numbers per word</strong>. That number
+            is not a law of nature. It is a choice we make before training, called a
+            hyperparameter. Larger systems often use many more numbers. We use 36 so
+            the training is still browser-sized, but rich enough to show real
+            neighborhood patterns.
+          </p>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">Bengio et al. on distributed word representations</a>,
+            <a href="https://arxiv.org/abs/1301.3781" target="_blank" rel="noreferrer">the first Word2Vec paper</a>, and
+            <a href="https://arxiv.org/abs/1310.4546" target="_blank" rel="noreferrer">negative sampling in Word2Vec</a>.
+          </p>
+        </div>
+
+        <div class="concept-grid">
+          <div class="panel concept-panel">
+            <h3>A vector is a row of learned numbers</h3>
+            <p>
+              The numbers below are only a sketch. The browser learns its own
+              numbers from the selected text. The useful part is the shape: one word,
+              one row, many small values.
+            </p>
+            <div class="vector-table" aria-label="Example word vectors">
+              <div class="vector-row">
+                <strong>dog</strong>
+                <code>[0.42, -0.10, 0.31, 0.08, ...]</code>
+              </div>
+              <div class="vector-row">
+                <strong>cat</strong>
+                <code>[0.39, -0.12, 0.29, 0.11, ...]</code>
+              </div>
+              <div class="vector-row">
+                <strong>table</strong>
+                <code>[-0.05, 0.33, -0.18, 0.22, ...]</code>
+              </div>
+            </div>
+            <p class="microcopy">
+              If <code>dog</code> and <code>cat</code> appear near many of the same
+              words, training can make their rows more alike. The model is not given
+              labels like "animal." It learns from word neighborhoods.
+            </p>
+          </div>
+
+          <div class="panel concept-panel">
+            <h3>What skip-gram trains on</h3>
+            <p>
+              Skip-gram starts with a center word. It asks: which nearby words really
+              appeared around this center word? Then negative sampling adds a few
+              made-up pairs, so the model also learns what does not fit.
+            </p>
+            <div class="skipgram-diagram" aria-label="Skip-gram with negative sampling example">
+              <div class="sentence-strip" aria-label="Example sentence">
+                <span>alice</span>
+                <span>heard</span>
+                <span>the</span>
+                <span class="is-center">rabbit</span>
+                <span>nearby</span>
+              </div>
+              <div class="diagram-stage">
+                <div class="center-token">
+                  <span>center word</span>
+                  <strong>rabbit</strong>
+                </div>
+                <div class="pair-column positive-pairs">
+                  <span class="diagram-label">real nearby pairs</span>
+                  <code>rabbit -> the</code>
+                  <code>rabbit -> nearby</code>
+                  <strong>raise the score</strong>
+                </div>
+                <div class="pair-column negative-pairs">
+                  <span class="diagram-label">made-up pairs</span>
+                  <code>rabbit -> king</code>
+                  <code>rabbit -> table</code>
+                  <strong>lower the score</strong>
+                </div>
+              </div>
+            </div>
+            <p class="microcopy">
+              This is a simplified redraw of the Word2Vec skip-gram idea. The original
+              Word2Vec paper also contrasts skip-gram with CBOW, which predicts a
+              center word from its surrounding words.
+            </p>
+          </div>
+        </div>
+
+        <div class="training-math-grid">
+          <div class="panel training-math-card">
+            <h3>What one training step does</h3>
+            <p>
+              Each word starts with a small list of random numbers. Training is the
+              repeated work of making those numbers less random. In one step, the
+              model takes a center word such as <code>rabbit</code> and one word
+              from its nearby window, such as <code>watch</code>.
+            </p>
+            <ol class="training-step-list">
+              <li>Look up the current vector for <code>rabbit</code>.</li>
+              <li>Look up the current vector for <code>watch</code>.</li>
+              <li>Take a dot product. This asks, "Do these two rows point in a similar direction?"</li>
+              <li>Turn that score into a probability between 0 and 1 with sigmoid, an S-shaped squashing function.</li>
+              <li>Compare the probability with the answer: real pair or made-up pair.</li>
+              <li>Nudge the numbers so the next score is a little less wrong.</li>
+            </ol>
+            <p>
+              One nudge is tiny. Thousands of nudges create the pattern. One full
+              sweep through all of those word pairs is called an epoch, and the
+              training-depth control simply sets how many sweeps to run. That is why
+              the loss trace matters: it shows the repeated nudges are making the
+              training task easier for the model.
+            </p>
+            <div class="formula-stack" aria-label="Skip-gram training formulas">
+              <code>score = center vector · context vector</code>
+              <code>probability real = sigmoid(score)</code>
+              <code>loss = surprise about the right answer</code>
+            </div>
+          </div>
+          <div class="panel training-math-card">
+            <h3>Why fake pairs are useful</h3>
+            <p>
+              If <code>rabbit → nearby</code> really appeared, training nudges the
+              vectors so that score goes up. If <code>rabbit → table</code> was a
+              made-up negative example, training nudges the score down. After many
+              passes, words with similar neighborhoods receive similar nudges, so
+              their final lists of numbers become more alike.
+            </p>
+            <p class="microcopy">
+              This is why nearby words mean <em>similar usage in this corpus</em>.
+              They are not guaranteed to be synonyms.
+            </p>
+          </div>
+        </div>
+
+        <section class="trainer chapter2-trainer" aria-label="Train word vectors">
+          <div class="trainer-head">
+            <div>
+              <h3>Now choose the text and train</h3>
+              <p>
+                Pick a corpus and how much of it to use. Then press the button.
+                The default starts with Alice because its repeated characters and
+                scenes make the first embedding map easier to inspect. The balanced
+                mix and deeper training are there if you want to wait longer and
+                compare. More epochs can lower loss, but in a small browser model
+                they can also over-specialize. Use the neighbor evidence, not just
+                the final loss number, to judge the run. The browser
+                filters most glue words out of the display vocabulary, but still
+                uses them as context evidence.
+              </p>
+            </div>
+            <button id="trainEmbeddingsButton" class="primary-button" type="button">Train word vectors</button>
+          </div>
+          <div class="control-grid section-controls">
+            <label class="select-row" for="chapterCorpusSelect">
+              <span>Corpus</span>
+              <select id="chapterCorpusSelect" class="control-input"></select>
+            </label>
+            <label class="range-row" for="tokenBudgetSlider">
+              <span>How much text</span>
+              <input id="tokenBudgetSlider" type="range" min="10000" max="100000" step="5000" value="60000">
+              <output id="tokenBudgetLabel" for="tokenBudgetSlider">60000</output>
+            </label>
+            <label class="select-row" for="trainingDepthSelect">
+              <span>Training depth</span>
+              <select id="trainingDepthSelect" class="control-input">
+                <option value="8" selected>Recommended - 8 epochs</option>
+                <option value="12">Longer - 12 epochs</option>
+                <option value="20">Deep dive - 20 epochs</option>
+              </select>
+            </label>
+          </div>
+          <p class="microcopy">
+            Good experiments: use Alice for <code>queen</code> and <code>croquet</code>,
+            Pride and Prejudice for <code>elizabeth</code> and <code>darcy</code>, or
+            Sherlock Holmes for <code>holmes</code> and <code>watson</code>. When you
+            switch corpora, the meaning of "nearby" changes with the text.
+          </p>
+          <div id="chapterStats" class="stat-grid chapter-stat-grid" aria-live="polite"></div>
+          <p id="trainingStatus" class="insight-note" aria-live="polite"></p>
+        </section>
+
+        <div class="training-grid">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Training trace</h3>
+              <span id="lossLabel" class="pill">not trained</span>
+            </div>
+            <p class="microcopy">
+              Loss is the model's training error. Lower is better here, but do not
+              over-read a handful of browser-sized passes. The main point is that
+              the word numbers are being adjusted by evidence from the corpus.
+            </p>
+            <div id="lossPanel" class="loss-panel" aria-live="polite"></div>
+          </div>
+          <div class="panel">
+            <h3>What the button trained</h3>
+            <p class="microcopy">
+              These labels describe the actual browser run. They are not new
+              concepts to memorize; they are knobs and counts that explain what
+              just happened.
+            </p>
+            <div id="trainingDetails" class="detail-list" aria-live="polite"></div>
+          </div>
+          <div class="panel watch-panel">
+            <div class="section-title-row">
+              <h3>Watch a few word pairs</h3>
+              <span id="watchLabel" class="pill">not trained</span>
+            </div>
+            <p class="microcopy">
+              Cosine similarity starts near random. As training runs, useful pairs
+              should move closer when they appear in similar neighborhoods.
+            </p>
+            <div id="trainingWatch" class="watch-list" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <article class="code-cell chapter-code-cell" data-chapter-output="training">
+          <div class="cell-head">
+            <h3>Inspect what was trained</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">return embeddingTrainingSummary();</textarea>
+          <div class="code-output" aria-live="polite"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="embeddings" class="band" aria-labelledby="embeddings-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">9. Word embeddings</p>
+          <h2 id="embeddings-title">Now inspect the word vectors you trained.</h2>
+          <p>
+            A word embedding is the trained vector for one word. In this chapter,
+            <code>rabbit</code> gets one vector, <code>queen</code> gets one vector,
+            and so on. These are static embeddings: the same word has the same row of
+            numbers wherever it appears in this small model.
+          </p>
+          <p>
+            The browser trains vectors for up to <strong>260 focus words</strong>
+            from your selected text. The focus vocabulary keeps characters, names,
+            places, and other content words. It removes most high-frequency glue
+            words from the map, because a cloud of <code>the</code>, <code>of</code>,
+            and <code>and</code> is not the lesson we want here.
+          </p>
+          <p>
+            Word2Vec learns from local prediction. GloVe learns from a larger
+            co-occurrence table. Both helped popularize the same practical idea:
+            words can be represented by learned numbers, and nearby vectors often
+            reflect related usage. This is not the same as a dictionary definition.
+            In the Alice corpus, <code>queen</code> may sit near other characters,
+            court words, or shouted-dialogue words because those are the situations
+            where the book uses her.
+          </p>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://arxiv.org/abs/1301.3781" target="_blank" rel="noreferrer">Word2Vec CBOW and skip-gram</a>,
+            <a href="https://arxiv.org/abs/1310.4546" target="_blank" rel="noreferrer">negative sampling and analogies</a>,
+            <a href="https://aclanthology.org/D14-1162/" target="_blank" rel="noreferrer">GloVe</a>, and
+            <a href="https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html" target="_blank" rel="noreferrer">PCA documentation</a>.
+          </p>
+        </div>
+
+        <div class="embedding-guide-grid">
+          <div class="panel guide-card">
+            <h3>Read the map gently</h3>
+            <p>
+              The model has 36 numbers per word, but the screen has only two axes.
+              PCA is a drawing method that squeezes the 36-number vectors into an
+              <code>x</code> and <code>y</code> position. It is useful for a first
+              look, but it can hide some distances and exaggerate others.
+            </p>
+          </div>
+          <div class="panel guide-card">
+            <h3>Trust neighbors more than the picture</h3>
+            <p>
+              The neighbor list compares the original 36-number vectors with cosine
+              similarity. That means it asks whether two rows point in a similar
+              direction. It uses the full trained vectors, not the flattened map view.
+            </p>
+          </div>
+          <div class="panel guide-card">
+            <h3>Try analogies, but stay skeptical</h3>
+            <p>
+              Classic examples like <code>king - man + woman</code> came from much
+              larger training runs. Our browser model is intentionally small. Vector
+              math can still be interesting, but failed or strange answers are part
+              of the lesson.
+            </p>
+          </div>
+        </div>
+
+        <p class="example-note">
+          <em>Read this like evidence, not magic.</em> If a corpus uses two words in
+          similar places, they may become neighbors. If the corpus is small,
+          genre-specific, or biased, the vectors can be odd or biased too. Use the
+          "Why these neighbors?" box to inspect the context clues behind the list.
+          </p>
+
+        <div class="embedding-layout real-embedding-layout">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Embedding map</h3>
+              <span id="embeddingMapLabel" class="pill">trained vectors</span>
+            </div>
+            <p class="microcopy">The map plots a selected content-word slice. It labels the selected word; hover over any dot to read the word.</p>
+            <div id="embeddingMap" class="embedding-map real-map" aria-live="polite"></div>
+          </div>
+          <div class="panel">
+            <div class="control-grid compact-controls">
+              <label class="select-row" for="focusWordSelect">
+                <span>Word to inspect</span>
+                <select id="focusWordSelect" class="control-input"></select>
+              </label>
+              <label class="select-row" for="analogyInput">
+                <span>Vector math</span>
+                <input id="analogyInput" class="control-input" type="text" placeholder="optional: alice - said + queen">
+              </label>
+            </div>
+            <p class="microcopy">Pick a trained word. Nearby words are ranked with cosine similarity on the full vectors.</p>
+            <div id="nearestPanel" class="neighbor-list" aria-live="polite"></div>
+            <div id="analogyPanel" class="vector-readout" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <article class="code-cell chapter-code-cell" data-chapter-output="neighbors">
+          <div class="cell-head">
+            <h3>Find nearby trained words</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">return nearestWords(focusWord, 8);</textarea>
+          <div class="code-output" aria-live="polite"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="sequences" class="band band-muted" aria-labelledby="sequences-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">10. Sequence models before Transformers</p>
+          <h2 id="sequences-title">What if the useful clue is far away?</h2>
+          <p>
+            Think of finishing a sentence like "I grew up in France, so I speak
+            fluent ___." The word that fits is <code>french</code>, but the clue that
+            points to it sits all the way back at the start. A fixed n-gram window
+            only sees the last word or two, so by the time we reach the blank that
+            evidence is long gone. Recurrent neural networks tried a gentler idea:
+            read one token at a time, and carry a small learned note forward as you
+            go. That running note is called a hidden state.
+          </p>
+          <p>
+            The hard part is training that memory. A learning signal from far back in
+            the sentence has to travel through many steps, and at each step it gets
+            multiplied again. That repeated multiplying is unforgiving: a factor of
+            0.9 applied twenty times shrinks to about 0.12, while a factor of 1.1
+            applied twenty times grows to roughly 6.7. So the signal tends to either
+            fade to almost nothing or blow up. LSTMs and GRUs added gates to tame that
+            flow.
+          </p>
+        </div>
+
+        <div class="training-grid">
+          <div class="panel">
+            <div class="control-grid compact-controls">
+              <label class="range-row" for="recurrentWeightSlider">
+                <span>Recurrent weight</span>
+                <input id="recurrentWeightSlider" type="range" min="0.2" max="1.4" step="0.05" value="0.75">
+                <output id="recurrentWeightLabel" for="recurrentWeightSlider">0.75</output>
+              </label>
+              <label class="range-row" for="sequenceStepsSlider">
+                <span>Time steps</span>
+                <input id="sequenceStepsSlider" type="range" min="4" max="28" step="1" value="16">
+                <output id="sequenceStepsLabel" for="sequenceStepsSlider">16</output>
+              </label>
+            </div>
+            <p id="gradientSummary" class="insight-note" aria-live="polite"></p>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Gradient through time</h3>
+              <span id="gradientMode" class="pill">vanishing</span>
+            </div>
+            <div id="gradientPanel" class="gradient-panel" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tokens" class="band" aria-labelledby="tokens-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">11. Why tokenization matters</p>
+          <h2 id="tokens-title">Tokenization comes back, but now the stakes are higher.</h2>
+          <p>
+            Chapter 1 used a simple tokenizer so we could count words. Here the
+            tokenizer becomes part of the model design. The model does not read raw
+            text. It reads token IDs. So the boundary choices affect cost, speed, and
+            what patterns the model can learn.
+          </p>
+          <p>
+            Whole words are easy to read, but rare words break them. Characters and
+            bytes can represent almost anything, but they make longer sequences.
+            Subwords are the middle path. They keep common pieces whole and split
+            rarer words into useful chunks.
+          </p>
+          <p class="example-note">
+            <em>What is new here?</em> In Chapter 1, tokenization helped us make a
+            count table. Here, tokenization decides how much work the neural model
+            does and how unfamiliar words are represented.
+          </p>
+        </div>
+
+        <div class="tokenizer-layout">
+          <div class="panel">
+            <label class="field-label" for="tokenizerInput">Text to inspect</label>
+            <textarea id="tokenizerInput" class="corpus-input tokenizer-input" spellcheck="false">Tokenization turns unfamiliar words like microtransformers into useful pieces.</textarea>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Boundary comparison</h3>
+              <span id="boundarySummary" class="pill">current text</span>
+            </div>
+            <div id="boundaryPanel" class="tokenizer-comparison" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="algorithms" class="band band-muted" aria-labelledby="algorithms-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">12. Tokenizer algorithms</p>
+          <h2 id="algorithms-title">Now let the tokenizer learn its pieces.</h2>
+          <p>
+            A hand-written splitter is easy, but modern tokenizers are usually
+            trained. They look at a corpus and decide which pieces are worth keeping.
+            That is why common chunks stay short and rare words can still be spelled
+            with smaller pieces.
+          </p>
+          <p class="example-note">
+            <em>This lab is small, but real.</em> BPE merges frequent neighboring
+            pieces. WordPiece-style encoding picks the longest known piece it can.
+            Unigram-style encoding chooses a likely segmentation from learned pieces.
+            Byte-level encoding uses the actual UTF-8 bytes.
+          </p>
+        </div>
+
+        <div class="tokenizer-layout">
+          <div class="panel">
+            <div class="control-grid section-controls">
+              <label class="select-row" for="tokenizerAlgorithmSelect">
+                <span>Algorithm</span>
+                <select id="tokenizerAlgorithmSelect" class="control-input">
+                  <option value="bpe">BPE merges</option>
+                  <option value="wordpiece">WordPiece-style</option>
+                  <option value="unigram">Unigram-style</option>
+                  <option value="byte">Byte-level UTF-8</option>
+                </select>
+              </label>
+              <label class="range-row" for="tokenizerVocabSlider">
+                <span>Target pieces</span>
+                <input id="tokenizerVocabSlider" type="range" min="40" max="180" step="10" value="90">
+                <output id="tokenizerVocabLabel" for="tokenizerVocabSlider">90</output>
+              </label>
+            </div>
+            <div id="tokenizerTrainingPanel" class="algorithm-flow" aria-live="polite"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Encoded output</h3>
+              <span id="algorithmSummary" class="pill">BPE</span>
+            </div>
+            <div id="algorithmTokens" class="tokenizer-chip-rail" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <article class="code-cell chapter-code-cell" data-chapter-output="tokenizer">
+          <div class="cell-head">
+            <h3>Train BPE and encode text</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">return trainBpeAndEncode(tokenizerText, 90);</textarea>
+          <div class="code-output" aria-live="polite"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="edges" class="band" aria-labelledby="edges-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">13. Tokenization edge cases</p>
+          <h2 id="edges-title">Always inspect what the model actually receives.</h2>
+          <p>
+            Edge cases are not trivia. They are where hidden assumptions show up.
+            Multilingual text, code, whitespace, numbers, emoji, rare names, and
+            domain vocabulary can all change the token stream.
+          </p>
+          <p>
+            Pick a case and inspect the output. Sometimes the visible text and the
+            tokenized input are not as similar as they look. That can affect cost,
+            evidence, safety, and fairness.
+          </p>
+        </div>
+
+        <div class="tokenizer-layout">
+          <div class="panel">
+            <label class="select-row" for="edgeCaseSelect">
+              <span>Case</span>
+              <select id="edgeCaseSelect" class="control-input">
+                <option value="multilingual">Multilingual text</option>
+                <option value="code">Code and whitespace</option>
+                <option value="numbers">Numbers</option>
+                <option value="emoji">Emoji and Unicode</option>
+                <option value="rare">Rare names</option>
+                <option value="domain">Domain vocabulary</option>
+                <option value="hidden">Hidden text</option>
+              </select>
+            </label>
+            <div id="edgeCasePanel" class="edge-card" aria-live="polite"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Tokenizer output</h3>
+              <span id="edgeCaseSummary" class="pill">edge case</span>
+            </div>
+            <div id="edgeCaseTokens" class="tokenizer-chip-rail" aria-live="polite"></div>
+            <div id="edgeCaseWarnings" class="warning-list" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="references" class="band band-muted" aria-labelledby="references-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">14. Going deeper</p>
+          <h2 id="references-title">Further reading.</h2>
+          <p>
+            These references follow the path of the chapter. Start with why learned
+            word vectors helped count-based models. Then move to sequence models,
+            attention, and trained tokenizers. The implementation links are here so
+            the ideas stay connected to working code.
+          </p>
+        </div>
+
+        <ol class="reference-list">
+          <li>
+            <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">Bengio et al., A Neural Probabilistic Language Model</a>
+            <span>The key paper linking n-gram sparsity to learned distributed representations.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1301.3781" target="_blank" rel="noreferrer">Mikolov et al., Efficient Estimation of Word Representations</a>
+            <span>Introduces CBOW and skip-gram training for efficient word-vector learning.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1310.4546" target="_blank" rel="noreferrer">Mikolov et al., Distributed Representations of Words and Phrases</a>
+            <span>Negative sampling, phrase vectors, and the analogy examples often associated with Word2Vec.</span>
+          </li>
+          <li>
+            <a href="https://aclanthology.org/D14-1162/" target="_blank" rel="noreferrer">Pennington, Socher, and Manning, GloVe</a>
+            <span>A global co-occurrence approach to word vectors.</span>
+          </li>
+          <li>
+            <a href="https://www.bioinf.jku.at/publications/older/2604.pdf" target="_blank" rel="noreferrer">Hochreiter and Schmidhuber, Long Short-Term Memory</a>
+            <span>The original LSTM paper addressing long-range recurrent learning.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1406.1078" target="_blank" rel="noreferrer">Cho et al., RNN Encoder-Decoder</a>
+            <span>A compact source for encoder-decoder modeling and the GRU.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1409.0473" target="_blank" rel="noreferrer">Bahdanau, Cho, and Bengio, Neural Machine Translation with Attention</a>
+            <span>The pre-Transformer attention paper for sequence-to-sequence translation.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1508.07909" target="_blank" rel="noreferrer">Sennrich, Haddow, and Birch, BPE for Rare Words</a>
+            <span>The influential subword BPE paper for neural machine translation.</span>
+          </li>
+          <li>
+            <a href="https://aclanthology.org/P18-1007/" target="_blank" rel="noreferrer">Kudo, Subword Regularization and Unigram Tokenization</a>
+            <span>A primary source for Unigram language-model tokenization.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1808.06226" target="_blank" rel="noreferrer">Kudo and Richardson, SentencePiece</a>
+            <span>Raw-text subword tokenization and detokenization for neural text processing.</span>
+          </li>
+          <li>
+            <a href="https://github.com/google-research/bert/blob/master/tokenization.py" target="_blank" rel="noreferrer">BERT Tokenization Code</a>
+            <span>A readable implementation reference for BasicTokenizer and WordPieceTokenizer.</span>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="chapter-nav-band" aria-label="Chapter navigation">
+      <div class="section-shell">
+        <nav class="chapter-nav">
+          <a class="chapter-nav-card" href="index.html">
+            <span>Previous chapter</span>
+            <strong>Chapter 1: Build a tiny next-word predictor</strong>
+            <em>Return to tokens, n-grams, smoothing, and perplexity.</em>
+          </a>
+          <span class="chapter-nav-card is-disabled">
+            <span>Next chapter</span>
+            <strong>More chapters coming</strong>
+            <em>This chapter is the current end of the path.</em>
+          </span>
+        </nav>
+      </div>
+    </section>
+  </main>
+
+  <script src="corpora.js"></script>
+  <script src="chapter2.js"></script>
+</body>
+</html>

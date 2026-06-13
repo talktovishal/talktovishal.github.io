@@ -8,6 +8,7 @@
   --muted: #68635d;
   --line: #ded9d0;
   --teal: #c65f1e;
+  --accent: #c65f1e;
   --teal-soft: #fff0e4;
   --coral: #b03d28;
   --coral-soft: #fff0eb;
@@ -1511,6 +1512,57 @@ input[type="range"] {
   line-height: 1.45;
 }
 
+.chapter-nav-band {
+  padding: 34px 0 72px;
+  background: #ffffff;
+}
+
+.chapter-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.chapter-nav-card {
+  display: grid;
+  align-content: start;
+  min-height: 116px;
+  gap: 7px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.chapter-nav-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chapter-nav-card strong {
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.chapter-nav-card em {
+  color: #544f49;
+  font-style: normal;
+}
+
+a.chapter-nav-card:hover {
+  border-color: var(--accent);
+}
+
+.chapter-nav-card.is-disabled {
+  background: #f7f4ee;
+  color: #766f66;
+}
+
 .eval-row {
   display: grid;
   grid-template-columns: 92px minmax(120px, 1fr) 74px;
@@ -1561,7 +1613,7 @@ input[type="range"] {
 
 .code-cell {
   display: grid;
-  grid-template-rows: auto minmax(112px, auto) minmax(132px, auto);
+  grid-template-rows: auto minmax(112px, auto) auto;
   gap: 10px;
   margin-top: 14px;
   padding: 12px;
@@ -1590,16 +1642,238 @@ input[type="range"] {
 
 .code-output {
   min-height: 132px;
-  max-height: 280px;
   margin: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: 12px;
-  border: 1px solid #c9d7d8;
+  border: 1px solid var(--line);
   border-radius: 8px;
+  background: #fffaf4;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.code-output.is-empty,
+.code-output.is-running,
+.code-output.is-stale {
+  display: grid;
+  place-items: center;
+  border-style: dashed;
+  background: #fffdf9;
+}
+
+.code-output.is-error {
+  border-color: #d46a4c;
+  background: #fff2ec;
+}
+
+.output-message {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.output-message strong {
+  color: var(--ink);
+  font-size: 0.98rem;
+}
+
+.output-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.output-status strong {
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.output-visual {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.output-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.output-metric {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.output-metric strong {
+  font-size: 1.02rem;
+  font-weight: 900;
+}
+
+.output-metric span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.output-chip-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 148px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px dashed #decbb5;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.output-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fffdf9;
+  color: var(--ink);
+  font-weight: 850;
+}
+
+.output-chip.repeat {
+  border-color: #d9a35f;
+  background: #fff0cf;
+}
+
+.output-chip.seed {
+  border-color: #c65f1e;
+  background: #fff1e6;
+}
+
+.output-table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 0.86rem;
+}
+
+.output-table th,
+.output-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.output-table th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.output-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.output-probability-list {
+  display: grid;
+  gap: 7px;
+}
+
+.output-probability-row {
+  display: grid;
+  grid-template-columns: minmax(76px, 0.7fr) minmax(120px, 1.4fr) minmax(72px, auto);
+  gap: 10px;
+  align-items: center;
+}
+
+.output-probability-row > span:first-child {
+  font-weight: 900;
+}
+
+.output-probability-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8e1d7;
+}
+
+.output-probability-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.output-probability-row strong {
+  text-align: right;
+  font-size: 0.82rem;
+}
+
+.output-formula {
+  display: block;
+  padding: 9px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: #fff4ea;
+  color: #233044;
+  white-space: normal;
+}
+
+.output-insight {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: #fff4ea;
+  color: var(--muted);
+}
+
+.output-raw {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.output-raw summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.output-raw pre,
+.output-raw-preview,
+.output-error-text {
+  max-height: 220px;
+  margin: 8px 0 0;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 7px;
   background: #121a24;
   color: #e8f4f3;
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   line-height: 1.45;
   white-space: pre-wrap;
 }
@@ -1699,8 +1973,19 @@ input[type="range"] {
   .smoothing-compare,
   .surprise-trace-panel .surprise-panel,
   .lesson-grid,
-  .reference-list {
+  .chapter-nav,
+  .reference-list,
+  .output-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .output-probability-row {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .output-probability-row strong {
+    text-align: left;
   }
 
   .choice-row,
@@ -1760,6 +2045,7 @@ input[type="range"] {
   .surprise-row em {
     text-align: left;
   }
+
 }
 
 @media (max-width: 460px) {

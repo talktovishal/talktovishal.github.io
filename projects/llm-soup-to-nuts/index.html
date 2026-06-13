@@ -23,7 +23,7 @@
       <a href="#generate">Generate</a>
       <a href="#evaluate">Evaluate</a>
       <a href="#references">References</a>
-      <a href="../../">Portfolio</a>
+      <a href="chapter-2.html">Chapter 2</a>
     </nav>
   </header>
 
@@ -55,7 +55,7 @@
           <p>
             Let's start with something familiar. I type a few words on my phone, and
             before I finish the sentence, the keyboard suggests what might come next.
-            The goal here is to make that behavior less mysterious by building the
+            My goal here is to make that behavior feel less mysterious by building the
             smallest useful version ourselves.
           </p>
           <p>
@@ -124,7 +124,7 @@
             <code>n't</code>, or be treated like <code>do not</code>? And in languages
             such as Chinese or Thai, spaces do not mark words the way they usually do
             in English. So even this first step, deciding where one piece ends and the
-            next begins, can become a serious language problem.
+            next begins, can become a surprisingly deep language problem.
           </p>
           <p>
             After tokenization, I want you to notice two different views of the same
@@ -220,7 +220,7 @@
           </div>
         </div>
 
-        <article class="code-cell">
+        <article class="code-cell" data-output-type="tokens">
           <div class="cell-head">
             <h3>Run the tokenizer</h3>
             <button class="run-button" type="button">Run</button>
@@ -258,7 +258,7 @@ return {
   tokenCount: tokens.length,
   vocabularySize: new Set(tokens).size
 };</textarea>
-          <pre class="code-output" aria-live="polite"></pre>
+          <div class="code-output" aria-live="polite"></div>
         </article>
       </div>
     </section>
@@ -297,6 +297,15 @@ return {
             ignores the local context and asks what tokens are common in general. The
             tradeoff is the heart of this section: more memory can be more precise,
             but it also creates more exact contexts the model may never have seen.
+          </p>
+          <p>
+            There is a quiet assumption hiding in all of this, and it even has a name:
+            the <strong>Markov assumption</strong>. We are betting that the last word
+            or two stands in well enough for the entire history that came before it.
+            That is clearly not the whole truth, since real sentences lean on far more
+            than two words. But it is a wonderfully useful simplification, because it
+            turns the impossible job of remembering everything into the manageable job
+            of counting short windows.
           </p>
           <p class="learn-more">
             Learn more:
@@ -413,7 +422,7 @@ return {
           </div>
         </div>
 
-        <article class="code-cell">
+        <article class="code-cell" data-output-type="ngram-table">
           <div class="cell-head">
             <h3>Build the count table</h3>
             <button class="run-button" type="button">Run</button>
@@ -434,7 +443,7 @@ return {
   totalWindows: Math.max(0, tokens.length - n + 1),
   mostCommon: table.slice(0, 10)
 };</textarea>
-          <pre class="code-output" aria-live="polite"></pre>
+          <div class="code-output" aria-live="polite"></div>
         </article>
       </div>
     </section>
@@ -466,6 +475,14 @@ return {
             <code>P(king | said the) = 29 / 209 = 13.9%</code>. We are not guessing
             by feel. We are asking what share of the evidence points to this next
             token.
+          </p>
+          <p>
+            Here is a small but reassuring detail. If you add up these shares across
+            every token that ever followed <code>said the</code>, they come to exactly
+            1, which is just another way of writing 100%. That is what makes this a
+            real probability distribution and not a loose handful of percentages: the
+            context has one whole unit of confidence to give away, and it only has to
+            decide how much of it each possible next token deserves.
           </p>
           <p>
             The important detail is that this probability is local. It does not mean
@@ -513,7 +530,7 @@ return {
           </div>
         </div>
 
-        <article class="code-cell">
+        <article class="code-cell" data-output-type="probability">
           <div class="cell-head">
             <h3>Calculate one probability</h3>
             <button class="run-button" type="button">Run</button>
@@ -522,7 +539,7 @@ return {
 // Probability is the count for one next token divided by
 // the total count for that context.
 return explainProbability(sampleText, settings.n, currentContext, selectedToken);</textarea>
-          <pre class="code-output" aria-live="polite"></pre>
+          <div class="code-output" aria-live="polite"></div>
         </article>
       </div>
     </section>
@@ -534,10 +551,11 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <h2 id="generate-title">Write forward one token at a time.</h2>
           <p>
             Once the model can predict one next token, we can ask it to keep going.
-            We start with a seed phrase, choose a next token, attach that token to the
-            end, and then ask again from the new ending. In a trigram model, the text
-            is built from many tiny choices, and each choice only looks back at the
-            last two tokens.
+            This is the moment our little model starts to feel like the phone keyboard
+            from the opening: we hand it a seed phrase, let it choose a next token,
+            attach that token to the end, and then ask again from the new ending. In a
+            trigram model, the text is built from many tiny choices, and each choice
+            only looks back at the last two tokens.
           </p>
           <p>
             The probability table tells us what could come next, but it does not by
@@ -596,7 +614,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           </article>
         </div>
 
-        <article class="code-cell">
+        <article class="code-cell" data-output-type="generation">
           <div class="cell-head">
             <h3>Generate text</h3>
             <button class="run-button" type="button">Run</button>
@@ -608,7 +626,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
   backoff: settings.backoff,
   steps: 18
 });</textarea>
-          <pre class="code-output" aria-live="polite"></pre>
+          <div class="code-output" aria-live="polite"></div>
         </article>
       </div>
     </section>
@@ -733,7 +751,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           </div>
         </div>
 
-        <article class="code-cell">
+        <article class="code-cell" data-output-type="backoff">
           <div class="cell-head">
             <h3>Inspect backoff</h3>
             <button class="run-button" type="button">Run</button>
@@ -745,7 +763,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
   backoff: settings.backoff,
   explain: true
 });</textarea>
-          <pre class="code-output" aria-live="polite"></pre>
+          <div class="code-output" aria-live="polite"></div>
         </article>
       </div>
     </section>
@@ -756,10 +774,10 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <p class="eyebrow">6. Test on held-out text</p>
           <h2 id="evaluate-title">Measure surprise with perplexity.</h2>
           <p>
-            After we generate a few amusing sentences, we need a more honest question:
-            is the model actually good at prediction? One common way to test that is
-            to keep a small piece of text aside, not train on it, and then ask the
-            model to predict it token by token. That kept-aside text is called a
+            After we generate a few amusing sentences, I think we owe the model a more
+            honest question: is it actually any good at prediction? One common way to
+            test that is to keep a small piece of text aside, not train on it, and then
+            ask the model to predict it token by token. That kept-aside text is called a
             <strong>holdout</strong>.
           </p>
           <p>
@@ -777,6 +795,15 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             <code>PPL = exp(H)</code>. Good predictions make the <code>p_i</code>
             values larger, which makes the surprise smaller, which pushes perplexity
             down.
+          </p>
+          <p>
+            If that formula still feels abstract, here is the picture I keep in my
+            head. Perplexity is roughly how many words the model feels like it is
+            choosing between at each step. A perplexity of 30 means it is about as
+            unsure as someone guessing blindly among 30 equally likely words, while a
+            perplexity of 5 means it has narrowed the field to a handful. So lower
+            perplexity simply means fewer options the model is torn between, which is
+            one more way of saying it was less surprised.
           </p>
           <p>
             This is also why a bigram or trigram often beats a unigram on matched
@@ -828,7 +855,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <div class="evaluation-input-stack">
             <label class="field-label" for="holdoutInput">Holdout text</label>
             <textarea id="holdoutInput" class="corpus-input holdout-input" spellcheck="false"></textarea>
-            <article class="code-cell">
+            <article class="code-cell" data-output-type="evaluation">
               <div class="cell-head">
                 <h3>Evaluate the models</h3>
                 <button class="run-button" type="button">Run</button>
@@ -839,7 +866,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
   alpha: settings.alpha,
   backoff: settings.backoff
 });</textarea>
-              <pre class="code-output" aria-live="polite"></pre>
+              <div class="code-output" aria-live="polite"></div>
             </article>
           </div>
           <div class="panel">
@@ -892,10 +919,8 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             those probabilities into text.
           </p>
           <p class="learn-more">
-            Learn more:
-            <a href="https://en.wikipedia.org/wiki/Large_language_model" target="_blank" rel="noreferrer">large language models</a>
-            and
-            <a href="https://en.wikipedia.org/wiki/Language_model" target="_blank" rel="noreferrer">language models</a>
+            Next:
+            <a href="chapter-2.html">open Chapter 2, When Count Tables Need Help</a>
           </p>
         </div>
       </div>
@@ -907,11 +932,11 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <p class="eyebrow">8. Going deeper</p>
           <h2 id="references-title">Further reading.</h2>
           <p>
-            For further reading, the following references provide more detailed notes,
-            textbook treatments, implementation guides, and historical context. Start
-            with Jurafsky and Martin for the main narrative, Collins for a compact
-            mathematical treatment, and NLTK or KenLM when you want to connect these
-            ideas to working language-model code.
+            If you want to keep going, these are the references I would reach for: more
+            detailed notes, textbook treatments, implementation guides, and a bit of
+            history. Start with Jurafsky and Martin for the main narrative, Collins for
+            a compact mathematical treatment, and NLTK or KenLM when you want to connect
+            these ideas to working language-model code.
           </p>
         </div>
 
@@ -969,6 +994,23 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             <span>A widely used toolkit for building and querying large n-gram language models efficiently.</span>
           </li>
         </ol>
+      </div>
+    </section>
+
+    <section class="chapter-nav-band" aria-label="Chapter navigation">
+      <div class="section-shell">
+        <nav class="chapter-nav">
+          <span class="chapter-nav-card is-disabled">
+            <span>Previous chapter</span>
+            <strong>Start of course</strong>
+            <em>You are at the first chapter.</em>
+          </span>
+          <a class="chapter-nav-card" href="chapter-2.html">
+            <span>Next chapter</span>
+            <strong>Chapter 2: When count tables need help</strong>
+            <em>Move from exact counts to learned representations.</em>
+          </a>
+        </nav>
       </div>
     </section>
   </main>

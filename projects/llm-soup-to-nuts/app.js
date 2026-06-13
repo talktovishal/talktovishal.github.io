@@ -1523,8 +1523,9 @@ async function runCodeCell(cell) {
   const print = (...values) => {
     logs.push(values.map(formatValue).join(" "));
   };
+  const started = window.performance ? window.performance.now() : Date.now();
 
-  output.textContent = "Running...";
+  setCodeOutputState(output, "running", "Running code...", "The result will appear here.");
 
   try {
     const api = makeApi(print);
@@ -1552,12 +1553,10 @@ ${input.value}
 })();`
     );
     const result = await runner(api);
-    const resultText = result === undefined ? "" : formatValue(result);
-    output.textContent = logs.length
-      ? `${logs.join("\n")}${resultText ? `\n\nReturn value:\n${resultText}` : ""}`
-      : resultText || "undefined";
+    const ended = window.performance ? window.performance.now() : Date.now();
+    renderCodeOutput(cell, output, result, logs, Math.max(0, ended - started));
   } catch (error) {
-    output.textContent = `${error.name}: ${error.message}`;
+    renderCodeError(output, error);
   }
 }
 
@@ -1569,16 +1568,327 @@ function runAllCells() {
 
 function prepareCodeCells() {
   document.querySelectorAll(".code-output").forEach((output) => {
-    output.textContent = "Press Run to execute this cell.";
+    setCodeOutputState(output, "empty", "Ready to run", "Press Run to execute this cell.");
   });
 }
 
 function markCodeCellsStale() {
   document.querySelectorAll(".code-output").forEach((output) => {
-    if (output.textContent.trim() && output.textContent !== "Press Run to execute this cell.") {
-      output.textContent = "Settings changed. Press Run again.";
+    if (!output.classList.contains("is-empty")) {
+      setCodeOutputState(output, "stale", "Settings changed", "Press Run again to refresh this result.");
     }
   });
+}
+
+function setCodeOutputState(output, state, title, message) {
+  resetOutputState(output);
+  output.classList.add(`is-${state}`);
+  const note = document.createElement("div");
+  note.className = "output-message";
+  const strong = document.createElement("strong");
+  strong.textContent = title;
+  const span = document.createElement("span");
+  span.textContent = message;
+  note.append(strong, span);
+  output.replaceChildren(note);
+}
+
+function resetOutputState(output) {
+  output.classList.remove("is-empty", "is-running", "is-success", "is-error", "is-stale");
+  output.replaceChildren();
+}
+
+function renderCodeOutput(cell, output, result, logs, duration) {
+  const rawText = makeRawOutputText(result, logs);
+  resetOutputState(output);
+  output.classList.add("is-success");
+  output.append(makeOutputStatus("Ran successfully", `${Math.max(1, Math.round(duration))} ms`));
+
+  const visual = document.createElement("div");
+  visual.className = "output-visual";
+  const rendered = renderTypedOutput(cell.dataset.outputType, visual, result);
+  if (!rendered) renderRawPreview(visual, result);
+  output.append(visual);
+
+  if (logs.length) output.append(makeLogBlock(logs));
+  output.append(makeRawDetails(rawText));
+}
+
+function renderCodeError(output, error) {
+  resetOutputState(output);
+  output.classList.add("is-error");
+  output.append(makeOutputStatus("Error while running", error.name || "Error"));
+  const message = document.createElement("pre");
+  message.className = "output-error-text";
+  message.textContent = `${error.name}: ${error.message}`;
+  output.append(message);
+}
+
+function makeOutputStatus(label, detail) {
+  const status = document.createElement("div");
+  status.className = "output-status";
+  const strong = document.createElement("strong");
+  strong.textContent = label;
+  const span = document.createElement("span");
+  span.textContent = detail;
+  status.append(strong, span);
+  return status;
+}
+
+function makeRawOutputText(result, logs = []) {
+  const resultText = result === undefined ? "undefined" : formatValue(result);
+  return logs.length
+    ? `${logs.join("\n")}${resultText ? `\n\nReturn value:\n${resultText}` : ""}`
+    : resultText;
+}
+
+function renderTypedOutput(type, container, result) {
+  if (type === "tokens") return renderTokenOutput(container, result);
+  if (type === "ngram-table") return renderNgramOutput(container, result);
+  if (type === "probability") return renderProbabilityOutput(container, result);
+  if (type === "generation") return renderGenerationOutput(container, result);
+  if (type === "backoff") return renderBackoffOutput(container, result);
+  if (type === "evaluation") return renderEvaluationOutput(container, result);
+  return false;
+}
+
+function renderTokenOutput(container, result) {
+  if (!result || !Array.isArray(result.firstTokens)) return false;
+  appendMetrics(container, [
+    ["tokens", formatNumber(result.tokenCount || 0)],
+    ["vocabulary", formatNumber(result.vocabularySize || 0)],
+    ["preview", `${result.firstTokens.length} tokens`]
+  ]);
+  appendChipRail(container, result.firstTokens, { markRepeats: true });
+  appendOutputInsight(container, "The output is a token stream preview plus the unique vocabulary size from the same tokenizer code.");
+  return true;
+}
+
+function renderNgramOutput(container, result) {
+  if (!result || !Array.isArray(result.mostCommon)) return false;
+  appendMetrics(container, [
+    ["model", result.model || "n-gram"],
+    ["windows", formatNumber(result.totalWindows || 0)],
+    ["shown", `${result.mostCommon.length} rows`]
+  ]);
+  appendResultTable(container, ["context", "next token", "count"], result.mostCommon.map((row) => [
+    row.context || "(any context)",
+    row.next,
+    `x${formatNumber(row.count || 0)}`
+  ]));
+  appendOutputInsight(container, "Each row is a repeated training window: remembered context on the left, observed next token on the right.");
+  return true;
+}
+
+function renderProbabilityOutput(container, result) {
+  if (!result || !("probability" in result)) return false;
+  appendMetrics(container, [
+    ["context", result.context || "(any context)"],
+    ["token", result.token || "(none)"],
+    ["probability", percent(Number(result.probability || 0))]
+  ]);
+
+  const bar = document.createElement("div");
+  bar.className = "output-probability-row";
+  const label = document.createElement("span");
+  label.textContent = result.token || "(none)";
+  const track = document.createElement("span");
+  track.className = "output-probability-track";
+  const fill = document.createElement("span");
+  fill.style.width = `${Math.max(3, Number(result.probability || 0) * 100)}%`;
+  track.append(fill);
+  const value = document.createElement("strong");
+  value.textContent = percent(Number(result.probability || 0));
+  bar.append(label, track, value);
+  container.append(bar);
+
+  if (result.formula) {
+    const formula = document.createElement("code");
+    formula.className = "output-formula";
+    formula.textContent = `P(${result.token} | ${result.context}) = ${result.formula}`;
+    container.append(formula);
+  } else if (result.note) {
+    appendOutputInsight(container, result.note);
+  }
+  return true;
+}
+
+function renderGenerationOutput(container, result) {
+  if (typeof result !== "string") return false;
+  const tokens = tokenize(result);
+  appendMetrics(container, [
+    ["generated tokens", formatNumber(tokens.length)],
+    ["strategy", currentSettings().strategy === "top" ? "top pick" : "sample"],
+    ["model", currentSettings().modelName]
+  ]);
+  appendChipRail(container, tokens, { seedTokens: tokenize(dom.contextInput.value).length });
+  appendOutputInsight(container, "The generated string is shown as chips so each chosen token is visible.");
+  return true;
+}
+
+function renderBackoffOutput(container, result) {
+  if (!result || !Array.isArray(result.predictions)) return false;
+  appendMetrics(container, [
+    ["requested", result.requestedModel || "model"],
+    ["used", result.usedModel || "model"],
+    ["context", result.context || "(any context)"]
+  ]);
+
+  if (Array.isArray(result.ladder) && result.ladder.length) {
+    appendResultTable(container, ["model", "context", "evidence"], result.ladder.map((row) => [
+      nNames[row.order] || `${row.order}-gram`,
+      row.context || "(any context)",
+      row.seen ? `${formatNumber(row.total || 0)} match${row.total === 1 ? "" : "es"}${row.used ? " - used" : ""}` : `not seen${row.used ? " - used" : ""}`
+    ]));
+  }
+
+  if (result.predictions.length) {
+    appendProbabilityBars(container, result.predictions);
+  } else {
+    container.append(emptyState("No next-token probabilities under the current settings."));
+  }
+
+  if (!result.predictions.length) {
+    appendOutputInsight(container, "The exact context has no usable evidence with the current settings. Backoff or smoothing can give the model another way to continue.");
+  } else {
+    appendOutputInsight(container, result.usedBackoff
+      ? "The model used a shorter context because the exact context had no usable evidence."
+      : "The model used the requested context directly.");
+  }
+  return true;
+}
+
+function renderEvaluationOutput(container, result) {
+  if (!Array.isArray(result)) return false;
+  const finite = result.filter((row) => typeof row.perplexity === "number");
+  const best = finite.length ? finite.reduce((a, b) => (a.perplexity <= b.perplexity ? a : b)) : null;
+  appendMetrics(container, [
+    ["models", formatNumber(result.length)],
+    ["best finite", best ? best.model : "none"],
+    ["alpha", currentAlpha().toFixed(1)]
+  ]);
+  appendResultTable(container, ["model", "scored", "impossible", "perplexity"], result.map((row) => [
+    row.model,
+    formatNumber(row.tokensScored || 0),
+    row.unknown ? `${row.impossible} (${row.unknown} outside vocab)` : String(row.impossible),
+    row.perplexity === "infinity" ? "infinity" : String(row.perplexity)
+  ]));
+  appendOutputInsight(container, "Lower finite perplexity means lower average surprise on the held-out text.");
+  return true;
+}
+
+function renderRawPreview(container, result) {
+  const pre = document.createElement("pre");
+  pre.className = "output-raw-preview";
+  pre.textContent = result === undefined ? "undefined" : formatValue(result);
+  container.append(pre);
+}
+
+function appendMetrics(container, metrics) {
+  const grid = document.createElement("div");
+  grid.className = "output-metrics";
+  metrics.forEach(([label, value]) => {
+    const item = document.createElement("div");
+    item.className = "output-metric";
+    const strong = document.createElement("strong");
+    strong.textContent = value;
+    const span = document.createElement("span");
+    span.textContent = label;
+    item.append(strong, span);
+    grid.append(item);
+  });
+  container.append(grid);
+}
+
+function appendChipRail(container, tokens, options = {}) {
+  const counts = new Map();
+  tokens.forEach((token) => counts.set(token, (counts.get(token) || 0) + 1));
+  const rail = document.createElement("div");
+  rail.className = "output-chip-rail";
+  tokens.forEach((token, index) => {
+    const chip = document.createElement("span");
+    chip.className = "output-chip";
+    if (options.markRepeats && counts.get(token) > 1) chip.classList.add("repeat");
+    if (options.seedTokens && index < options.seedTokens) chip.classList.add("seed");
+    chip.textContent = token;
+    rail.append(chip);
+  });
+  container.append(rail);
+}
+
+function appendResultTable(container, headings, rows) {
+  const table = document.createElement("table");
+  table.className = "output-table";
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  headings.forEach((heading) => {
+    const th = document.createElement("th");
+    th.textContent = heading;
+    headRow.append(th);
+  });
+  thead.append(headRow);
+  const tbody = document.createElement("tbody");
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    row.forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.append(td);
+    });
+    tbody.append(tr);
+  });
+  table.append(thead, tbody);
+  container.append(table);
+}
+
+function appendProbabilityBars(container, rows) {
+  const list = document.createElement("div");
+  list.className = "output-probability-list";
+  rows.forEach((row) => {
+    const item = document.createElement("div");
+    item.className = "output-probability-row";
+    const label = document.createElement("span");
+    label.textContent = row.token;
+    const track = document.createElement("span");
+    track.className = "output-probability-track";
+    const fill = document.createElement("span");
+    fill.style.width = `${Math.max(3, Number(row.probability || 0) * 100)}%`;
+    track.append(fill);
+    const value = document.createElement("strong");
+    value.textContent = `${percent(Number(row.probability || 0))} | x${formatNumber(row.count || 0)}`;
+    item.append(label, track, value);
+    list.append(item);
+  });
+  container.append(list);
+}
+
+function appendOutputInsight(container, text) {
+  const note = document.createElement("p");
+  note.className = "output-insight";
+  note.textContent = text;
+  container.append(note);
+}
+
+function makeLogBlock(logs) {
+  const block = document.createElement("details");
+  block.className = "output-raw";
+  const summary = document.createElement("summary");
+  summary.textContent = "View printed logs";
+  const pre = document.createElement("pre");
+  pre.textContent = logs.join("\n");
+  block.append(summary, pre);
+  return block;
+}
+
+function makeRawDetails(rawText) {
+  const details = document.createElement("details");
+  details.className = "output-raw";
+  const summary = document.createElement("summary");
+  summary.textContent = "View raw output";
+  const pre = document.createElement("pre");
+  pre.textContent = rawText || "undefined";
+  details.append(summary, pre);
+  return details;
 }
 
 function formatValue(value) {
