@@ -1,0 +1,979 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Language Models Before LLMs - LLM Soup to Nuts</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="LLM Soup to Nuts home">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>
+        <strong>LLM Soup to Nuts</strong>
+        <small>Learning by doing</small>
+      </span>
+    </a>
+    <nav class="topnav" aria-label="Lesson sections">
+      <a href="#predict">Overview</a>
+      <a href="#tokens">Tokens</a>
+      <a href="#memory">Memory</a>
+      <a href="#probability">Counts</a>
+      <a href="#generate">Generate</a>
+      <a href="#evaluate">Evaluate</a>
+      <a href="#references">References</a>
+      <a href="../../">Portfolio</a>
+    </nav>
+  </header>
+
+  <aside class="lesson-toc" aria-label="Table of contents">
+    <p>Table of contents</p>
+    <nav>
+      <a href="#predict"><span>00</span>Lesson overview</a>
+      <a href="#tokens"><span>01</span>Text becomes tokens</a>
+      <a href="#memory"><span>02</span>Remember context</a>
+      <a href="#probability"><span>03</span>Turn counts into chances</a>
+      <a href="#generate"><span>04</span>Generate from the model</a>
+      <a href="#stuck"><span>05</span>When the model gets stuck</a>
+      <a href="#evaluate"><span>06</span>Measure surprise</a>
+      <a href="#bridge"><span>07</span>Bridge to LLMs</a>
+      <a href="#references"><span>08</span>References</a>
+    </nav>
+  </aside>
+
+  <main id="top">
+    <section id="predict" class="workbench-band" aria-labelledby="page-title">
+      <div class="workbench">
+        <article class="intro-copy">
+          <p class="eyebrow">Learning by doing</p>
+          <h1 id="page-title">Language Models Before LLMs.</h1>
+          <p class="lead">
+            Language modeling from first principles: let's build a tiny next-word
+            predictor with tokens, n-grams, smoothing, and perplexity.
+          </p>
+          <p>
+            Let's start with something familiar. I type a few words on my phone, and
+            before I finish the sentence, the keyboard suggests what might come next.
+            The goal here is to make that behavior less mysterious by building the
+            smallest useful version ourselves.
+          </p>
+          <p>
+            We will start from raw text, turn it into pieces a computer can count,
+            and then ask a practical question over and over: when these words
+            appeared before, what usually came next? That simple question gives us a
+            real language model, even though it is much smaller than a modern LLM.
+          </p>
+          <p>
+            By the end of this chapter, terms like corpus, token, n-gram, smoothing,
+            backoff, and perplexity should feel less like vocabulary to memorize and
+            more like tools you have already used. We will keep the math close to the
+            moment where it explains something you can see on the page.
+          </p>
+          <p class="example-note">
+            <em>Guiding question:</em> if I type <code>the quick brown fox</code>,
+            why does <code>jumps</code> feel like a reasonable next word, but after
+            only <code>fox</code> the next word feels much less certain?
+          </p>
+          <div class="idea-flow" aria-label="Lesson flow">
+            <div>
+              <strong>Learn from text</strong>
+              <span>Start with examples from books and short passages.</span>
+            </div>
+            <div>
+              <strong>Make countable pieces</strong>
+              <span>Decide what a word, mark, or token should be.</span>
+            </div>
+            <div>
+              <strong>Remember context</strong>
+              <span>Compare no memory, one-word memory, and two-word memory.</span>
+            </div>
+            <div>
+              <strong>Generate and test</strong>
+              <span>Sample continuations, then measure surprise.</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="tokens" class="band" aria-labelledby="tokens-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">1. From text to tokens</p>
+          <h2 id="tokens-title">Turn text into pieces the model can count.</h2>
+          <p>
+            The prediction problem starts before prediction. If I want my phone to
+            suggest the next word, it first needs examples of writing to learn from.
+            In our small version, those examples might be a public-domain book, a
+            Wikipedia-style article, or a few paragraphs we write ourselves. That
+            collection of training text is called a <strong>corpus</strong>.
+          </p>
+          <p>
+            Once we have a corpus, we have to make it readable to the computer.
+            Humans can casually say, "split it into words," but the computer needs a
+            rule it can apply again and again. We call the resulting countable pieces
+            <strong>tokens</strong>. In this lesson a token can be a word like
+            <code>alice</code>, a word like <code>rabbit</code>, or even a punctuation
+            mark like <code>,</code>. A word is the thing we talk about in ordinary
+            language; a token is the exact piece we hand to the model.
+          </p>
+          <p class="example-note">
+            <em>Tokenization is already a modeling choice.</em> Should
+            <code>don't</code> stay as one token, become <code>do</code> plus
+            <code>n't</code>, or be treated like <code>do not</code>? And in languages
+            such as Chinese or Thai, spaces do not mark words the way they usually do
+            in English. So even this first step, deciding where one piece ends and the
+            next begins, can become a serious language problem.
+          </p>
+          <p>
+            After tokenization, I want you to notice two different views of the same
+            text. The <strong>token stream</strong> keeps the full order, including
+            repeats, because counts depend on how often things happened. The
+            <strong>vocabulary</strong> keeps the unique tokens. If <code>the</code>
+            appears 900 times, the stream keeps all 900 appearances, but the
+            vocabulary contains <code>the</code> once. That vocabulary is the menu of
+            tokens this simple model can ever predict.
+          </p>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://en.wikipedia.org/wiki/Text_segmentation" target="_blank" rel="noreferrer">text segmentation</a>
+            and
+            <a href="https://en.wikipedia.org/wiki/Lexical_analysis" target="_blank" rel="noreferrer">lexical tokenization</a>
+          </p>
+        </div>
+
+        <section class="trainer token-trainer" aria-label="Training corpus and token counts">
+          <div class="trainer-head">
+            <div>
+              <h3>Training corpus</h3>
+              <p>
+                Pick the text we want the model to learn from. The full text is used
+                for counting, but this box only shows a scrollable preview so the page
+                stays usable. Changing this text changes the model's little world:
+                its style, its favorite words, and its blind spots.
+              </p>
+            </div>
+            <button id="resetButton" class="ghost-button" type="button">Reset</button>
+          </div>
+
+          <div class="corpus-picker">
+            <label class="field-label" for="corpusSelect">Corpus</label>
+            <select id="corpusSelect" class="control-input"></select>
+            <p id="corpusDetails" class="corpus-details"></p>
+            <p id="sourceDetails" class="source-details"></p>
+          </div>
+
+          <label class="field-label" for="corpusInput">Training text preview</label>
+          <textarea id="corpusInput" class="corpus-input" spellcheck="false"></textarea>
+
+          <div class="stat-grid" aria-label="Training statistics">
+            <div><strong id="tokenCount">0</strong><span>tokens</span></div>
+            <div><strong id="vocabCount">0</strong><span>vocabulary</span></div>
+            <div><strong id="windowCount">0</strong><span>windows</span></div>
+          </div>
+        </section>
+
+        <div class="two-column">
+          <div class="concept-stack">
+            <article class="lesson-block">
+              <h3>Corpus</h3>
+              <p>
+                Think of the corpus as the model's reading pile. This simple model
+                cannot invent evidence from outside that pile, so a fairy-tale corpus,
+                a news corpus, and a technical corpus will all lead to different
+                predictions.
+              </p>
+            </article>
+            <article class="lesson-block">
+              <h3>Token</h3>
+              <p>
+                A token is the exact piece we let the computer count. In this page,
+                <code>alice</code>, <code>rabbit</code>, and <code>,</code> can all
+                be tokens. Lowercasing decides whether <code>Alice</code> and
+                <code>alice</code> should become the same piece.
+              </p>
+            </article>
+            <article class="lesson-block">
+              <h3>Vocabulary</h3>
+              <p>
+                Vocabulary is the unique menu of tokens. The stream may contain
+                <code>the</code> hundreds of times, but the vocabulary keeps one
+                <code>the</code>. This matters because the model can only choose
+                or predict tokens on that menu.
+              </p>
+            </article>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Token stream</h3>
+              <span id="windowLabel" class="pill">first tokens</span>
+            </div>
+            <div id="tokenRail" class="token-rail" aria-live="polite"></div>
+            <p id="tokenLegend" class="microcopy"></p>
+            <div class="section-title-row compact-row">
+              <h3>Vocabulary sample</h3>
+              <span id="vocabLabel" class="pill">0 unique</span>
+            </div>
+            <div id="vocabRail" class="vocab-rail" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <article class="code-cell">
+          <div class="cell-head">
+            <h3>Run the tokenizer</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <div class="control-grid code-controls" aria-label="Tokenization controls">
+            <label class="check-row">
+              <input id="lowercaseToggle" type="checkbox" checked>
+              <span>Lowercase tokens</span>
+            </label>
+            <label class="check-row">
+              <input id="punctuationToggle" type="checkbox" checked>
+              <span>Keep punctuation</span>
+            </label>
+          </div>
+          <textarea class="code-input" spellcheck="false">function simpleTokenize(text, options) {
+  // Lowercasing makes "Alice" and "alice" count as the same token.
+  const source = options.lowercase ? text.toLowerCase() : text;
+
+  // This pattern keeps words like "don't" together.
+  // When keepPunctuation is on, . ! ? , ; : become tokens too.
+  const pattern = options.keepPunctuation
+    ? /[a-z0-9]+(?:'[a-z0-9]+)?|[.!?,;:]/gi
+    : /[a-z0-9]+(?:'[a-z0-9]+)?/gi;
+
+  return source.match(pattern) || [];
+}
+
+const tokens = simpleTokenize(sampleText, {
+  lowercase: settings.lowercase,
+  keepPunctuation: settings.keepPunctuation
+});
+
+return {
+  firstTokens: tokens.slice(0, 30),
+  tokenCount: tokens.length,
+  vocabularySize: new Set(tokens).size
+};</textarea>
+          <pre class="code-output" aria-live="polite"></pre>
+        </article>
+      </div>
+    </section>
+
+    <section id="memory" class="band band-muted" aria-labelledby="memory-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">2. Context changes the guess</p>
+          <h2 id="memory-title">Give the model a little memory.</h2>
+          <p>
+            Now that the corpus has become tokens, we can ask the question that makes
+            prediction interesting: how much of the recent past should we look at? If
+            I only say <code>fox</code>, the next word could go in many directions.
+            If I say <code>the quick brown fox</code>, many of us immediately expect
+            something like <code>jumps</code>. The extra words narrow the guess.
+          </p>
+          <p class="example-note">
+            <em>Try this intuition:</em> after <code>the</code>, almost any noun
+            could come next. After <code>said the</code>, a story corpus might point
+            toward <code>king</code>, <code>queen</code>, <code>hatter</code>, or
+            another character. We are not changing the model's intelligence here; we
+            are changing which evidence it is allowed to use.
+          </p>
+          <p>
+            This is the point where the term <strong>n-gram</strong> becomes useful.
+            It just means a window of <code>n</code> tokens. A
+            <strong>unigram</strong> is a one-token window, so it mostly knows what
+            tokens are common overall. A <strong>bigram</strong> is a two-token
+            window, so it can remember one previous token. A <strong>trigram</strong>
+            is a three-token window, so it can remember two previous tokens.
+          </p>
+          <p>
+            So when the context is <code>said the</code>, a trigram asks, "When this
+            exact two-token context appeared, what followed?" A bigram ignores
+            <code>said</code> and only asks what followed <code>the</code>. A unigram
+            ignores the local context and asks what tokens are common in general. The
+            tradeoff is the heart of this section: more memory can be more precise,
+            but it also creates more exact contexts the model may never have seen.
+          </p>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://en.wikipedia.org/wiki/N-gram" target="_blank" rel="noreferrer">n-grams</a>
+            and
+            <a href="https://en.wikipedia.org/wiki/Word_n-gram_language_model" target="_blank" rel="noreferrer">word n-gram language models</a>
+          </p>
+        </div>
+
+        <div class="control-grid section-controls memory-settings" aria-label="Memory and next-token choice controls">
+          <div class="choice-row" role="radiogroup" aria-labelledby="memoryChoiceLabel">
+            <span id="memoryChoiceLabel" class="choice-label">Memory</span>
+            <div class="choice-group">
+              <label class="choice-pill">
+                <input type="radio" name="nChoice" value="1">
+                <span>Unigram</span>
+              </label>
+              <label class="choice-pill">
+                <input type="radio" name="nChoice" value="2">
+                <span>Bigram</span>
+              </label>
+              <label class="choice-pill">
+                <input type="radio" name="nChoice" value="3" checked>
+                <span>Trigram</span>
+              </label>
+            </div>
+            <span id="nLabel" class="choice-summary">trigram</span>
+          </div>
+          <label class="select-row next-choice-row" for="strategySelect">
+            <span>Next-token choice</span>
+            <select id="strategySelect" class="control-input">
+              <option value="sample">Sample using probabilities</option>
+              <option value="top">Always choose highest probability</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="predict-box section-predict-box">
+          <label class="field-label" for="contextInput">Ask the current n-gram model what comes next after</label>
+          <div class="inline-action">
+            <input id="contextInput" class="control-input" type="text" value="said the" autocomplete="off">
+            <button id="generateButton" class="primary-button" type="button">Generate</button>
+          </div>
+          <p id="activeSettings" class="microcopy"></p>
+        </div>
+        <p class="microcopy section-note">
+          For now, read the bars as count-based evidence: taller bars mean this next
+          token followed the current context more often. In the next section, we turn
+          that idea into the probability formula.
+        </p>
+
+        <div class="window-control-bar" aria-label="Training-window controls">
+          <div>
+            <strong>Walk through training windows</strong>
+            <span>Move the highlight in the three panels below. Gold tokens are the remembered context; the warm token is what came next.</span>
+          </div>
+          <div class="window-button-row">
+            <button id="prevWindowButton" class="ghost-button icon-button" type="button" aria-label="Previous training window">
+              <span class="button-icon" aria-hidden="true">&larr;</span>
+              <span>Previous</span>
+            </button>
+            <button id="playWindowButton" class="ghost-button icon-button" type="button" aria-label="Play training windows">
+              <span class="button-icon" aria-hidden="true">&#9654;</span>
+              <span>Play</span>
+            </button>
+            <button id="nextWindowButton" class="ghost-button icon-button" type="button" aria-label="Next training window">
+              <span>Next</span>
+              <span class="button-icon" aria-hidden="true">&rarr;</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="visual-grid">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>1. Highlight a training window</h3>
+              <span id="memoryTokenLabel" class="pill">trigram preview</span>
+            </div>
+            <div id="memoryTokenRail" class="token-rail memory-token-rail" aria-live="polite"></div>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>2. Split context from next token</h3>
+              <span id="windowCountLabel" class="pill">window 0</span>
+            </div>
+            <div id="windowInspector" class="window-inspector" aria-live="polite"></div>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3 id="ngramTitle">3. Count repeated trigram windows</h3>
+              <span id="countsMode" class="pill">trigram</span>
+            </div>
+            <div id="ngramCards" class="ngram-cards" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="panel prediction-panel">
+          <div class="prediction-layout">
+            <div>
+              <div class="section-title-row">
+                <h3>4. Next-token probabilities for your context</h3>
+                <span id="predictionStatus" class="pill">exact context</span>
+              </div>
+              <div id="predictionBars" class="prediction-bars" aria-live="polite"></div>
+              <p id="formulaLine" class="formula-line"></p>
+            </div>
+
+            <div>
+              <h3>Generated continuation</h3>
+              <div id="generatedOutput" class="generated-output" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+
+        <article class="code-cell">
+          <div class="cell-head">
+            <h3>Build the count table</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">const n = settings.n;
+const tokens = simpleTokenize(sampleText, {
+  lowercase: settings.lowercase,
+  keepPunctuation: settings.keepPunctuation
+});
+
+// A window is n adjacent tokens.
+// For a bigram, ["the", "model"] means:
+// context = "the", next = "model".
+const table = countNgrams(tokens, n);
+
+return {
+  model: settings.modelName,
+  totalWindows: Math.max(0, tokens.length - n + 1),
+  mostCommon: table.slice(0, 10)
+};</textarea>
+          <pre class="code-output" aria-live="polite"></pre>
+        </article>
+      </div>
+    </section>
+
+    <section id="probability" class="band" aria-labelledby="probability-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">3. From counts to chances</p>
+          <h2 id="probability-title">Turn repeated patterns into next-token probabilities.</h2>
+          <p>
+            At this point, nothing mystical has happened. We have a pile of examples,
+            and we have counted small windows inside that pile. For each context, the
+            model can ask a plain question: "When I saw this before, what came next?"
+            If one continuation happened many times and another happened once, we want
+            the model to treat the first continuation as more likely.
+          </p>
+          <p>
+            The move from counts to probability is division. We count how often a
+            next token appeared after a context, then divide by the total number of
+            times that context appeared:
+            <code>P(next | context) = count(context, next) / count(context)</code>.
+            The vertical bar means "given." So I read <code>P(king | said the)</code>
+            as "the probability of <code>king</code> given that the current context is
+            <code>said the</code>."
+          </p>
+          <p class="example-note">
+            <em>Example:</em> if <code>king</code> followed <code>said the</code> 29
+            times, and <code>said the</code> appeared 209 times total, then
+            <code>P(king | said the) = 29 / 209 = 13.9%</code>. We are not guessing
+            by feel. We are asking what share of the evidence points to this next
+            token.
+          </p>
+          <p>
+            The important detail is that this probability is local. It does not mean
+            <code>king</code> is always a likely English word. It means
+            <code>king</code> was common after this context in this corpus. Change the
+            corpus, change the context, or change the tokenizer, and the probability
+            table can change. That is why the visualization shows a distribution, not
+            just one winning word.
+          </p>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://web.stanford.edu/~jurafsky/slp3/3.pdf" target="_blank" rel="noreferrer">n-gram probabilities</a>
+            and
+            <a href="https://en.wikipedia.org/wiki/Word_n-gram_language_model" target="_blank" rel="noreferrer">relative-frequency language models</a>
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Probability explorer controls">
+          <label class="select-row" for="contextSelect">
+            <span>Context</span>
+            <select id="contextSelect" class="control-input"></select>
+          </label>
+          <label class="select-row" for="tokenSelect">
+            <span>Next token</span>
+            <select id="tokenSelect" class="control-input"></select>
+          </label>
+        </div>
+
+        <div class="visual-grid">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Probability map</h3>
+              <span id="graphMode" class="pill">current context</span>
+            </div>
+            <svg id="chainSvg" class="chain-svg" viewBox="0 0 640 320" role="img" aria-label="Graph of current context and likely next tokens"></svg>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Probability table</h3>
+              <span id="probabilityMode" class="pill">top tokens</span>
+            </div>
+            <div id="probabilityTable" class="probability-table" aria-live="polite"></div>
+            <p id="selectedProbability" class="formula-line"></p>
+          </div>
+        </div>
+
+        <article class="code-cell">
+          <div class="cell-head">
+            <h3>Calculate one probability</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">// Pick a context above, then run this.
+// Probability is the count for one next token divided by
+// the total count for that context.
+return explainProbability(sampleText, settings.n, currentContext, selectedToken);</textarea>
+          <pre class="code-output" aria-live="polite"></pre>
+        </article>
+      </div>
+    </section>
+
+    <section id="generate" class="band band-muted" aria-labelledby="generate-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">4. Prediction becomes generation</p>
+          <h2 id="generate-title">Write forward one token at a time.</h2>
+          <p>
+            Once the model can predict one next token, we can ask it to keep going.
+            We start with a seed phrase, choose a next token, attach that token to the
+            end, and then ask again from the new ending. In a trigram model, the text
+            is built from many tiny choices, and each choice only looks back at the
+            last two tokens.
+          </p>
+          <p>
+            The probability table tells us what could come next, but it does not by
+            itself decide which token we should actually choose. One simple rule is
+            <strong>top-pick</strong>: always take the token with the largest
+            probability. That is stable and easy to inspect, but it can become
+            repetitive. Another rule is <strong>sampling</strong>: choose randomly,
+            but weight the random choice by the probabilities.
+          </p>
+          <p class="example-note">
+            <em>Think of it like a weighted draw.</em> If one token has 70%
+            probability and another has 10%, top-pick always chooses the 70% token.
+            Sampling usually chooses it too, but every so often it lets the 10% token
+            through. That is why two runs from the same prompt can either feel locked
+            in or pleasantly varied.
+          </p>
+          <p>
+            This is also the bridge to modern language models. Their probabilities
+            come from a neural network rather than from an n-gram count table, but the
+            decoding question is still recognizable: after we have a probability for
+            every possible next token, do we always take the most likely one, or do we
+            allow controlled variation?
+          </p>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://en.wikipedia.org/wiki/Language_model" target="_blank" rel="noreferrer">language models</a>
+            and
+            <a href="https://web.stanford.edu/~jurafsky/slp3/3.pdf" target="_blank" rel="noreferrer">sampling from n-gram models</a>
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Generation controls">
+          <div class="stepper-row">
+            <button id="rerunTopButton" class="ghost-button" type="button">Run top-pick</button>
+            <button id="rerunSampleButton" class="ghost-button" type="button">Run sample</button>
+            <button id="rerunBothButton" class="primary-button" type="button">Compare again</button>
+          </div>
+        </div>
+
+        <div class="compare-grid">
+          <article class="panel">
+            <div class="section-title-row">
+              <h3>Always take the strongest guess</h3>
+              <span id="topRunCount" class="pill">0 runs</span>
+            </div>
+            <div id="topPickOutput" class="generated-output compare-output" aria-live="polite"></div>
+            <p class="microcopy">Top-pick chooses the largest bar every time, so the same context usually follows the same path.</p>
+          </article>
+          <article class="panel">
+            <div class="section-title-row">
+              <h3>Choose with weighted randomness</h3>
+              <span id="sampleRunCount" class="pill">0 runs</span>
+            </div>
+            <div id="sampleOutput" class="generated-output compare-output" aria-live="polite"></div>
+            <p class="microcopy">Sampling chooses with weighted randomness, so lower-probability tokens can still appear.</p>
+          </article>
+        </div>
+
+        <article class="code-cell">
+          <div class="cell-head">
+            <h3>Generate text</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">return generateText(sampleText, settings.n, currentContext, {
+  // Try "top" and "sample" here.
+  strategy: "sample",
+  alpha: settings.alpha,
+  backoff: settings.backoff,
+  steps: 18
+});</textarea>
+          <pre class="code-output" aria-live="polite"></pre>
+        </article>
+      </div>
+    </section>
+
+    <section id="stuck" class="band" aria-labelledby="stuck-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">5. When exact context is missing</p>
+          <h2 id="stuck-title">Back off to evidence the model has actually seen.</h2>
+          <p>
+            Here is where the extra memory from a trigram can hurt us. Suppose we ask
+            what comes after <code>softly said</code>. The trigram is very specific:
+            it wants to know what followed that exact two-token context. If the exact
+            phrase never appeared in the corpus, the model has no trigram evidence,
+            even though <code>said</code> by itself may be very common.
+          </p>
+          <p>
+            This is why <strong>backoff</strong> exists. I like to think of it as
+            lowering the ambition of the question. If the detailed question has no
+            evidence, ask a simpler question. Instead of "what followed
+            <code>softly said</code>?", ask "what followed <code>said</code>?" If
+            that also fails, fall back again to the unigram model. We lose precision,
+            but we often gain enough evidence to keep moving.
+          </p>
+          <p class="example-note">
+            <em>Backoff is not magic.</em> It does not know what
+            <code>softly said</code> should mean. It simply notices that the exact
+            trigram is missing and reuses a shorter, better-supported context. Watch
+            the ladder below: the highlighted row is the evidence the model actually
+            uses.
+          </p>
+          <p>
+            <strong>Smoothing</strong> solves a related, but slightly different,
+            problem. Backoff helps when the context itself is missing. Smoothing helps
+            when the context exists, but one possible next token has a count of zero.
+            In a small training corpus, zero count is a dangerous thing to believe too
+            strongly. It may mean "this can never happen," but it may also mean "this
+            just did not happen in the slice of text we trained on."
+          </p>
+          <p>
+            Suppose the model is using the context <code>said the</code>, which appears
+            often in the Alice corpus. The count table may say that
+            <code>king</code>, <code>hatter</code>, and <code>mock</code> followed that
+            context, while a known word such as <code>rabbit</code> never did. Raw
+            counting gives <code>P(rabbit | said the) = 0</code>. That zero is brittle:
+            generation can never choose <code>rabbit</code> there, and evaluation
+            becomes infinitely surprised if a held-out sentence actually contains that
+            next token. Smoothing is a way to say, "I mostly trust the counts, but I
+            will leave a tiny door open for known words I did not observe in this exact
+            spot."
+          </p>
+          <p>
+            Add-alpha smoothing does that by adding the same small imaginary count to
+            every known vocabulary token before we divide:
+            <code>(count + alpha) / (context total + alpha * |V|)</code>. The numerator
+            gives each token a little extra evidence. The denominator grows by the
+            total imaginary evidence we added across the whole vocabulary. So alpha is
+            a humility knob: a little alpha removes harsh zeros, while too much alpha
+            flattens the model and steals probability from the words the corpus really
+            did show often.
+          </p>
+          <p class="example-note">
+            <em>Watch for the tradeoff.</em> When you move alpha from
+            <code>0.0</code> to <code>0.1</code> or <code>0.5</code>, rare or unseen
+            known tokens become possible, but the strongest observed choices become
+            less dominant. Smoothing is not making the model smarter; it is making the
+            model less overconfident about what a small corpus failed to show.
+          </p>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://en.wikipedia.org/wiki/Katz%27s_back-off_model" target="_blank" rel="noreferrer">Katz backoff</a>
+            and
+            <a href="https://en.wikipedia.org/wiki/Additive_smoothing" target="_blank" rel="noreferrer">additive smoothing</a>
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Backoff and smoothing controls">
+          <label class="check-row">
+            <input id="backoffToggle" type="checkbox">
+            <span>Use backoff ladder</span>
+          </label>
+          <label class="range-row" for="alphaSlider">
+            <span>Smoothing alpha</span>
+            <input id="alphaSlider" type="range" min="0" max="1" step="0.1" value="0">
+            <output id="alphaLabel" for="alphaSlider">0.0</output>
+          </label>
+          <label class="select-row" for="stuckContextInput">
+            <span>Try context</span>
+            <input id="stuckContextInput" class="control-input" type="text" value="softly said" autocomplete="off">
+          </label>
+          <div class="stepper-row">
+            <button id="tryStuckButton" class="primary-button" type="button">Use in prediction</button>
+          </div>
+        </div>
+        <div class="math-note">
+          <p><strong>Raw count:</strong> <code>P(next | context) = count(context + next) / count(context)</code></p>
+          <p><strong>Add-alpha smoothing:</strong> <code>P(next | context) = (count + alpha) / (context total + alpha * |V|)</code></p>
+        </div>
+        <p class="microcopy">
+          Backoff starts here: the ladder always shows the possible path from the selected memory to shorter memories, and the highlighted row is the evidence the model actually uses.
+        </p>
+        <p class="microcopy">
+          Smoothing alpha is the amount of imaginary evidence added to each possible next token. Alpha 0.0 means "trust only observed counts." Higher alpha values reduce zero probabilities but also flatten the strongest predictions.
+        </p>
+        <p id="stuckSummary" class="insight-note" aria-live="polite"></p>
+
+        <div class="visual-grid">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Backoff ladder</h3>
+              <span id="backoffStatus" class="pill">disabled</span>
+            </div>
+            <div id="backoffLadder" class="ladder" aria-live="polite"></div>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Smoothing effect</h3>
+              <span id="smoothingStatus" class="pill">alpha 0.0</span>
+            </div>
+            <div id="smoothingPanel" class="smoothing-panel" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <article class="code-cell">
+          <div class="cell-head">
+            <h3>Inspect backoff</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">return predictNext(sampleText, settings.n, stuckContext, 8, {
+  // Backoff tries shorter contexts.
+  // Smoothing gives every known token a small non-zero chance.
+  alpha: settings.alpha,
+  backoff: settings.backoff,
+  explain: true
+});</textarea>
+          <pre class="code-output" aria-live="polite"></pre>
+        </article>
+      </div>
+    </section>
+
+    <section id="evaluate" class="band band-muted" aria-labelledby="evaluate-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">6. Test on held-out text</p>
+          <h2 id="evaluate-title">Measure surprise with perplexity.</h2>
+          <p>
+            After we generate a few amusing sentences, we need a more honest question:
+            is the model actually good at prediction? One common way to test that is
+            to keep a small piece of text aside, not train on it, and then ask the
+            model to predict it token by token. That kept-aside text is called a
+            <strong>holdout</strong>.
+          </p>
+          <p>
+            For each token in the holdout, we look at the probability the model gave
+            to the token that actually appeared. If the model gave the real next token
+            high probability, it was not very surprised. If it gave that token tiny
+            probability, it was very surprised. <strong>Perplexity</strong> is a way
+            to summarize that surprise. Lower perplexity means the model's guesses fit
+            the held-out text better.
+          </p>
+          <p class="example-note">
+            <em>The math version:</em> if the actual next-token probabilities are
+            <code>p_1, p_2, ..., p_N</code>, average surprise is
+            <code>H = -(1 / N) * sum(log(p_i))</code>, and perplexity is
+            <code>PPL = exp(H)</code>. Good predictions make the <code>p_i</code>
+            values larger, which makes the surprise smaller, which pushes perplexity
+            down.
+          </p>
+          <p>
+            This is also why a bigram or trigram often beats a unigram on matched
+            text. A unigram spreads probability across words that are common anywhere
+            in the corpus. A bigram can notice that after <code>the</code>, nouns are
+            much more plausible than many other words. A trigram can sometimes narrow
+            the guess even further: after <code>said the</code>, this corpus often
+            points toward character words. When the extra context is reliable, the
+            actual holdout token gets a larger <code>p_i</code>, so
+            <code>-log(p_i)</code> is smaller and perplexity drops. When the extra
+            context is too rare, the opposite can happen, which is why smoothing and
+            backoff matter.
+          </p>
+          <p>
+            If you see infinite perplexity, the page is not broken. It means at least
+            one real holdout token received probability zero, and <code>log(0)</code>
+            does not behave like an ordinary number. In this small model, that usually
+            means the context was unseen or the holdout contains a token outside the
+            training vocabulary. Smoothing can help with known tokens, but it cannot
+            rescue a word the model never saw as a token at all.
+          </p>
+          <div class="math-note">
+            <p><strong>Average surprise:</strong> <code>H = -(1 / N) * sum(log(p_i))</code></p>
+            <p><strong>Perplexity:</strong> <code>PPL = exp(H)</code>. If any <code>p_i = 0</code>, then <code>log(0)</code> makes the score infinite.</p>
+          </div>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://en.wikipedia.org/wiki/Perplexity" target="_blank" rel="noreferrer">perplexity</a>
+            and
+            <a href="https://web.stanford.edu/~jurafsky/slp3/3.pdf" target="_blank" rel="noreferrer">language-model evaluation</a>
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Evaluation controls">
+          <label class="select-row" for="holdoutPresetSelect">
+            <span>Holdout</span>
+            <select id="holdoutPresetSelect" class="control-input">
+              <option value="matched">Matched to corpus</option>
+              <option value="unseen">Unseen topic</option>
+              <option value="custom">Custom text</option>
+            </select>
+          </label>
+          <div class="stepper-row">
+            <button id="evaluateButton" class="primary-button" type="button">Evaluate again</button>
+          </div>
+        </div>
+
+        <div class="evaluation-grid">
+          <div class="evaluation-input-stack">
+            <label class="field-label" for="holdoutInput">Holdout text</label>
+            <textarea id="holdoutInput" class="corpus-input holdout-input" spellcheck="false"></textarea>
+            <article class="code-cell">
+              <div class="cell-head">
+                <h3>Evaluate the models</h3>
+                <button class="run-button" type="button">Run</button>
+              </div>
+              <textarea class="code-input" spellcheck="false">return evaluateModels(sampleText, holdoutText, {
+  // Perplexity is a measure of surprise.
+  // Lower is better. Infinity means the model hit a zero probability.
+  alpha: settings.alpha,
+  backoff: settings.backoff
+});</textarea>
+              <pre class="code-output" aria-live="polite"></pre>
+            </article>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Model comparison</h3>
+              <span id="evalSettings" class="pill">current settings</span>
+            </div>
+            <div id="evaluationPanel" class="evaluation-panel" aria-live="polite"></div>
+            <p id="perplexitySummary" class="insight-note" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="panel surprise-trace-panel">
+          <div id="surprisePanel" class="surprise-panel" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="bridge" class="band" aria-labelledby="bridge-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">7. Bridge to modern LLMs</p>
+          <h2 id="bridge-title">What this tiny model teaches about LLMs.</h2>
+          <p>
+            I like ending with n-grams because they make the larger LLM story less
+            mysterious. Modern neural language models do not keep a simple count table
+            like this one, but the learning loop should now feel familiar: learn from
+            text, represent context, estimate next-token probabilities, choose from
+            those probabilities, and test on text the model did not train on.
+          </p>
+          <p>
+            The big difference is how the model represents evidence. Our n-gram model
+            remembers exact local patterns: <code>said the</code> and
+            <code>asked the</code> live in separate count boxes even if they behave
+            similarly. Neural LLMs learn internal representations where related words,
+            phrases, and situations can share statistical strength. That is one reason
+            they can generalize beyond exact repeated windows.
+          </p>
+          <p class="example-note">
+            <em>What carries forward:</em> training text becomes evidence, context
+            changes the next-token distribution, and generation is still a sequence of
+            choices. The machinery becomes much more powerful, but the question
+            <code>P(next | context)</code> never really leaves the room.
+          </p>
+          <p>
+            The other difference is context length. A trigram sees only two previous
+            tokens; an LLM can condition on a much larger prompt, including
+            instructions, examples, and earlier conversation. So the modern model is
+            not "just an n-gram." But after this lesson, the basic shape should feel
+            less foreign: context goes in, probabilities come out, and decoding turns
+            those probabilities into text.
+          </p>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://en.wikipedia.org/wiki/Large_language_model" target="_blank" rel="noreferrer">large language models</a>
+            and
+            <a href="https://en.wikipedia.org/wiki/Language_model" target="_blank" rel="noreferrer">language models</a>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="references" class="band band-muted" aria-labelledby="references-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">8. Going deeper</p>
+          <h2 id="references-title">Further reading.</h2>
+          <p>
+            For further reading, the following references provide more detailed notes,
+            textbook treatments, implementation guides, and historical context. Start
+            with Jurafsky and Martin for the main narrative, Collins for a compact
+            mathematical treatment, and NLTK or KenLM when you want to connect these
+            ideas to working language-model code.
+          </p>
+        </div>
+
+        <ol class="reference-list">
+          <li>
+            <a href="https://web.stanford.edu/~jurafsky/slp3/3.pdf" target="_blank" rel="noreferrer">Jurafsky and Martin, Chapter 3: N-gram Language Models</a>
+            <span>The closest companion to this chapter: chain rule, Markov assumption, counts, smoothing, sampling, and perplexity.</span>
+          </li>
+          <li>
+            <a href="https://web.stanford.edu/~jurafsky/slp3/2.pdf" target="_blank" rel="noreferrer">Jurafsky and Martin, Chapter 2: Words and Tokens</a>
+            <span>A deeper look at tokenization, word types, subwords, and why languages without spaces make token boundaries interesting.</span>
+          </li>
+          <li>
+            <a href="https://web.stanford.edu/~jurafsky/slp3/C.pdf" target="_blank" rel="noreferrer">Jurafsky and Martin, Appendix C: Kneser-Ney Smoothing</a>
+            <span>A short technical follow-up once add-alpha smoothing and backoff feel comfortable.</span>
+          </li>
+          <li>
+            <a href="https://www.cs.columbia.edu/~mcollins/courses/nlp2011/notes/lm.pdf" target="_blank" rel="noreferrer">Michael Collins, Language Modeling Notes</a>
+            <span>A compact, math-first treatment of Markov models and trigram language models.</span>
+          </li>
+          <li>
+            <a href="https://mitpress.mit.edu/9780262133609/foundations-of-statistical-natural-language-processing/" target="_blank" rel="noreferrer">Manning and Schutze, Foundations of Statistical Natural Language Processing</a>
+            <span>The classic statistical NLP textbook; best when you want the broader probabilistic modeling background.</span>
+          </li>
+          <li>
+            <a href="https://www.nltk.org/api/nltk.lm.html" target="_blank" rel="noreferrer">NLTK Language Modeling Module</a>
+            <span>Practical Python examples for n-gram counts, MLE, Laplace/Lidstone smoothing, Kneser-Ney, generation, entropy, and perplexity.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/cmp-lg/9606011" target="_blank" rel="noreferrer">Chen and Goodman, An Empirical Study of Smoothing Techniques</a>
+            <span>The classic empirical comparison of smoothing methods for language modeling.</span>
+          </li>
+          <li>
+            <a href="https://en.wikipedia.org/wiki/Katz%27s_back-off_model" target="_blank" rel="noreferrer">Katz Back-off Model</a>
+            <span>A useful reference for the formal backoff idea after seeing the ladder in this lesson.</span>
+          </li>
+          <li>
+            <a href="https://en.wikipedia.org/wiki/Kneser%E2%80%93Ney_smoothing" target="_blank" rel="noreferrer">Kneser-Ney Smoothing</a>
+            <span>A readable overview of one of the most important smoothing ideas for serious n-gram models.</span>
+          </li>
+          <li>
+            <a href="https://en.wikipedia.org/wiki/Perplexity" target="_blank" rel="noreferrer">Perplexity</a>
+            <span>The information-theory view: perplexity as exponentiated entropy or average surprise.</span>
+          </li>
+          <li>
+            <a href="https://research.google/blog/all-our-n-gram-are-belong-to-you/" target="_blank" rel="noreferrer">Google Research: All Our N-gram are Belong to You</a>
+            <span>A historical snapshot of what web-scale n-gram count tables look like.</span>
+          </li>
+          <li>
+            <a href="https://books.google.com/ngrams/" target="_blank" rel="noreferrer">Google Books Ngram Viewer</a>
+            <span>A quick way to explore phrase frequencies over a very large book corpus, with the usual corpus-bias caveats.</span>
+          </li>
+          <li>
+            <a href="https://github.com/kpu/kenlm" target="_blank" rel="noreferrer">KenLM</a>
+            <span>A widely used toolkit for building and querying large n-gram language models efficiently.</span>
+          </li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <script src="corpora.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
