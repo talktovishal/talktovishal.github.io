@@ -48,19 +48,12 @@ a:hover {
 
 .site-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: baseline;
   gap: 24px;
   max-width: 850px;
   margin: 0 auto;
-  padding: 24px 24px 6px;
-}
-
-.site-name {
-  color: var(--text);
-  font-size: 18px;
-  font-weight: 600;
-  text-decoration: none;
+  padding: 20px 24px 4px;
 }
 
 nav {
@@ -95,6 +88,7 @@ nav a:hover {
 .portrait {
   width: 184px;
   height: 184px;
+  margin-top: 10px;
   object-fit: cover;
   border-radius: 2px;
 }
@@ -152,10 +146,10 @@ p {
 
 @media (max-width: 650px) {
   .site-header {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
     gap: 8px;
-    padding-top: 20px;
+    padding-top: 18px;
   }
 
   nav {
@@ -174,6 +168,7 @@ p {
   .portrait {
     width: 148px;
     height: 148px;
+    margin-top: 0;
   }
 
   .list li {
