@@ -53,7 +53,7 @@ a:hover {
   gap: 24px;
   max-width: 850px;
   margin: 0 auto;
-  padding: 32px 24px 10px;
+  padding: 24px 24px 6px;
 }
 
 .site-name {
@@ -81,26 +81,26 @@ nav a:hover {
 .page {
   max-width: 850px;
   margin: 0 auto;
-  padding: 30px 24px 70px;
+  padding: 22px 24px 56px;
 }
 
 .intro {
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
-  gap: 34px;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 30px;
   align-items: start;
-  margin-top: 10px;
+  margin-top: 4px;
 }
 
 .portrait {
-  width: 160px;
-  height: 160px;
+  width: 168px;
+  height: 168px;
   object-fit: cover;
   border-radius: 2px;
 }
 
 h1 {
-  margin: 0 0 18px;
+  margin: 0 0 14px;
   font-size: 30px;
   line-height: 1.2;
   font-weight: 500;
@@ -114,7 +114,7 @@ h2 {
 }
 
 p {
-  margin: 0 0 14px;
+  margin: 0 0 12px;
 }
 
 .inline-links {
@@ -122,8 +122,8 @@ p {
 }
 
 .section {
-  margin-top: 42px;
-  padding-top: 30px;
+  margin-top: 34px;
+  padding-top: 24px;
   border-top: 1px solid var(--line);
 }
 
@@ -147,15 +147,15 @@ p {
 }
 
 .more-link {
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 @media (max-width: 650px) {
   .site-header {
     align-items: flex-start;
     flex-direction: column;
-    gap: 10px;
-    padding-top: 24px;
+    gap: 8px;
+    padding-top: 20px;
   }
 
   nav {
@@ -163,17 +163,17 @@ p {
   }
 
   .page {
-    padding-top: 20px;
+    padding-top: 16px;
   }
 
   .intro {
     grid-template-columns: 1fr;
-    gap: 22px;
+    gap: 18px;
   }
 
   .portrait {
-    width: 136px;
-    height: 136px;
+    width: 148px;
+    height: 148px;
   }
 
   .list li {
