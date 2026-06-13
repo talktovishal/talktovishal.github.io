@@ -46,35 +46,10 @@ a:hover {
   border: 1px solid var(--line);
 }
 
-.site-header {
-  display: flex;
-  justify-content: flex-end;
-  align-items: baseline;
-  gap: 24px;
-  max-width: 850px;
-  margin: 0 auto;
-  padding: 20px 24px 4px;
-}
-
-nav {
-  display: flex;
-  gap: 18px;
-  font-size: 15px;
-}
-
-nav a {
-  color: var(--text);
-  text-decoration: none;
-}
-
-nav a:hover {
-  color: var(--link);
-}
-
 .page {
   max-width: 850px;
   margin: 0 auto;
-  padding: 22px 24px 56px;
+  padding: 30px 24px 56px;
 }
 
 .intro {
@@ -145,19 +120,8 @@ p {
 }
 
 @media (max-width: 650px) {
-  .site-header {
-    align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-    padding-top: 18px;
-  }
-
-  nav {
-    flex-wrap: wrap;
-  }
-
   .page {
-    padding-top: 16px;
+    padding-top: 22px;
   }
 
   .intro {
