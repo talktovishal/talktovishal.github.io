@@ -17,6 +17,7 @@
       </span>
     </a>
     <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="https://talktovishal.github.io/">Home</a>
       <a href="index.html">Overview</a>
       <a href="chapter-1.html">Ch 1</a>
       <a class="is-active" href="chapter-2.html">Ch 2</a>
@@ -44,7 +45,7 @@
       <div class="workbench">
         <article class="intro-copy">
           <p class="eyebrow">Learning by doing</p>
-          <h1 id="page-title">When Count Tables Need Help.</h1>
+          <h1 id="page-title">When counting words is no longer sufficient.</h1>
           <p class="lead">
             In Chapter 1, our model remembered exact word windows. That was useful.
             It was also strict. If the exact window was missing, the model had very
@@ -155,7 +156,7 @@ small rabbit</textarea>
             Section 7 showed the problem. A count table only trusts exact phrases.
             If it has seen <code>the cat slept</code> but not <code>the dog slept</code>,
             it has no built-in reason to let <code>cat</code> help <code>dog</code>.
-            Neural language models changed that by giving each word a learned
+            <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">Neural language models</a> changed that by giving each word a learned
             representation.
           </p>
           <p>
@@ -170,12 +171,6 @@ small rabbit</textarea>
             hyperparameter. Larger systems often use many more numbers. We use 36 so
             the training is still browser-sized, but rich enough to show real
             neighborhood patterns.
-          </p>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">Bengio et al. on distributed word representations</a>,
-            <a href="https://arxiv.org/abs/1301.3781" target="_blank" rel="noreferrer">the first Word2Vec paper</a>, and
-            <a href="https://arxiv.org/abs/1310.4546" target="_blank" rel="noreferrer">negative sampling in Word2Vec</a>.
           </p>
         </div>
 
@@ -461,20 +456,13 @@ small rabbit</textarea>
             and <code>and</code> is not the lesson we want here.
           </p>
           <p>
-            Word2Vec learns from local prediction. GloVe learns from a larger
+            <a href="https://arxiv.org/abs/1301.3781" target="_blank" rel="noreferrer">Word2Vec</a> learns from local prediction. <a href="https://aclanthology.org/D14-1162/" target="_blank" rel="noreferrer">GloVe</a> learns from a larger
             co-occurrence table. Both helped popularize the same practical idea:
             words can be represented by learned numbers, and nearby vectors often
             reflect related usage. This is not the same as a dictionary definition.
             In the Alice corpus, <code>queen</code> may sit near other characters,
             court words, or shouted-dialogue words because those are the situations
             where the book uses her.
-          </p>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://arxiv.org/abs/1301.3781" target="_blank" rel="noreferrer">Word2Vec CBOW and skip-gram</a>,
-            <a href="https://arxiv.org/abs/1310.4546" target="_blank" rel="noreferrer">negative sampling and analogies</a>,
-            <a href="https://aclanthology.org/D14-1162/" target="_blank" rel="noreferrer">GloVe</a>, and
-            <a href="https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html" target="_blank" rel="noreferrer">PCA documentation</a>.
           </p>
         </div>
 
@@ -483,7 +471,7 @@ small rabbit</textarea>
             <h3>Read the map gently</h3>
             <p>
               The model has 36 numbers per word, but the screen has only two axes.
-              PCA is a drawing method that squeezes the 36-number vectors into an
+              <a href="https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html" target="_blank" rel="noreferrer">PCA</a> is a drawing method that squeezes the 36-number vectors into an
               <code>x</code> and <code>y</code> position. It is useful for a first
               look, but it can hide some distances and exaggerate others.
             </p>
@@ -733,6 +721,8 @@ small rabbit</textarea>
   <script src="corpora.js"></script>
   <script src="glove-mini.js"></script>
   <script src="chapter2.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script defer src="code-highlight.js"></script>
+  <script src="site.js" defer></script>
 </body>
 </html>
-

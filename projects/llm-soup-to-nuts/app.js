@@ -83,7 +83,6 @@ const dom = {
   strategySelect: document.getElementById("strategySelect"),
   tokenCount: document.getElementById("tokenCount"),
   vocabCount: document.getElementById("vocabCount"),
-  windowCount: document.getElementById("windowCount"),
   contextInput: document.getElementById("contextInput"),
   generateButton: document.getElementById("generateButton"),
   resetButton: document.getElementById("resetButton"),
@@ -92,13 +91,8 @@ const dom = {
   predictionBars: document.getElementById("predictionBars"),
   formulaLine: document.getElementById("formulaLine"),
   generatedOutput: document.getElementById("generatedOutput"),
-  tokenRail: document.getElementById("tokenRail"),
-  tokenLegend: document.getElementById("tokenLegend"),
   memoryTokenRail: document.getElementById("memoryTokenRail"),
   memoryTokenLabel: document.getElementById("memoryTokenLabel"),
-  vocabRail: document.getElementById("vocabRail"),
-  vocabLabel: document.getElementById("vocabLabel"),
-  windowLabel: document.getElementById("windowLabel"),
   windowCountLabel: document.getElementById("windowCountLabel"),
   windowInspector: document.getElementById("windowInspector"),
   ngramCards: document.getElementById("ngramCards"),
@@ -305,7 +299,6 @@ function rebuildModel() {
 function renderAll() {
   syncControlLabels();
   renderStats();
-  renderTokens();
   renderMemoryTokenRail();
   renderWindowInspector();
   renderNgramCards();
@@ -318,11 +311,9 @@ function renderAll() {
 
 function renderStats() {
   const n = currentN();
-  const windows = Math.max(0, state.tokens.length - n + 1);
   const corpus = getActiveCorpus();
   dom.tokenCount.textContent = formatNumber(state.tokens.length);
   dom.vocabCount.textContent = formatNumber(state.vocab.length);
-  dom.windowCount.textContent = formatNumber(windows);
   dom.corpusDetails.textContent = `${corpus.title} | ${formatNumber(state.tokens.length)} tokens | ${formatNumber(state.vocab.length)} unique tokens. ${corpus.source || corpus.sourceName || ""}`;
   const memoryName = `${nNames[n][0].toUpperCase()}${nNames[n].slice(1)}`;
   const memoryDescription = {
@@ -351,68 +342,6 @@ function renderStats() {
     link.rel = "noreferrer";
     link.textContent = "Open source";
     dom.sourceDetails.append(link);
-  }
-}
-
-function renderTokens() {
-  const maxVisible = MAX_VISIBLE_TOKENS;
-  const total = state.tokens.length;
-  let start = 0;
-
-  if (total > maxVisible) {
-    start = 0;
-  }
-
-  const end = Math.min(total, start + maxVisible);
-  dom.tokenRail.replaceChildren();
-  dom.windowLabel.textContent = total > maxVisible
-    ? `first ${maxVisible} tokens`
-    : `${formatNumber(total)} tokens`;
-
-  if (!total) {
-    dom.tokenRail.append(emptyState("Add training text to create tokens."));
-    dom.tokenLegend.textContent = "";
-  } else {
-    const previewTokens = state.tokens.slice(start, end);
-    const previewCounts = new Map();
-    previewTokens.forEach((token) => {
-      previewCounts.set(token, (previewCounts.get(token) || 0) + 1);
-    });
-    const repeatedTokens = Array.from(previewCounts.entries())
-      .filter(([, count]) => count > 1)
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([token], index) => [token, (index % 8) + 1]);
-    const colorByToken = new Map(repeatedTokens);
-    let repeatedVisible = 0;
-    for (let visibleIndex = start; visibleIndex < end; visibleIndex += 1) {
-      const token = state.tokens[visibleIndex];
-      const repeatColor = colorByToken.get(token) || 0;
-      const repeated = repeatColor > 0;
-      if (repeated) repeatedVisible += 1;
-      dom.tokenRail.append(makeTokenChip(token, {
-        repeated,
-        repeatColor,
-        muted: false
-      }));
-    }
-
-    if (end < total) dom.tokenRail.append(makeTokenChip(`+${total - end} more`, { muted: true }));
-    dom.tokenLegend.textContent = `Matching colors mean matching tokens in this preview. Vocabulary below keeps each unique token once. ${formatNumber(repeatedVisible)} repeated token instances appear here.`;
-  }
-
-  dom.vocabRail.replaceChildren();
-  dom.vocabLabel.textContent = `${formatNumber(state.vocab.length)} unique`;
-  state.vocab.slice(0, 48).forEach((token) => {
-    const chip = document.createElement("span");
-    chip.className = "vocab-chip";
-    chip.textContent = token;
-    dom.vocabRail.append(chip);
-  });
-  if (state.vocab.length > 48) {
-    const chip = document.createElement("span");
-    chip.className = "vocab-chip muted-chip";
-    chip.textContent = `+${state.vocab.length - 48} more`;
-    dom.vocabRail.append(chip);
   }
 }
 
@@ -1659,9 +1588,78 @@ function renderTokenOutput(container, result) {
     ["vocabulary", formatNumber(result.vocabularySize || 0)],
     ["preview", `${result.firstTokens.length} tokens`]
   ]);
-  appendChipRail(container, result.firstTokens, { markRepeats: true });
-  appendOutputInsight(container, "The output is a token stream preview plus the unique vocabulary size from the same tokenizer code.");
+
+  appendOutputSubhead(container, "Token stream", "matching colors mark repeats");
+  appendColorCodedTokenRail(container, result.firstTokens);
+
+  const vocabSample = Array.isArray(result.vocabularySample) ? result.vocabularySample : [];
+  const uniqueTotal = result.vocabularySize || vocabSample.length;
+  appendOutputSubhead(container, "Vocabulary sample", `${formatNumber(uniqueTotal)} unique`);
+  appendVocabRail(container, vocabSample, uniqueTotal);
+
+  appendOutputInsight(container, "Same tokenizer, two views: the token stream keeps order and repeats (matching colors flag repeated tokens), while the vocabulary keeps each unique token once. The model can only predict tokens from that vocabulary list.");
   return true;
+}
+
+function appendOutputSubhead(container, title, pillText) {
+  const row = document.createElement("div");
+  row.className = "output-subhead";
+  const strong = document.createElement("strong");
+  strong.textContent = title;
+  row.append(strong);
+  if (pillText) {
+    const pill = document.createElement("span");
+    pill.className = "output-subhead-pill";
+    pill.textContent = pillText;
+    row.append(pill);
+  }
+  container.append(row);
+}
+
+function appendColorCodedTokenRail(container, tokens) {
+  const rail = document.createElement("div");
+  rail.className = "output-token-rail";
+  if (!tokens.length) {
+    rail.append(emptyState("No tokens yet. Add training text to create tokens."));
+    container.append(rail);
+    return;
+  }
+  const counts = new Map();
+  tokens.forEach((token) => counts.set(token, (counts.get(token) || 0) + 1));
+  const colorByToken = new Map(
+    Array.from(counts.entries())
+      .filter(([, count]) => count > 1)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([token], index) => [token, (index % 8) + 1])
+  );
+  tokens.forEach((token) => {
+    const repeatColor = colorByToken.get(token) || 0;
+    rail.append(makeTokenChip(token, { repeated: repeatColor > 0, repeatColor }));
+  });
+  container.append(rail);
+}
+
+function appendVocabRail(container, vocab, uniqueTotal) {
+  const rail = document.createElement("div");
+  rail.className = "output-vocab-rail";
+  if (!vocab.length) {
+    rail.append(emptyState("The vocabulary is empty until the tokenizer runs."));
+    container.append(rail);
+    return;
+  }
+  vocab.forEach((token) => {
+    const chip = document.createElement("span");
+    chip.className = "vocab-chip";
+    chip.textContent = token;
+    rail.append(chip);
+  });
+  if (uniqueTotal > vocab.length) {
+    const chip = document.createElement("span");
+    chip.className = "vocab-chip muted-chip";
+    chip.textContent = `+${formatNumber(uniqueTotal - vocab.length)} more`;
+    rail.append(chip);
+  }
+  container.append(rail);
 }
 
 function renderNgramOutput(container, result) {
@@ -1990,7 +1988,6 @@ function applyHoldoutPreset() {
 
 function scheduleModelRebuild() {
   window.clearTimeout(modelRefreshTimer);
-  dom.tokenLegend.textContent = "Updating tokenization and counts...";
   modelRefreshTimer = window.setTimeout(() => {
     window.requestAnimationFrame(() => {
       modelRefreshTimer = window.setTimeout(() => {

@@ -52,6 +52,33 @@ a {
   text-decoration: none;
 }
 
+/* Inline links inside reading prose should look like links: colored + underlined. */
+.intro-copy p a,
+.section-heading p:not(.learn-more) a,
+.example-note a,
+.insight-note a,
+.math-note a,
+.guide-card p a,
+.worked-example p a,
+figcaption a {
+  color: var(--teal);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2.5px;
+  font-weight: 750;
+}
+
+.intro-copy p a:hover,
+.section-heading p:not(.learn-more) a:hover,
+.example-note a:hover,
+.insight-note a:hover,
+.math-note a:hover,
+.guide-card p a:hover,
+.worked-example p a:hover,
+figcaption a:hover {
+  color: var(--coral);
+}
+
 :focus-visible {
   outline: 3px solid rgba(198, 95, 30, 0.35);
   outline-offset: 3px;
@@ -526,8 +553,9 @@ code {
 }
 
 .code-controls {
+  display: flex;
+  flex-wrap: wrap;
   margin: 0;
-  grid-template-columns: repeat(2, max-content);
   gap: 8px;
   align-items: center;
 }
@@ -554,8 +582,9 @@ code {
 }
 
 .code-controls .check-row {
-  min-height: 38px;
-  padding: 7px 10px;
+  min-height: 36px;
+  padding: 6px 14px;
+  grid-template-columns: auto auto;
 }
 
 .check-row input {
@@ -1118,6 +1147,35 @@ input[type="range"] {
   gap: 10px;
 }
 
+.concept-lines {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.concept-lines p {
+  margin: 0;
+  padding: 9px 13px;
+  border-left: 3px solid var(--gold);
+  border-radius: 6px;
+  background: #fffdf7;
+  color: #393632;
+  font-size: 0.99rem;
+  line-height: 1.55;
+}
+
+.concept-lines strong {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.exercise-intro {
+  margin: 0 0 14px;
+  color: #393632;
+  font-size: 1.03rem;
+  line-height: 1.58;
+}
+
 .panel {
   padding: 13px;
   border: 1px solid var(--line);
@@ -1272,6 +1330,15 @@ input[type="range"] {
 
 .lesson-block p {
   color: var(--muted);
+}
+
+.lesson-number {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
 }
 
 .window-inspector {
@@ -1647,49 +1714,48 @@ input[type="range"] {
 }
 
 .reference-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 28px;
   margin: 18px 0 0;
   padding: 0;
-  counter-reset: reference;
   list-style: none;
+  counter-reset: reference;
+  display: grid;
+  gap: 13px;
 }
 
 .reference-list li {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: 10px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
+  position: relative;
+  display: block;
+  margin: 0;
+  padding: 0 0 0 26px;
+  counter-increment: reference;
 }
 
 .reference-list li::before {
-  counter-increment: reference;
-  content: counter(reference, decimal-leading-zero);
-  color: var(--accent);
-  font-size: 0.8rem;
-  font-weight: 900;
-  letter-spacing: 0.04em;
+  content: counter(reference) ".";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
 }
 
 .reference-list a {
-  grid-column: 2;
   color: var(--ink);
-  font-weight: 900;
+  font-weight: 800;
   text-decoration: none;
 }
 
 .reference-list a:hover {
   color: var(--accent);
+  text-decoration: underline;
 }
 
 .reference-list span {
   display: block;
-  grid-column: 2;
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--muted);
-  font-size: 0.91rem;
+  font-size: 0.9rem;
   line-height: 1.45;
 }
 
@@ -1762,42 +1828,38 @@ a.chapter-nav-card:hover {
 
 .chapter-map {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 22px;
+  margin-top: 4px;
 }
 
 .chapter-map-card {
-  display: grid;
-  gap: 7px;
-  min-height: 148px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
+  display: block;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.chapter-map-card:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.chapter-map-card a {
   color: var(--ink);
+  font-size: 1.14rem;
+  font-weight: 900;
+  line-height: 1.3;
   text-decoration: none;
 }
 
-.chapter-map-card span {
+.chapter-map-card a:hover {
   color: var(--accent);
-  font-size: 0.78rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-decoration: underline;
 }
 
-.chapter-map-card strong {
-  font-size: 1.12rem;
-  line-height: 1.24;
-}
-
-.chapter-map-card em {
-  color: #544f49;
-  font-style: normal;
-}
-
-.chapter-map-card:hover {
-  border-color: var(--accent);
+.chapter-map-card p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .eval-row {
@@ -1850,7 +1912,6 @@ a.chapter-nav-card:hover {
 
 .code-cell {
   display: grid;
-  grid-template-rows: auto minmax(112px, auto) auto;
   gap: 10px;
   margin-top: 14px;
   padding: 12px;
@@ -1868,7 +1929,7 @@ a.chapter-nav-card:hover {
 }
 
 .code-input {
-  min-height: 112px;
+  min-height: 240px;
   padding: 12px;
   resize: vertical;
   color: #17212f;
@@ -1903,6 +1964,100 @@ a.chapter-nav-card:hover {
 .code-output.is-error {
   border-color: #d46a4c;
   background: #fff2ec;
+}
+
+/* Syntax highlighting: a highlighted <pre> sits behind a transparent,
+   still-editable <textarea> so run logic that reads .value is untouched. */
+.code-input-wrap {
+  position: relative;
+  display: block;
+  min-height: 240px;
+}
+
+.code-input-wrap .code-input-highlight {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #fffefa;
+  color: #17212f;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.code-input-wrap .code-input-highlight code {
+  display: block;
+  margin: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  white-space: inherit;
+}
+
+.code-input-wrap .code-input.code-input-overlay {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: #17212f;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+
+.code-input-overlay::selection {
+  background: rgba(47, 109, 122, 0.22);
+}
+
+/* Token colors (highlight.js classes), themed to the page palette. */
+.code-input-highlight .hljs-comment,
+.code-input-highlight .hljs-quote {
+  color: #8a8576;
+  font-style: italic;
+}
+
+.code-input-highlight .hljs-keyword,
+.code-input-highlight .hljs-literal,
+.code-input-highlight .hljs-type {
+  color: #b5531c;
+}
+
+.code-input-highlight .hljs-string,
+.code-input-highlight .hljs-regexp,
+.code-input-highlight .hljs-meta .hljs-string {
+  color: #4f7a3a;
+}
+
+.code-input-highlight .hljs-number {
+  color: #7a5cc0;
+}
+
+.code-input-highlight .hljs-title,
+.code-input-highlight .hljs-title.function_,
+.code-input-highlight .hljs-built_in {
+  color: #2f6d7a;
+}
+
+.code-input-highlight .hljs-attr,
+.code-input-highlight .hljs-property {
+  color: #3a6ea5;
+}
+
+.code-input-highlight .hljs-params {
+  color: #17212f;
 }
 
 .output-message {
@@ -2000,6 +2155,53 @@ a.chapter-nav-card:hover {
 .output-chip.seed {
   border-color: #c65f1e;
   background: #fff1e6;
+}
+
+.output-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.output-subhead strong {
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+.output-subhead-pill {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.output-token-rail,
+.output-vocab-rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px dashed #decbb5;
+  border-radius: 8px;
+  background: #fffdf9;
+}
+
+.output-token-rail {
+  max-height: 360px;
+}
+
+.output-vocab-rail {
+  max-height: 140px;
 }
 
 .output-table {
@@ -2309,4 +2511,117 @@ a.chapter-nav-card:hover {
   .run-button {
     width: 100%;
   }
+}
+
+/* Floating feedback button (injected on every page by site.js). */
+.feedback-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 850;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(17, 17, 17, 0.16);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.feedback-fab:hover {
+  background: #a64f18;
+  box-shadow: 0 8px 22px rgba(17, 17, 17, 0.22);
+  transform: translateY(-1px);
+}
+
+.feedback-fab:focus-visible {
+  outline: 3px solid rgba(198, 95, 30, 0.35);
+  outline-offset: 2px;
+}
+
+.feedback-fab-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+@media (max-width: 560px) {
+  .feedback-fab {
+    right: 12px;
+    bottom: 12px;
+    padding: 11px;
+  }
+  .feedback-fab-text {
+    display: none;
+  }
+}
+
+/* Inline feedback pop-up (injected by site.js when a Web3Forms key is set). */
+.feedback-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(17, 17, 17, 0.42);
+}
+
+.feedback-modal {
+  width: 100%;
+  max-width: 440px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffefa;
+  box-shadow: 0 18px 48px rgba(17, 17, 17, 0.26);
+}
+
+.feedback-modal-title {
+  margin: 0 0 6px;
+  font-size: 1.18rem;
+}
+
+.feedback-modal-intro {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.feedback-form {
+  display: grid;
+  gap: 12px;
+}
+
+.feedback-message {
+  resize: vertical;
+  min-height: 96px;
+  font-family: inherit;
+}
+
+.feedback-status {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.feedback-status.is-error {
+  color: var(--coral);
+}
+
+.feedback-status.is-success {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }

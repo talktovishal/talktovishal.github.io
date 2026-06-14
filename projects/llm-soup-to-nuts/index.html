@@ -16,6 +16,7 @@
       </span>
     </a>
     <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="https://talktovishal.github.io/">Home</a>
       <a class="is-active" href="index.html">Overview</a>
       <a href="chapter-1.html">Ch 1</a>
       <a href="chapter-2.html">Ch 2</a>
@@ -33,21 +34,24 @@
           <p class="eyebrow">Learning by doing</p>
           <h1 id="page-title">LLM Soup to Nuts.</h1>
           <p class="lead">
-            A hands-on path from the simplest language model to the systems ideas
-            behind modern LLMs. The goal is not to memorize buzzwords. The goal is to
-            build small working versions, inspect their behavior, and carry the
-            intuition forward.
+            I'm writing this for one reader in particular: a curious high-schooler
+            who keeps hearing about AI and ChatGPT and wants to actually
+            understand how they work. My goal is to start small, learn by building from the basics. I'll introduce each piece slowly and build it up. If you can read and you're willing to tinker,
+            you will build small, working versions of these ideas yourself, right here
+            in your browser.
           </p>
           <p>
-            Each chapter starts with a concrete problem: predict the next word, borrow
-            evidence from similar words, train a tiny neural model, split text into
-            tokens, let tokens attend to each other, and finally scale the training
-            loop. We keep the math close to the moment where it explains something
-            visible.
+            Here is how I think about it. I don't want you to memorize buzzwords. I
+            want you to build the smallest honest version of each idea, change
+            something, and watch what happens. You'll predict the next word, borrow
+            evidence from similar words, train a tiny neural network, split text into
+            tokens, let words pay attention to each other, and finally see how the
+            whole thing scales up. Don't worry if these terms are alien to you. We will learn them all! Every time the math appears, it is there to explain
+            something you can see on the screen, never the other way around.
           </p>
           <p class="example-note">
-            <em>Course promise:</em> if a concept matters, you should be able to see it,
-            change something, and watch the result.
+            <em>My promise to you:</em> if an idea matters, you will get to see it,
+            change something, and watch the result, not just read about it.
           </p>
           <p class="course-start-row">
             <a class="primary-button" href="chapter-1.html">Start with Chapter 1</a>
@@ -59,18 +63,20 @@
     <section class="band" aria-labelledby="values-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">Course values</p>
-          <h2 id="values-title">Small models first, big ideas second.</h2>
+          <p class="eyebrow">Why I built it this way</p>
+          <h2 id="values-title">Build from basics, no unnecessary complexity.</h2>
           <p>
-            The course uses deliberately small examples because small models let you
-            see the whole machine. A count table, a vector update, a softmax, or an
-            attention map is easier to trust when you have watched the numbers move.
+            I lean on deliberately small examples because small models let you see the
+            whole machine at once. A table of words and their counts, a single vector update, a softmax, or
+            an attention map is so much easier to trust once you have watched the
+            numbers move with your own eyes.
           </p>
           <p>
-            The chapters are also connected. We start with next-word prediction and
-            keep returning to it as the machinery changes. That throughline makes the
-            jump from n-grams to neural networks to Transformers feel like a sequence
-            of repairs, not a pile of disconnected terms.
+            I also work hard to keep the chapters connected. Everything starts with one
+            simple question, what word comes next, and that same question keeps coming
+            back as the machinery changes. That throughline is what makes the jump from
+            n-grams to neural networks to Transformers feel like a series of small incremental steps
+             instead of a pile of disconnected terms. Once again, don't worry about the terms, we will get to them soon :-).
           </p>
         </div>
 
@@ -88,7 +94,7 @@
           <article class="lesson-block">
             <span class="lesson-number">03</span>
             <h3>Keep the math attached</h3>
-            <p>Formulas appear when they explain a visible behavior.</p>
+            <p>Formulas appear when they are needed, not to show off :-)</p>
           </article>
           <article class="lesson-block">
             <span class="lesson-number">04</span>
@@ -103,44 +109,74 @@
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">Chapter map</p>
-          <h2 id="chapters-title">Choose a chapter.</h2>
+          <h2 id="chapters-title">Where we are going.</h2>
           <p>
-            Start at Chapter 1 if you want the full path. Jump ahead when you already
-            know the earlier idea and want the next layer.
-          </p>
-        </div>
-
-        <div class="chapter-map">
-          <a class="chapter-map-card" href="chapter-1.html">
-            <span>Chapter 1</span>
-            <strong>Build a tiny next-word predictor</strong>
-            <em>Tokens, n-grams, probabilities, generation, smoothing, backoff, and perplexity.</em>
-          </a>
-          <a class="chapter-map-card" href="chapter-2.html">
-            <span>Chapter 2</span>
-            <strong>When count tables need help</strong>
-            <em>Why exact counts break, and how learned word vectors borrow evidence.</em>
-          </a>
-          <a class="chapter-map-card" href="chapter-3.html">
-            <span>Chapter 3</span>
-            <strong>The math that makes a model guess</strong>
-            <em>Surprise, vectors, gradients, softmax, and a tiny neural next-word model.</em>
-          </a>
-          <a class="chapter-map-card" href="chapter-4.html">
-            <span>Chapter 4</span>
-            <strong>Tokenization</strong>
-            <em>How text becomes model-readable pieces, and why boundaries matter.</em>
-          </a>
-          <a class="chapter-map-card" href="chapter-5.html">
-            <span>Chapter 5</span>
-            <strong>Transformers and attention</strong>
-            <em>Attention as weighted lookup, causal masks, Transformer blocks, and variants.</em>
-          </a>
-          <a class="chapter-map-card" href="chapter-6.html">
-            <span>Chapter 6</span>
-            <strong>Pretraining LLMs</strong>
-            <em>Objectives, data, scaling laws, and distributed training systems.</em>
-          </a>
+            If you want the full journey, start at Chapter 1 and read in order; each
+            chapter builds on the one before it. If you already know an earlier idea,
+            feel free to jump straight to the part you are curious about.
+          </p>  
+        </div>  
+    
+            <div class="chapter-map">
+              <article class="chapter-map-card">
+            <a href="chapter-1.html">Chapter 1 · Build a tiny next-word predictor</a>
+            <p>
+              This is where it all starts. You'll build the simplest model that guesses
+              the next word just by counting which words tend to follow which, the same
+              basic trick your phone keyboard uses when it suggests your next word.
+              Along the way you'll meet tokens and n-grams and a couple of friendly
+              ways to measure how good a guess really is.
+            </p>
+          </article>
+          <article class="chapter-map-card">
+            <a href="chapter-2.html">Chapter 2 · When counting words is no longer sufficient</a>
+            <p>
+              Plain counting works great until the exact phrase you need has never
+              shown up before. You'll run straight into that wall on purpose, then
+              climb over it by giving every word its own little list of numbers, so
+              that words used in similar ways can share what they have learned. This is
+              the first real step from simple shallow learning to what we call as <b>deep learning</b> :-).
+            </p>
+          </article>
+          <article class="chapter-map-card">
+            <a href="chapter-3.html">Chapter 3 · The math that makes a model guess</a>
+            <p>
+              This is the friendly math chapter, and nothing is assumed. One piece at a
+              time, you'll build the small toolkit a model actually uses, probability,
+              vectors, a dot product, softmax, and the gentle nudge called a gradient,
+              and then train a tiny neural network right in your browser. Every idea
+              shows up only when it solves a problem you can see.
+            </p>
+          </article>
+          <article class="chapter-map-card">
+            <a href="chapter-4.html">Chapter 4 · Tokenization</a>
+            <p>
+              When we eat something we take small bits of the food, correct? In the same way when the  model sees a big book it chops the text into pieces
+              called tokens. It sounds boring, but how you cut matters a lot: it
+              changes cost, speed, and even fairness. You'll train real tokenizers and
+              watch the same sentence get split in surprisingly different ways.
+            </p>
+          </article>
+          <article class="chapter-map-card">
+            <a href="chapter-5.html">Chapter 5 · Transformers and attention</a>
+            <p>
+              This is the big one, the idea behind nearly every AI tool you have heard
+              of. You'll build attention from scratch, the trick that lets every word
+              look at every other word at once, and then load a real, working language
+              model right into your browser to watch it predict and write. By the end,
+              the word Transformer won't feel like magic anymore. Once again, don't worry you will learn it all :-)
+            </p>
+          </article>
+          <article class="chapter-map-card">
+            <a href="chapter-6.html">Chapter 6 · Pretraining LLMs</a>
+            <p>
+              Finally, you'll zoom out to how these models get trained on enormous
+              amounts of text. You'll play with the real tradeoffs that AI labs argue
+              about: what goal to train toward, how to clean messy web data, and
+              whether to spend your budget on a bigger model or more data. It is the
+              same tiny loop from Chapter 3, just blown up to an enormous scale.
+            </p>
+          </article>
         </div>
       </div>
     </section>
@@ -157,6 +193,6 @@
       </div>
     </section>
   </main>
+  <script src="site.js" defer></script>
 </body>
 </html>
-

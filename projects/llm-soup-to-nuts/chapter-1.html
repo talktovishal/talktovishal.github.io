@@ -16,6 +16,7 @@
       </span>
     </a>
     <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="https://talktovishal.github.io/">Home</a>
       <a href="index.html">Overview</a>
       <a class="is-active" href="chapter-1.html">Ch 1</a>
       <a href="chapter-2.html">Ch 2</a>
@@ -46,33 +47,25 @@
       <div class="workbench">
         <article class="intro-copy">
           <p class="eyebrow">Learning by doing</p>
-          <h1 id="page-title">Language Models Before LLMs.</h1>
+          <h1 id="page-title">Language Models Before before ChatGPT (LLMs) :-).</h1>
           <p class="lead">
             Language modeling from first principles: let's build a tiny next-word
-            predictor with tokens, n-grams, smoothing, and perplexity.
+            predictor.
           </p>
           <p>
-            Let's start with something familiar. I type a few words on my phone, and
-            before I finish the sentence, the keyboard suggests what might come next.
-            My goal here is to make that behavior feel less mysterious by building the
-            smallest useful version ourselves.
+            I type a few words on my phone, and
+            before I finish the sentence, the keyboard suggests what might come next. How does that happen? Let's build one by ourselves!
           </p>
           <p>
-            We will start from raw text, turn it into pieces a computer can count,
-            and then ask a practical question over and over: when these words
+            We will start from text, turn it into pieces - words or tokens. We keep a tally of how many times a word occurred and also it's neigbors. Why? Remember how <i>you are known by the company you keep</i>, the same is true for words!
+            We then ask a practical question over and over: when these words
             appeared before, what usually came next? That simple question gives us a
             real language model, even though it is much smaller than a modern LLM.
           </p>
-          <p>
-            By the end of this chapter, terms like corpus, token, n-gram, smoothing,
-            backoff, and perplexity should feel less like vocabulary to memorize and
-            more like tools you have already used. We will keep the math close to the
-            moment where it explains something you can see on the page.
-          </p>
           <p class="example-note">
-            <em>Guiding question:</em> if I type <code>the quick brown fox</code>,
-            why does <code>jumps</code> feel like a reasonable next word, but after
-            only <code>fox</code> the next word feels much less certain?
+            <em>Guiding question:</em> if I type <code>Happy Birthday to you, Happy Birthday to</code>
+            why does <code>you</code> feel like a reasonable next word, but after
+            only <code>to</code> the next word feels much less certain?
           </p>
           <div class="idea-flow" aria-label="Lesson flow">
             <div>
@@ -85,71 +78,99 @@
             </div>
             <div>
               <strong>Remember context</strong>
-              <span>Compare no memory, one-word memory, and two-word memory.</span>
+              <span>How much should I remember what has come before a word?</span>
             </div>
             <div>
               <strong>Generate and test</strong>
-              <span>Sample continuations, then measure surprise.</span>
+              <span>From prefixes - initial words, generate the next word and then measure surprise.</span>
             </div>
           </div>
         </article>
       </div>
     </section>
-
+    
     <section id="tokens" class="band" aria-labelledby="tokens-title">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">1. From text to tokens</p>
-          <h2 id="tokens-title">Turn text into pieces the model can count.</h2>
+          <h2 id="tokens-title">Break text into smaller pieces the model can count.</h2>
           <p>
-            The prediction problem starts before prediction. If I want my phone to
-            suggest the next word, it first needs examples of writing to learn from.
-            In our small version, those examples might be a public-domain book, a
+            If I want my phone to suggest the next word, it first needs examples of writing to learn from. It needs to understand the patterns in the text to make good predictions. It's called learning from data.
+            In our small version, we learn can from a public-domain book, a
             Wikipedia-style article, or a few paragraphs we write ourselves. That
-            collection of training text is called a <strong>corpus</strong>.
+            collection of text used for training the model is called a <strong>corpus</strong>.
           </p>
           <p>
-            Once we have a corpus, we have to make it readable to the computer.
-            Humans can casually say, "split it into words," but the computer needs a
-            rule it can apply again and again. We call the resulting countable pieces
-            <strong>tokens</strong>. In this lesson a token can be a word like
+            Remember how we take small bites of the food? In the same way, we need to break down the text into smaller pieces that the model can process. 
+            Humans can casually say, "<a href="https://en.wikipedia.org/wiki/Text_segmentation" target="_blank" rel="noreferrer">split it into words</a>," but the computer needs a
+            rule it can apply again. Humans call the smaller units <strong>words</strong> and in computer science lingo we call the smaller units 
+            <a href="https://en.wikipedia.org/wiki/Lexical_analysis" target="_blank" rel="noreferrer"><strong>tokens</strong></a>. In this lesson a token can be a word like
             <code>alice</code>, a word like <code>rabbit</code>, or even a punctuation
-            mark like <code>,</code>. A word is the thing we talk about in ordinary
-            language; a token is the exact piece we hand to the model.
+            mark like <code>,</code>. To re-iterate, a word is the thing we talk about in ordinary
+            language; a token is the exact piece we hand to the computer program aka the model.
           </p>
           <p class="example-note">
-            <em>Tokenization is already a modeling choice.</em> Should
+            <em>Why is tokenization not straightforward?</em> <br>Should
             <code>don't</code> stay as one token, become <code>do</code> plus
             <code>n't</code>, or be treated like <code>do not</code>? And in languages
             such as Chinese or Thai, spaces do not mark words the way they usually do
             in English. So even this first step, deciding where one piece ends and the
-            next begins, can become a surprisingly deep language problem.
+            next begins, can become a surprisingly complicated problem.
           </p>
           <p>
             After tokenization, I want you to notice two different views of the same
             text. The <strong>token stream</strong> keeps the full order, including
             repeats, because counts depend on how often things happened. The
             <strong>vocabulary</strong> keeps the unique tokens. If <code>the</code>
-            appears 900 times, the stream keeps all 900 appearances, but the
-            vocabulary contains <code>the</code> once. That vocabulary is the menu of
-            tokens this simple model can ever predict.
+            appears 900 times, the stream keeps all 900 appearances in order, but the
+            vocabulary contains <code>the</code> once. Vocabulary is the menu of
+            tokens (words for human language) this simple model can ever predict or guess.
           </p>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://en.wikipedia.org/wiki/Text_segmentation" target="_blank" rel="noreferrer">text segmentation</a>
-            and
-            <a href="https://en.wikipedia.org/wiki/Lexical_analysis" target="_blank" rel="noreferrer">lexical tokenization</a>
+          <br>
+          <p>
+            Now let's go an do our first exercise!!! Woohoo! We will take a <code>corpus</code> and break it down into <code>tokens</code>. As part of this particular exercise, I have downloaded some text that is freely available from the internet, like the full text of the <i>Alice In Wonderland</i> book, as well as some other different type of <code>corpora</code> (corpus - singular, corpora - plural). We are going to use this corpora to break them down into tokens and explore them further.
           </p>
         </div>
+
+        <div class="concept-row">
+          <article class="lesson-block">
+            <h3>Corpus</h3>
+            <p>
+              Think of the corpus as the model's reading pile. This simple model
+              cannot invent evidence from outside that pile, so a fairy-tale corpus,
+              a news corpus, and a technical corpus will all lead to different
+              predictions.
+            </p>
+          </article>
+          <article class="lesson-block">
+            <h3>Token</h3>
+            <p>
+              A token is the exact piece we let the computer count. In this page,
+              <code>alice</code>, <code>rabbit</code>, and <code>,</code> can all
+              be tokens. We can make a choice to lowercase so that <code>Alice</code> and
+              <code>alice</code> should become the same piece. Think about why would this be useful and if it's always a good idea :-)? Can you think of words that have the same spelling but different meanings depending on the context and the casing? Consider a word like "Big" what if someone's name is "Big"? Would you then like to treat "Big" and "big" as the same token? What if "Big" is a proper noun and "big" is an adjective? How would you handle that? We will deal with these questions as we explore the world of tokens.
+            </p>
+          </article>
+          <article class="lesson-block">
+            <h3>Vocabulary</h3>
+            <p>
+              Vocabulary is the unique list of tokens. The stream may contain
+              <code>the</code> hundreds of times, but the vocabulary keeps one
+              <code>the</code>. This matters because the model can only choose
+              or predict tokens from that list.
+            </p>
+          </article>
+        </div>
+
+        <br><br>
 
         <section class="trainer token-trainer" aria-label="Training corpus and token counts">
           <div class="trainer-head">
             <div>
               <h3>Training corpus</h3>
               <p>
-                Pick the text we want the model to learn from. The full text is used
-                for counting, but this box only shows a scrollable preview so the page
-                stays usable. Changing this text changes the model's little world:
+                Select a corpora of text we want the model to learn it's next token predictions from! By now, you know tokens and words are similar concepts, but they are not the same :-). The full text is used
+                for counting, but this box only shows a scrollable preview. Changing this text changes the model's little world:
                 its style, its favorite words, and its blind spots.
               </p>
             </div>
@@ -169,55 +190,17 @@
           <div class="stat-grid" aria-label="Training statistics">
             <div><strong id="tokenCount">0</strong><span>tokens</span></div>
             <div><strong id="vocabCount">0</strong><span>vocabulary</span></div>
-            <div><strong id="windowCount">0</strong><span>windows</span></div>
           </div>
         </section>
 
-        <div class="two-column">
-          <div class="concept-stack">
-            <article class="lesson-block">
-              <h3>Corpus</h3>
-              <p>
-                Think of the corpus as the model's reading pile. This simple model
-                cannot invent evidence from outside that pile, so a fairy-tale corpus,
-                a news corpus, and a technical corpus will all lead to different
-                predictions.
-              </p>
-            </article>
-            <article class="lesson-block">
-              <h3>Token</h3>
-              <p>
-                A token is the exact piece we let the computer count. In this page,
-                <code>alice</code>, <code>rabbit</code>, and <code>,</code> can all
-                be tokens. Lowercasing decides whether <code>Alice</code> and
-                <code>alice</code> should become the same piece.
-              </p>
-            </article>
-            <article class="lesson-block">
-              <h3>Vocabulary</h3>
-              <p>
-                Vocabulary is the unique menu of tokens. The stream may contain
-                <code>the</code> hundreds of times, but the vocabulary keeps one
-                <code>the</code>. This matters because the model can only choose
-                or predict tokens on that menu.
-              </p>
-            </article>
-          </div>
-
-          <div class="panel">
-            <div class="section-title-row">
-              <h3>Token stream</h3>
-              <span id="windowLabel" class="pill">first tokens</span>
-            </div>
-            <div id="tokenRail" class="token-rail" aria-live="polite"></div>
-            <p id="tokenLegend" class="microcopy"></p>
-            <div class="section-title-row compact-row">
-              <h3>Vocabulary sample</h3>
-              <span id="vocabLabel" class="pill">0 unique</span>
-            </div>
-            <div id="vocabRail" class="vocab-rail" aria-live="polite"></div>
-          </div>
-        </div>
+        <p class="exercise-intro">
+          This is the hands-on heart of this section. Run the tokenizer to turn the
+          chosen corpus into its two views at once: the ordered <strong>token
+          stream</strong>, where matching colors mark repeated tokens, and the unique
+          <strong>vocabulary</strong>. This is the list of tokens the model is allowed to guess from in the future. Inspect the
+          <code>simpleTokenize</code> function. You can decide whether to apply lowercasing
+          or punctuation. Change it and see how it affects the tokenization and the resulting vocabulary.
+        </p>
 
         <article class="code-cell" data-output-type="tokens">
           <div class="cell-head">
@@ -252,10 +235,14 @@ const tokens = simpleTokenize(sampleText, {
   keepPunctuation: settings.keepPunctuation
 });
 
+// The vocabulary is the set of unique tokens, kept in first-seen order.
+const vocabulary = [...new Set(tokens)];
+
 return {
-  firstTokens: tokens.slice(0, 30),
+  firstTokens: tokens.slice(0, 100),
   tokenCount: tokens.length,
-  vocabularySize: new Set(tokens).size
+  vocabularySize: vocabulary.length,
+  vocabularySample: vocabulary.slice(0, 48)
 };</textarea>
           <div class="code-output" aria-live="polite"></div>
         </article>
@@ -265,8 +252,8 @@ return {
     <section id="memory" class="band band-muted" aria-labelledby="memory-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">2. Context changes the guess</p>
-          <h2 id="memory-title">Give the model a little memory.</h2>
+          <p class="eyebrow">2. n-gram - How much context does the model need?</p>
+          <h2 id="memory-title">Give the model memory and tell it how much to remember.</h2>
           <p>
             Now that the corpus has become tokens, we can ask the question that makes
             prediction interesting: how much of the recent past should we look at? If
@@ -278,12 +265,11 @@ return {
             <em>Try this intuition:</em> after <code>the</code>, almost any noun
             could come next. After <code>said the</code>, a story corpus might point
             toward <code>king</code>, <code>queen</code>, <code>hatter</code>, or
-            another character. We are not changing the model's intelligence here; we
-            are changing which evidence it is allowed to use.
+            another character. We are not changing the model's memory here; we
+            are changing which evidence or <code>context</code> it is allowed to use. Remember this word context, we will encounter it again when we learn about ChatGPT. Do you see that why more context can be better, but also more complex or expensive since you have to process more information?
           </p>
           <p>
-            This is the point where the term <strong>n-gram</strong> becomes useful.
-            It just means a window of <code>n</code> tokens. A
+            Now let's introduce the concept of <a href="https://en.wikipedia.org/wiki/N-gram" target="_blank" rel="noreferrer"><strong>n-gram</strong></a>. It just means a <a href="https://en.wikipedia.org/wiki/Word_n-gram_language_model" target="_blank" rel="noreferrer">window of <code>n</code> tokens</a>. A
             <strong>unigram</strong> is a one-token window, so it mostly knows what
             tokens are common overall. A <strong>bigram</strong> is a two-token
             window, so it can remember one previous token. A <strong>trigram</strong>
@@ -295,7 +281,7 @@ return {
             <code>said</code> and only asks what followed <code>the</code>. A unigram
             ignores the local context and asks what tokens are common in general. The
             tradeoff is the heart of this section: more memory can be more precise,
-            but it also creates more exact contexts the model may never have seen.
+            but it also creates more exact contexts the model may never have seen. This is an important concept in natural language processing (NLP). More context can be better, but it also means that you are more specialized in the types of patterns you can recognize. Hence, we will see later how to manage when you see context which you have not seen before. How can you still make the predictions? Say I have seen <i>the <code>cat</code> sat on the mat</i>, and now I see the phrase <i>the <code>dog</code> sat on the ...</i>. As a human, we will guess the next token to be <code>mat</code> since we know that cat and dog are both animals that can sit on a mat. However, our current model doesn't know this.We will see later how to make our model more robust in handling such cases.
           </p>
           <figure class="diagram-figure">
             <svg class="pipeline-svg" viewBox="0 0 580 150" role="img" aria-labelledby="ngram-title ngram-desc">
@@ -331,18 +317,10 @@ return {
           </figure>
           <p>
             There is a quiet assumption hiding in all of this, and it even has a name:
-            the <strong>Markov assumption</strong>. We are betting that the last word
-            or two stands in well enough for the entire history that came before it.
-            That is clearly not the whole truth, since real sentences lean on far more
+            the <a href="https://en.wikipedia.org/wiki/Hidden_Markov_model" target="_blank" rel="noreferrer"><strong>Markov assumption</strong></a>. What it means is that the probability of the next word depends only on the current word (or a fixed number of previous words). That is clearly not the whole truth, since real sentences lean on far more
             than two words. But it is a wonderfully useful simplification, because it
             turns the impossible job of remembering everything into the manageable job
             of counting short windows.
-          </p>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://en.wikipedia.org/wiki/N-gram" target="_blank" rel="noreferrer">n-grams</a>
-            and
-            <a href="https://en.wikipedia.org/wiki/Word_n-gram_language_model" target="_blank" rel="noreferrer">word n-gram language models</a>
           </p>
         </div>
 
@@ -523,12 +501,6 @@ return {
             table can change. That is why the visualization shows a distribution, not
             just one winning word.
           </p>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://web.stanford.edu/~jurafsky/slp3/3.pdf" target="_blank" rel="noreferrer">n-gram probabilities</a>
-            and
-            <a href="https://en.wikipedia.org/wiki/Word_n-gram_language_model" target="_blank" rel="noreferrer">relative-frequency language models</a>
-          </p>
         </div>
 
         <div class="control-grid section-controls" aria-label="Probability explorer controls">
@@ -604,17 +576,11 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             in or pleasantly varied.
           </p>
           <p>
-            This is also the bridge to modern language models. Their probabilities
+            This is also the bridge to modern <a href="https://en.wikipedia.org/wiki/Language_model" target="_blank" rel="noreferrer">language models</a>. Their probabilities
             come from a neural network rather than from an n-gram count table, but the
             decoding question is still recognizable: after we have a probability for
             every possible next token, do we always take the most likely one, or do we
             allow controlled variation?
-          </p>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://en.wikipedia.org/wiki/Language_model" target="_blank" rel="noreferrer">language models</a>
-            and
-            <a href="https://web.stanford.edu/~jurafsky/slp3/3.pdf" target="_blank" rel="noreferrer">sampling from n-gram models</a>
           </p>
         </div>
 
@@ -675,7 +641,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             even though <code>said</code> by itself may be very common.
           </p>
           <p>
-            This is why <strong>backoff</strong> exists. I like to think of it as
+            This is why <a href="https://en.wikipedia.org/wiki/Katz%27s_back-off_model" target="_blank" rel="noreferrer"><strong>backoff</strong></a> exists. I like to think of it as
             lowering the ambition of the question. If the detailed question has no
             evidence, ask a simpler question. Instead of "what followed
             <code>softly said</code>?", ask "what followed <code>said</code>?" If
@@ -710,7 +676,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             spot."
           </p>
           <p>
-            Add-alpha smoothing does that by adding the same small imaginary count to
+            <a href="https://en.wikipedia.org/wiki/Additive_smoothing" target="_blank" rel="noreferrer">Add-alpha smoothing</a> does that by adding the same small imaginary count to
             every known vocabulary token before we divide:
             <code>(count + alpha) / (context total + alpha * |V|)</code>. The numerator
             gives each token a little extra evidence. The denominator grows by the
@@ -725,12 +691,6 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             known tokens become possible, but the strongest observed choices become
             less dominant. Smoothing is not making the model smarter; it is making the
             model less overconfident about what a small corpus failed to show.
-          </p>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://en.wikipedia.org/wiki/Katz%27s_back-off_model" target="_blank" rel="noreferrer">Katz backoff</a>
-            and
-            <a href="https://en.wikipedia.org/wiki/Additive_smoothing" target="_blank" rel="noreferrer">additive smoothing</a>
           </p>
         </div>
 
@@ -815,7 +775,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             For each token in the holdout, we look at the probability the model gave
             to the token that actually appeared. If the model gave the real next token
             high probability, it was not very surprised. If it gave that token tiny
-            probability, it was very surprised. <strong>Perplexity</strong> is a way
+            probability, it was very surprised. <a href="https://en.wikipedia.org/wiki/Perplexity" target="_blank" rel="noreferrer"><strong>Perplexity</strong></a> is a way
             to summarize that surprise. Lower perplexity means the model's guesses fit
             the held-out text better.
           </p>
@@ -860,12 +820,6 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             <p><strong>Average surprise:</strong> <code>H = -(1 / N) * sum(log(p_i))</code></p>
             <p><strong>Perplexity:</strong> <code>PPL = exp(H)</code>. If any <code>p_i = 0</code>, then <code>log(0)</code> makes the score infinite.</p>
           </div>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://en.wikipedia.org/wiki/Perplexity" target="_blank" rel="noreferrer">perplexity</a>
-            and
-            <a href="https://web.stanford.edu/~jurafsky/slp3/3.pdf" target="_blank" rel="noreferrer">language-model evaluation</a>
-          </p>
         </div>
 
         <div class="control-grid section-controls" aria-label="Evaluation controls">
@@ -1038,7 +992,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           </a>
           <a class="chapter-nav-card" href="chapter-2.html">
             <span>Next chapter</span>
-            <strong>Chapter 2: When count tables need help</strong>
+            <strong>Chapter 2 · When counting words is no longer sufficient</strong>
             <em>Move from exact counts to learned representations.</em>
           </a>
         </nav>
@@ -1048,6 +1002,8 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
 
   <script src="corpora.js"></script>
   <script src="app.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script defer src="code-highlight.js"></script>
+  <script src="site.js" defer></script>
 </body>
 </html>
-

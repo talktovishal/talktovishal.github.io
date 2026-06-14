@@ -17,6 +17,7 @@
       </span>
     </a>
     <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="https://talktovishal.github.io/">Home</a>
       <a href="index.html">Overview</a>
       <a href="chapter-1.html">Ch 1</a>
       <a href="chapter-2.html">Ch 2</a>
@@ -116,7 +117,7 @@
           <p class="eyebrow">1. Attention as weighted lookup</p>
           <h2 id="attention-title">Query, key, value: score the tokens, then blend them.</h2>
           <p>
-            Attention gives every token three roles, each a short vector. The
+            <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">Attention</a> gives every token three roles, each a short vector. The
             <strong>query</strong> is what this token is looking for. The
             <strong>key</strong> is what each token offers. The
             <strong>value</strong> is the information each token passes along. To
@@ -161,12 +162,6 @@
               heatmap in the next section simply repeats it for every query token.
             </p>
           </div>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">Attention Is All You Need</a>
-            and
-            <a href="https://jalammar.github.io/illustrated-transformer/" target="_blank" rel="noreferrer">The Illustrated Transformer</a>
-          </p>
         </div>
 
         <div class="control-grid section-controls" aria-label="Attention controls">
@@ -232,12 +227,6 @@
             <img src="assets/figures/chapter5-causal-mask.gif" width="720" height="360" alt="Animated attention matrix for the cat sat on the mat, revealing the lower triangle as allowed past attention while future cells are crossed out." decoding="async">
             <figcaption>A GPT-style causal mask keeps only the lower triangle: each row can read itself and the past, never the future.</figcaption>
           </figure>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://bbycroft.net/llm" target="_blank" rel="noreferrer">an animated LLM walkthrough</a>
-            and
-            <a href="https://e2eml.school/transformers.html" target="_blank" rel="noreferrer">Transformers from scratch</a>
-          </p>
         </div>
 
         <div class="panel heatmap-panel">
@@ -431,12 +420,6 @@
             single feed-forward network for many, using only a few per token. The core
             you just built does not change; these are ways to afford more of it.
           </p>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://jalammar.github.io/illustrated-gpt2/" target="_blank" rel="noreferrer">The Illustrated GPT-2</a>
-            and
-            <a href="https://huggingface.co/docs/transformers/model_summary" target="_blank" rel="noreferrer">a tour of model architectures</a>
-          </p>
         </div>
       </div>
     </section>
@@ -478,6 +461,22 @@
             <a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noreferrer">Brown et al., Language Models are Few-Shot Learners (GPT-3)</a>
             <span>The decoder-only scaling result behind modern chat models.</span>
           </li>
+          <li>
+            <a href="https://jalammar.github.io/illustrated-gpt2/" target="_blank" rel="noreferrer">Alammar, The Illustrated GPT-2</a>
+            <span>A visual walkthrough of a decoder-only model, picking up where The Illustrated Transformer leaves off.</span>
+          </li>
+          <li>
+            <a href="https://bbycroft.net/llm" target="_blank" rel="noreferrer">Bycroft, LLM Visualization</a>
+            <span>An animated, zoomable 3D walkthrough of every step inside a GPT-style model.</span>
+          </li>
+          <li>
+            <a href="https://e2eml.school/transformers.html" target="_blank" rel="noreferrer">Rohrer, Transformers from Scratch</a>
+            <span>A from-first-principles written explanation of attention and the Transformer block.</span>
+          </li>
+          <li>
+            <a href="https://huggingface.co/docs/transformers/model_summary" target="_blank" rel="noreferrer">Hugging Face, A Tour of Model Architectures</a>
+            <span>A reference tour of encoder, decoder, and encoder-decoder model families.</span>
+          </li>
         </ol>
       </div>
     </section>
@@ -501,6 +500,6 @@
   </main>
 
   <script src="chapter5.js"></script>
+  <script src="site.js" defer></script>
 </body>
 </html>
-

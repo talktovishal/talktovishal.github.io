@@ -17,6 +17,7 @@
       </span>
     </a>
     <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="https://talktovishal.github.io/">Home</a>
       <a href="index.html">Overview</a>
       <a href="chapter-1.html">Ch 1</a>
       <a href="chapter-2.html">Ch 2</a>
@@ -131,12 +132,6 @@
               effective number of next-token choices.
             </p>
           </div>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://jalammar.github.io/illustrated-bert/" target="_blank" rel="noreferrer">masked vs causal pretraining</a>
-            and
-            <a href="https://arxiv.org/abs/1910.10683" target="_blank" rel="noreferrer">the T5 denoising study</a>
-          </p>
         </div>
 
         <div class="control-grid section-controls" aria-label="Objective controls">
@@ -232,12 +227,6 @@
               evidence gets repeated and what gets removed.
             </p>
           </div>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://arxiv.org/abs/2101.00027" target="_blank" rel="noreferrer">the Pile dataset</a>
-            and
-            <a href="https://arxiv.org/abs/2306.01116" target="_blank" rel="noreferrer">filtering web data at scale</a>
-          </p>
         </div>
       </div>
     </section>
@@ -260,7 +249,7 @@
             train on less data, and vice versa. Pick a budget, then slide the model
             size along it. The curve shows the predicted loss, and the marked point is
             the <strong>compute-optimal</strong> balance, the lesson made famous by the
-            Chinchilla result: most early large models were too big and badly
+            <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noreferrer">Chinchilla result</a>: most early large models were too big and badly
             undertrained.
           </p>
           <div class="worked-example" aria-label="Scaling law compute by hand">
@@ -285,12 +274,6 @@
             <img src="assets/figures/chapter6-compute-balance.gif" width="720" height="360" alt="Animated seesaw showing a fixed compute budget, where increasing model size N reduces the amount of training data D, and a balanced middle point is marked." decoding="async">
             <figcaption>For a fixed compute budget, model size and training data trade off against each other. The sweet spot is a balance, not the largest model you can name.</figcaption>
           </figure>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noreferrer">the Chinchilla scaling paper</a>
-            and
-            <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noreferrer">the original scaling laws</a>
-          </p>
         </div>
 
         <div class="control-grid section-controls" aria-label="Scaling controls">
@@ -371,12 +354,6 @@
               devices so each GPU carries only part of the burden.
             </p>
           </div>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://arxiv.org/abs/1910.02054" target="_blank" rel="noreferrer">the ZeRO memory paper</a>
-            and
-            <a href="https://huggingface.co/docs/transformers/perf_train_gpu_many" target="_blank" rel="noreferrer">a guide to model parallelism</a>
-          </p>
         </div>
 
         <div class="control-grid section-controls" aria-label="Memory controls">
@@ -427,6 +404,10 @@
             <span>A widely used, openly documented pretraining dataset.</span>
           </li>
           <li>
+            <a href="https://arxiv.org/abs/2306.01116" target="_blank" rel="noreferrer">Penedo et al., The RefinedWeb Dataset</a>
+            <span>Large-scale filtering and deduplication of web text for pretraining.</span>
+          </li>
+          <li>
             <a href="https://arxiv.org/abs/1910.02054" target="_blank" rel="noreferrer">Rajbhandari et al., ZeRO</a>
             <span>Memory optimizations that shard optimizer state, gradients, and weights.</span>
           </li>
@@ -435,8 +416,16 @@
             <span>Tensor and pipeline parallelism for training very large Transformers.</span>
           </li>
           <li>
+            <a href="https://huggingface.co/docs/transformers/perf_train_gpu_many" target="_blank" rel="noreferrer">Hugging Face, Multi-GPU Training Methods</a>
+            <span>A practical guide to data, tensor, and pipeline parallelism.</span>
+          </li>
+          <li>
             <a href="https://arxiv.org/abs/1910.10683" target="_blank" rel="noreferrer">Raffel et al., T5</a>
             <span>A careful study of pretraining objectives and transfer with a unified text-to-text setup.</span>
+          </li>
+          <li>
+            <a href="https://jalammar.github.io/illustrated-bert/" target="_blank" rel="noreferrer">Alammar, The Illustrated BERT</a>
+            <span>A visual explanation of masked-language pretraining and contextual embeddings.</span>
           </li>
         </ol>
       </div>
@@ -461,6 +450,6 @@
   </main>
 
   <script src="chapter6.js"></script>
+  <script src="site.js" defer></script>
 </body>
 </html>
-

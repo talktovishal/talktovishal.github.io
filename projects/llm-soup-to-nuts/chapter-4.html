@@ -17,6 +17,7 @@
       </span>
     </a>
     <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="https://talktovishal.github.io/">Home</a>
       <a href="index.html">Overview</a>
       <a href="chapter-1.html">Ch 1</a>
       <a href="chapter-2.html">Ch 2</a>
@@ -155,7 +156,7 @@
           <div class="worked-example" aria-label="Token count cost by hand">
             <h3>Token cost by hand</h3>
             <p>
-              Imagine one sentence becomes 12 tokens with a good subword tokenizer,
+              Imagine one sentence becomes 12 tokens with a good <a href="https://en.wikipedia.org/wiki/Byte_pair_encoding" target="_blank" rel="noreferrer">subword tokenizer</a>,
               but 20 tokens with a byte-heavy tokenizer. The text looks the same to
               you, but the Transformer does more pairwise comparisons.
             </p>
@@ -170,12 +171,6 @@
               starts reasoning about meaning.
             </p>
           </div>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://en.wikipedia.org/wiki/Byte_pair_encoding" target="_blank" rel="noreferrer">byte pair encoding</a>
-            and
-            <a href="https://huggingface.co/learn/nlp-course/chapter6/1" target="_blank" rel="noreferrer">the Hugging Face tokenizers course</a>
-          </p>
         </div>
 
         <div class="corpus-picker tokenizer-corpus-picker">
@@ -257,12 +252,6 @@
             <img src="assets/figures/chapter4-bpe-merges.gif" width="720" height="360" alt="Animated BPE merge sequence that starts with h plus u plus g and gradually forms hug, then reuses hug inside hugs and hugging." decoding="async">
             <figcaption>BPE grows a vocabulary by repeatedly joining frequent neighbors, turning character pieces into reusable chunks.</figcaption>
           </figure>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://arxiv.org/abs/1508.07909" target="_blank" rel="noreferrer">BPE for rare words</a>,
-            <a href="https://arxiv.org/abs/1804.10959" target="_blank" rel="noreferrer">Unigram subword regularization</a>, and
-            <a href="https://arxiv.org/abs/1808.06226" target="_blank" rel="noreferrer">SentencePiece</a>
-          </p>
         </div>
 
         <div class="tokenizer-layout">
@@ -322,9 +311,9 @@ return trainBpeAndEncode(tokenizerText, 90);</textarea>
           </p>
           <p>
             Pick a case and inspect the output. Sometimes the visible text and the
-            tokenized input are not as similar as they look, and that gap can affect
+            <a href="https://tiktokenizer.vercel.app/" target="_blank" rel="noreferrer">tokenized input</a> are not as similar as they look, and that gap can affect
             cost, evidence, safety, and fairness. The hidden-text case is a small
-            preview of prompt-injection risks we will revisit much later.
+            preview of <a href="https://owasp.org/www-project-top-10-for-large-language-model-applications/" target="_blank" rel="noreferrer">prompt-injection risks</a> we will revisit much later.
           </p>
           <div class="worked-example" aria-label="Token tax edge case by hand">
             <h3>A token tax is evidence, not destiny</h3>
@@ -346,12 +335,6 @@ return trainBpeAndEncode(tokenizerText, 90);</textarea>
               tokenizer gives it.
             </p>
           </div>
-          <p class="learn-more">
-            Learn more:
-            <a href="https://tiktokenizer.vercel.app/" target="_blank" rel="noreferrer">an interactive tokenizer for real models</a>
-            and
-            <a href="https://owasp.org/www-project-top-10-for-large-language-model-applications/" target="_blank" rel="noreferrer">OWASP Top 10 for LLM applications</a>
-          </p>
         </div>
 
         <div class="tokenizer-layout">
@@ -443,6 +426,8 @@ return trainBpeAndEncode(tokenizerText, 90);</textarea>
 
   <script src="corpora.js"></script>
   <script src="chapter4.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script defer src="code-highlight.js"></script>
+  <script src="site.js" defer></script>
 </body>
 </html>
-
