@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transformers and Attention - LLM Soup to Nuts</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="chapter5.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="LLM Soup to Nuts overview">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>
+        <strong>LLM Soup to Nuts</strong>
+        <small>Chapter 5</small>
+      </span>
+    </a>
+    <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="index.html">Overview</a>
+      <a href="chapter-1.html">Ch 1</a>
+      <a href="chapter-2.html">Ch 2</a>
+      <a href="chapter-3.html">Ch 3</a>
+      <a href="chapter-4.html">Ch 4</a>
+      <a class="is-active" href="chapter-5.html">Ch 5</a>
+      <a href="chapter-6.html">Ch 6</a>
+    </nav>
+  </header>
+
+  <aside class="lesson-toc" aria-label="Table of contents">
+    <p>Chapter 5</p>
+    <nav>
+      <a href="#overview"><span>00</span>Overview</a>
+      <a href="#attention"><span>01</span>Attention as weighted lookup</a>
+      <a href="#heatmap"><span>02</span>The attention map</a>
+      <a href="#internals"><span>03</span>Inside a Transformer block</a>
+      <a href="#realmodel"><span>04</span>A real Transformer</a>
+      <a href="#variants"><span>05</span>Families and variants</a>
+      <a href="#references"><span>06</span>References</a>
+    </nav>
+  </aside>
+
+  <main id="top">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title">
+      <div class="workbench">
+        <article class="intro-copy">
+          <p class="eyebrow">Learning by doing</p>
+          <h1 id="page-title">Transformers: let every token look at every other token.</h1>
+          <p class="lead">
+            Chapter 2 ended with a problem. Recurrent models read one token at a time
+            and carry a single note forward, so a clue from far back has to survive a
+            long, lossy journey. The Transformer threw out that journey. Instead of
+            passing a note down a chain, it lets each token reach out and look directly
+            at every other token, all at once.
+          </p>
+          <p>
+            That single idea, called <strong>attention</strong>, is the engine inside
+            every modern LLM. The good news: you already have the math. Attention is
+            built from the dot products and softmax you met in Chapter 3. This chapter
+            assembles those pieces into the mechanism, then lets you run a real
+            Transformer in your own browser.
+          </p>
+          <figure class="diagram-figure">
+            <svg class="pipeline-svg attn-overview-svg" viewBox="0 0 460 210" role="img" aria-labelledby="attn-ov-title attn-ov-desc">
+              <title id="attn-ov-title">Every token can attend to every other token</title>
+              <desc id="attn-ov-desc">Four tokens are connected to each other by lines, showing that in self-attention each token can look at all the others at once, rather than passing information down a chain.</desc>
+              <line x1="120" y1="64" x2="340" y2="64" class="attn-edge"></line>
+              <line x1="120" y1="64" x2="120" y2="166" class="attn-edge"></line>
+              <line x1="120" y1="64" x2="340" y2="166" class="attn-edge attn-edge-strong"></line>
+              <line x1="340" y1="64" x2="120" y2="166" class="attn-edge"></line>
+              <line x1="340" y1="64" x2="340" y2="166" class="attn-edge"></line>
+              <line x1="120" y1="166" x2="340" y2="166" class="attn-edge"></line>
+              <circle cx="120" cy="64" r="27" class="attn-node is-query"></circle>
+              <text x="120" y="69" class="attn-node-text" text-anchor="middle">the</text>
+              <circle cx="340" cy="64" r="27" class="attn-node"></circle>
+              <text x="340" y="69" class="attn-node-text" text-anchor="middle">cat</text>
+              <circle cx="120" cy="166" r="27" class="attn-node"></circle>
+              <text x="120" y="171" class="attn-node-text" text-anchor="middle">sat</text>
+              <circle cx="340" cy="166" r="27" class="attn-node"></circle>
+              <text x="340" y="171" class="attn-node-text" text-anchor="middle">mat</text>
+              <text x="230" y="200" class="svg-caption" text-anchor="middle">No chain to travel down: each token reads every other token directly.</text>
+            </svg>
+            <figcaption>Self-attention connects every token to every other token in one step, so distance no longer fades the signal.</figcaption>
+          </figure>
+          <p class="example-note">
+            <em>Guiding question:</em> when the model is about to predict the word
+            after <code>the cat sat on the</code>, how does it decide that
+            <code>cat</code> matters more than <code>the</code>? Attention is the
+            answer, and it is just weighted lookup.
+          </p>
+          <div class="idea-flow" aria-label="Chapter flow">
+            <div>
+              <strong>Weighted lookup</strong>
+              <span>Score every token with a query and key, then blend their values.</span>
+            </div>
+            <div>
+              <strong>Read the map</strong>
+              <span>See the full attention matrix and what causal masking changes.</span>
+            </div>
+            <div>
+              <strong>Stack the block</strong>
+              <span>Add positions, residuals, normalization, and a feed-forward layer.</span>
+            </div>
+            <div>
+              <strong>Run the real thing</strong>
+              <span>Load a real GPT model and read its next-token probabilities.</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="attention" class="band" aria-labelledby="attention-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">1. Attention as weighted lookup</p>
+          <h2 id="attention-title">Query, key, value: score the tokens, then blend them.</h2>
+          <p>
+            Attention gives every token three roles, each a short vector. The
+            <strong>query</strong> is what this token is looking for. The
+            <strong>key</strong> is what each token offers. The
+            <strong>value</strong> is the information each token passes along. To
+            update one token, we compare its query against every key with a
+            <strong>dot product</strong> (the same similarity score from Chapter 3),
+            divide by <code>&#8730;d</code> to keep the numbers tame, and run the
+            scores through <strong>softmax</strong> to get weights that add to 1.
+          </p>
+          <p>
+            The new representation of the token is then the weighted sum of all the
+            value vectors. High-scoring tokens contribute more. That is the whole
+            mechanism: <code>attention(q) = softmax(q &middot; K / &#8730;d) &middot; V</code>.
+            Below, the six tokens of <code>the cat sat on the mat</code> each carry a
+            hand-picked query, key, and value so you can watch the weighted lookup
+            happen. In a real model these vectors are learned.
+          </p>
+          <p>
+            Where do those vectors come from? The model starts with the token vectors
+            from the embedding table, then learns three projection matrices:
+            <code>W_Q</code>, <code>W_K</code>, and <code>W_V</code>. Multiplying the
+            current token representations by those matrices gives
+            <code>Q = XW_Q</code>, <code>K = XW_K</code>, and <code>V = XW_V</code>.
+            The interactive below skips the learned matrices and gives you the
+            resulting vectors directly, so the attention math itself is visible.
+          </p>
+          <div class="worked-example" aria-label="One attention row by hand">
+            <h3>One attention row by hand</h3>
+            <p>
+              Use the default query token, <code>sat</code>. Its query is
+              <code>[0.0, 0.9, 0.1, 0.4]</code>. The key for <code>cat</code> is
+              <code>[0.0, 1.0, 0.0, 0.1]</code>. Their dot product is high because
+              both point strongly at the subject channel.
+            </p>
+            <div class="formula-stack">
+              <code>q_sat dot k_cat = 0.0*0.0 + 0.9*1.0 + 0.1*0.0 + 0.4*0.1 = 0.94</code>
+              <code>scaled score = 0.94 / sqrt(4) = 0.47</code>
+              <code>softmax over all six scaled scores gives weights about [14%, 22%, 15%, 15%, 14%, 19%]</code>
+              <code>output_sat = weighted sum of value vectors = [0.38, 0.32, 0.18, 0.31]</code>
+            </div>
+            <p class="microcopy">
+              The bars below are this same calculation for every key token. The
+              heatmap in the next section simply repeats it for every query token.
+            </p>
+          </div>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">Attention Is All You Need</a>
+            and
+            <a href="https://jalammar.github.io/illustrated-transformer/" target="_blank" rel="noreferrer">The Illustrated Transformer</a>
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Attention controls">
+          <label class="select-row" for="queryTokenSelect">
+            <span>Query token</span>
+            <select id="queryTokenSelect" class="control-input"></select>
+          </label>
+          <label class="check-row">
+            <input id="causalToggle" type="checkbox">
+            <span>Causal mask (a token sees only itself and earlier tokens)</span>
+          </label>
+        </div>
+
+        <div class="two-column">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Attention weights</h3>
+              <span class="pill">softmax of scores</span>
+            </div>
+            <p class="microcopy">Each bar is how much the query token attends to that token. The bars add up to 100%.</p>
+            <div id="qkvScores" class="attn-bars" aria-live="polite"></div>
+            <p id="qkvFormula" class="formula-line"></p>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>The blended result</h3>
+              <span class="pill">weighted sum of values</span>
+            </div>
+            <div id="qkvOutput" class="vector-readout" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="heatmap" class="band band-muted" aria-labelledby="heatmap-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">2. The attention map</p>
+          <h2 id="heatmap-title">Do it for every token at once, and you get a heatmap.</h2>
+          <p>
+            Run that same weighted lookup with every token taking a turn as the query,
+            and you get a full <strong>attention matrix</strong>: one row per query
+            token, one column per key token, each cell showing how much that row
+            attends to that column. This is exactly what people mean when they show an
+            "attention pattern." Brighter cells are stronger attention.
+          </p>
+          <p>
+            Toggle the <strong>causal mask</strong> from the controls above. Models
+            that generate text left to right are not allowed to peek at the future, so
+            each token may only attend to itself and earlier tokens. That blanks out
+            the upper triangle of the map, and the remaining weights are renormalized.
+            This single rule is what makes a Transformer a next-token predictor rather
+            than a fill-in-the-blank reader.
+          </p>
+          <p>
+            Mathematically, the mask is simple and a little dramatic: future positions
+            get a score of <code>-Infinity</code> before softmax. Exponentiating
+            <code>-Infinity</code> gives zero, so those future tokens receive exactly
+            no attention weight. Then softmax redistributes the probability mass over
+            the allowed past tokens.
+          </p>
+          <figure class="intuition-figure">
+            <img src="assets/figures/chapter5-causal-mask.gif" width="720" height="360" alt="Animated attention matrix for the cat sat on the mat, revealing the lower triangle as allowed past attention while future cells are crossed out." decoding="async">
+            <figcaption>A GPT-style causal mask keeps only the lower triangle: each row can read itself and the past, never the future.</figcaption>
+          </figure>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://bbycroft.net/llm" target="_blank" rel="noreferrer">an animated LLM walkthrough</a>
+            and
+            <a href="https://e2eml.school/transformers.html" target="_blank" rel="noreferrer">Transformers from scratch</a>
+          </p>
+        </div>
+
+        <div class="panel heatmap-panel">
+          <div class="section-title-row">
+            <h3>Self-attention matrix</h3>
+            <span id="heatmapStatus" class="pill">full attention</span>
+          </div>
+          <p class="microcopy">Rows are the query token; columns are the key token. Each number is the attention weight as a percent.</p>
+          <div id="attentionHeatmap" class="attention-heatmap" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="internals" class="band" aria-labelledby="internals-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">3. Inside a Transformer block</p>
+          <h2 id="internals-title">Attention is the heart, but a block has a few more parts.</h2>
+          <p>
+            Attention by itself ignores word order: shuffle the tokens and the dot
+            products are unchanged. So before the first block, every token embedding
+            gets a <strong>positional encoding</strong> added to it, a signal that says
+            where the token sits in the sequence. Now <code>the cat</code> and
+            <code>cat the</code> look different to the model.
+          </p>
+          <p>
+            A real model also runs several attention patterns in parallel, called
+            <strong>multi-head attention</strong>. One head might track the subject of a
+            verb while another tracks nearby punctuation. Their results are joined and
+            passed on. Around each sub-layer sit two workhorses from good neural-network
+            design: a <strong>residual connection</strong> that adds the input back to
+            the output so signal and gradients flow freely, and
+            <strong>layer normalization</strong> that keeps the numbers in a stable
+            range. Finally a small <strong>feed-forward network</strong> processes each
+            position on its own. Stack this block dozens of times and you have a GPT.
+          </p>
+        </div>
+
+        <div class="worked-example" aria-label="One Transformer block as equations">
+          <h3>One block as equations</h3>
+          <p>
+            Here is a compact post-normalization version that matches the diagram.
+            The shapes matter: if the sequence has <code>T</code> tokens and each
+            vector has <code>d_model</code> numbers, then <code>X</code> is a
+            <code>T by d_model</code> table. Attention mixes information across
+            tokens; the feed-forward network transforms each row independently.
+          </p>
+          <div class="formula-stack">
+            <code>X0 = token_embeddings + positional_embeddings</code>
+            <code>head_i = Attention(X0 W_Qi, X0 W_Ki, X0 W_Vi)</code>
+            <code>multi_head = concat(head_1, ..., head_h) W_O</code>
+            <code>X1 = LayerNorm(X0 + multi_head)</code>
+            <code>X2 = LayerNorm(X1 + FFN(X1))</code>
+          </div>
+          <p class="microcopy">
+            The residual additions are the skip paths. They let the block change a
+            representation without forcing it to forget what it already knew.
+          </p>
+        </div>
+
+        <div class="two-column">
+          <figure class="diagram-figure block-figure">
+            <svg class="pipeline-svg block-svg" viewBox="0 0 300 360" role="img" aria-labelledby="block-title block-desc">
+              <title id="block-title">One Transformer block</title>
+              <desc id="block-desc">Tokens plus positional encodings flow into multi-head attention, then add and normalize, then a feed-forward network, then add and normalize again, producing the block output.</desc>
+              <rect x="60" y="12" width="180" height="34" rx="8" class="svg-box-soft"></rect>
+              <text x="150" y="34" class="svg-word" text-anchor="middle">tokens + positions</text>
+              <line x1="150" y1="46" x2="150" y2="66" class="svg-arrow" marker-end="url(#b-arrow)"></line>
+              <rect x="40" y="66" width="220" height="38" rx="8" class="svg-box-accent"></rect>
+              <text x="150" y="89" class="svg-model-text" text-anchor="middle">multi-head attention</text>
+              <line x1="150" y1="104" x2="150" y2="124" class="svg-arrow" marker-end="url(#b-arrow)"></line>
+              <rect x="60" y="124" width="180" height="32" rx="8" class="svg-box-plain"></rect>
+              <text x="150" y="145" class="svg-word" text-anchor="middle">add &amp; normalize</text>
+              <line x1="150" y1="156" x2="150" y2="176" class="svg-arrow" marker-end="url(#b-arrow)"></line>
+              <rect x="40" y="176" width="220" height="38" rx="8" class="svg-box-accent"></rect>
+              <text x="150" y="199" class="svg-model-text" text-anchor="middle">feed-forward network</text>
+              <line x1="150" y1="214" x2="150" y2="234" class="svg-arrow" marker-end="url(#b-arrow)"></line>
+              <rect x="60" y="234" width="180" height="32" rx="8" class="svg-box-plain"></rect>
+              <text x="150" y="255" class="svg-word" text-anchor="middle">add &amp; normalize</text>
+              <line x1="150" y1="266" x2="150" y2="286" class="svg-arrow" marker-end="url(#b-arrow)"></line>
+              <rect x="60" y="286" width="180" height="34" rx="8" class="svg-box-soft"></rect>
+              <text x="150" y="308" class="svg-word" text-anchor="middle">block output</text>
+              <text x="150" y="344" class="svg-caption" text-anchor="middle">Stack this block many times to build a GPT.</text>
+              <defs>
+                <marker id="b-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>A single block: attention, then a feed-forward network, each wrapped in a residual connection and normalization.</figcaption>
+          </figure>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Why each part earns its place</h3>
+              <span class="pill">quick reference</span>
+            </div>
+            <div class="detail-list">
+              <div class="detail-row"><span>positional encoding</span><strong>gives attention a sense of order</strong></div>
+              <div class="detail-row"><span>multi-head attention</span><strong>several attention patterns at once</strong></div>
+              <div class="detail-row"><span>residual connection</span><strong>adds input back so signal survives depth</strong></div>
+              <div class="detail-row"><span>layer normalization</span><strong>keeps activations in a stable range</strong></div>
+              <div class="detail-row"><span>feed-forward network</span><strong>processes each position on its own</strong></div>
+              <div class="detail-row"><span>causal mask</span><strong>hides the future for left-to-right generation</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="realmodel" class="band band-muted" aria-labelledby="realmodel-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">4. A real Transformer</p>
+          <h2 id="realmodel-title">Read the next-token probabilities of a real GPT model.</h2>
+          <p>
+            Everything so far was a hand-built miniature. Now meet the real thing.
+            The button below loads <strong>distilGPT-2</strong>, a small but genuine
+            82-million-parameter Transformer, and runs it entirely in your browser
+            using the <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noreferrer">transformers.js</a>
+            library. Nothing is sent to a server; the model weights download once and
+            then your typing is processed on your own machine.
+          </p>
+          <p>
+            When it is ready, type a prompt and ask for the next-token probabilities.
+            You are looking at the exact same picture as Chapter 1's prediction bars,
+            the model's guess for what comes next, except these numbers come from a
+            real Transformer with learned attention instead of a small count table.
+            That is the whole arc of this course in one view.
+          </p>
+        </div>
+
+        <div class="panel model-loader">
+          <div class="stepper-row">
+            <button id="loadModelButton" class="primary-button" type="button">Load the real model</button>
+          </div>
+          <p id="modelStatus" class="model-status">The model downloads on the first click (a one-time download of roughly fifty megabytes), then runs offline from your browser cache. The attention demos above need no download.</p>
+        </div>
+
+        <div id="modelPanel" class="model-panel" hidden>
+          <div class="predict-box">
+            <label class="field-label" for="promptInput">Prompt</label>
+            <div class="inline-action">
+              <input id="promptInput" class="control-input" type="text" value="The cat sat on the" autocomplete="off">
+              <button id="predictButton" class="primary-button" type="button">Show next-token probabilities</button>
+            </div>
+            <div class="stepper-row">
+              <button id="generateButton" class="ghost-button" type="button">Generate 12 tokens (greedy)</button>
+            </div>
+          </div>
+          <div class="two-column">
+            <div class="panel">
+              <div class="section-title-row">
+                <h3>Most likely next tokens</h3>
+                <span class="pill">real distilGPT-2</span>
+              </div>
+              <div id="nextTokenBars" class="attn-bars" aria-live="polite"></div>
+            </div>
+            <div class="panel">
+              <div class="section-title-row">
+                <h3>Greedy continuation</h3>
+                <span class="pill">always take the top token</span>
+              </div>
+              <div id="generatedText" class="generated-output" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="variants" class="band" aria-labelledby="variants-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">5. Families and variants</p>
+          <h2 id="variants-title">One block, many family trees.</h2>
+          <p>
+            The same block powers models that feel quite different, mostly because of
+            how attention is masked and which way the model reads. <strong>Decoder-only</strong>
+            models like the GPT family use a causal mask and predict the next token;
+            they are the basis of most chat assistants. <strong>Encoder-only</strong>
+            models like BERT drop the mask, read the whole sentence at once, and are
+            great for understanding tasks. <strong>Encoder-decoder</strong> models like
+            T5 pair a reader with a writer for translation and summarization.
+          </p>
+          <p>
+            Beyond the family split, most scaling tricks are about making attention
+            cheaper or the network bigger without paying full price.
+            <strong>Multi-query</strong> and <strong>grouped-query attention</strong>
+            share keys and values across heads to save memory.
+            <strong>Sliding-window</strong> and <strong>sparse attention</strong> limit
+            how far each token looks. A <strong>mixture of experts</strong> swaps the
+            single feed-forward network for many, using only a few per token. The core
+            you just built does not change; these are ways to afford more of it.
+          </p>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://jalammar.github.io/illustrated-gpt2/" target="_blank" rel="noreferrer">The Illustrated GPT-2</a>
+            and
+            <a href="https://huggingface.co/docs/transformers/model_summary" target="_blank" rel="noreferrer">a tour of model architectures</a>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="references" class="band band-muted" aria-labelledby="references-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">6. Going deeper</p>
+          <h2 id="references-title">Further reading.</h2>
+          <p>
+            Start with the original Transformer paper, then use the illustrated guides
+            to build intuition, and the libraries to keep experimenting with real
+            models in the browser or in Python.
+          </p>
+        </div>
+
+        <ol class="reference-list">
+          <li>
+            <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">Vaswani et al., Attention Is All You Need</a>
+            <span>The paper that introduced the Transformer and self-attention.</span>
+          </li>
+          <li>
+            <a href="https://jalammar.github.io/illustrated-transformer/" target="_blank" rel="noreferrer">Alammar, The Illustrated Transformer</a>
+            <span>The most popular visual walkthrough of attention and the encoder-decoder block.</span>
+          </li>
+          <li>
+            <a href="https://nlp.seas.harvard.edu/annotated-transformer/" target="_blank" rel="noreferrer">The Annotated Transformer</a>
+            <span>A line-by-line PyTorch implementation alongside the paper.</span>
+          </li>
+          <li>
+            <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noreferrer">transformers.js</a>
+            <span>The library used in this chapter to run real models in the browser.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1810.04805" target="_blank" rel="noreferrer">Devlin et al., BERT</a>
+            <span>The encoder-only model that popularized masked-language pretraining.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noreferrer">Brown et al., Language Models are Few-Shot Learners (GPT-3)</a>
+            <span>The decoder-only scaling result behind modern chat models.</span>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="chapter-nav-band" aria-label="Chapter navigation">
+      <div class="section-shell">
+        <nav class="chapter-nav">
+          <a class="chapter-nav-card" href="chapter-4.html">
+            <span>Previous chapter</span>
+            <strong>Chapter 4: Tokenization</strong>
+            <em>Return to how text becomes the tokens a model reads.</em>
+          </a>
+          <a class="chapter-nav-card" href="chapter-6.html">
+            <span>Next chapter</span>
+            <strong>Chapter 6: Pretraining LLMs</strong>
+            <em>How these blocks are trained on the open web at scale.</em>
+          </a>
+        </nav>
+      </div>
+    </section>
+  </main>
+
+  <script src="chapter5.js"></script>
+</body>
+</html>
+

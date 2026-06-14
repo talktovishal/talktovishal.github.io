@@ -1,0 +1,171 @@
+/* Chapter 6: Pretraining. Component styles layered on styles.css. */
+
+/* Objective toggle uses buttons rather than radios. */
+#objectives .choice-group {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 360px;
+}
+
+.choice-group .choice-pill {
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fbfaf7;
+  color: #3f3b36;
+  font-size: 0.86rem;
+  font-weight: 850;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.choice-group .choice-pill:hover {
+  border-color: var(--teal);
+}
+
+.choice-group .choice-pill.is-active {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: #ffffff;
+}
+
+/* Objective example token rail. */
+.objective-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+
+.obj-chip {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-width: 64px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffefa;
+}
+
+.obj-chip strong {
+  font-size: 0.98rem;
+}
+
+.obj-chip small {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.obj-chip.is-context {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+}
+
+.obj-chip.is-target {
+  border-color: var(--teal);
+  background: var(--teal);
+}
+
+.obj-chip.is-target strong {
+  color: #fffefa;
+}
+
+.obj-chip.is-target small {
+  color: #fff0e4;
+}
+
+.obj-chip.is-hidden {
+  opacity: 0.42;
+  border-style: dashed;
+}
+
+/* Scaling-law chart. */
+.scaling-chart {
+  display: flex;
+  justify-content: center;
+}
+
+.scaling-svg {
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffefa;
+  padding: 6px;
+}
+
+.scaling-axis {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.2;
+}
+
+.scaling-axis-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.scaling-curve {
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 2.4;
+}
+
+.scaling-optimal-line {
+  stroke: var(--gold);
+  stroke-width: 1.4;
+  stroke-dasharray: 5 4;
+}
+
+.scaling-optimal-dot {
+  fill: var(--gold);
+}
+
+.scaling-chosen-dot {
+  fill: var(--coral);
+  stroke: #fffefa;
+  stroke-width: 1.5;
+}
+
+/* Readout / memory lists. */
+.detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.detail-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.1fr) minmax(0, 0.9fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.detail-row span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.detail-row strong {
+  font-weight: 850;
+  text-align: right;
+}
+
+.detail-row.is-total {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.detail-row.is-total strong {
+  color: var(--teal);
+  font-size: 1.05rem;
+}

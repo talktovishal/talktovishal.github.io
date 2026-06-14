@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tokenization - LLM Soup to Nuts</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="chapter2.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="LLM Soup to Nuts overview">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>
+        <strong>LLM Soup to Nuts</strong>
+        <small>Chapter 4</small>
+      </span>
+    </a>
+    <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="index.html">Overview</a>
+      <a href="chapter-1.html">Ch 1</a>
+      <a href="chapter-2.html">Ch 2</a>
+      <a href="chapter-3.html">Ch 3</a>
+      <a class="is-active" href="chapter-4.html">Ch 4</a>
+      <a href="chapter-5.html">Ch 5</a>
+      <a href="chapter-6.html">Ch 6</a>
+    </nav>
+  </header>
+
+  <aside class="lesson-toc" aria-label="Table of contents">
+    <p>Chapter 4</p>
+    <nav>
+      <a href="#overview"><span>00</span>Overview</a>
+      <a href="#why"><span>01</span>Why tokenization matters</a>
+      <a href="#algorithms"><span>02</span>Tokenizer algorithms</a>
+      <a href="#edges"><span>03</span>Tokenization edge cases</a>
+      <a href="#references"><span>04</span>References</a>
+    </nav>
+  </aside>
+
+  <main id="top">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title">
+      <div class="workbench">
+        <article class="intro-copy">
+          <p class="eyebrow">Learning by doing</p>
+          <h1 id="page-title">Tokenization: how text becomes the pieces a model reads.</h1>
+          <p class="lead">
+            Every chapter so far quietly split text into pieces before doing anything
+            else. Chapter 1 just cut on spaces. Real models do something smarter, and
+            that choice shapes cost, speed, memory, and even fairness. This chapter is
+            about that first, easy-to-overlook step.
+          </p>
+          <p>
+            Here is the thing to hold onto: a neural model never sees your letters. It
+            sees <strong>token IDs</strong>, plain integers that index into its
+            embedding table. So before any math happens, some tokenizer has to chop
+            your text into known pieces and look up their numbers. Pick the pieces
+            badly and a common word becomes three tokens; pick them well and a rare
+            word still spells out from familiar parts.
+          </p>
+          <figure class="diagram-figure">
+            <svg class="pipeline-svg" viewBox="0 0 640 150" role="img" aria-labelledby="pipeline-title pipeline-desc">
+              <title id="pipeline-title">From text to token IDs to model</title>
+              <desc id="pipeline-desc">The word unbelievable is split into the subword pieces un, believ, and able, each mapped to an integer ID, which the neural model reads.</desc>
+              <text x="16" y="26" class="svg-label">raw text</text>
+              <rect x="14" y="36" width="150" height="40" rx="8" class="svg-box-soft"></rect>
+              <text x="89" y="61" class="svg-word" text-anchor="middle">unbelievable</text>
+
+              <text x="214" y="26" class="svg-label">subword pieces</text>
+              <rect x="208" y="36" width="58" height="40" rx="8" class="svg-chip"></rect>
+              <text x="237" y="61" class="svg-chip-text" text-anchor="middle">un</text>
+              <rect x="270" y="36" width="74" height="40" rx="8" class="svg-chip"></rect>
+              <text x="307" y="61" class="svg-chip-text" text-anchor="middle">believ</text>
+              <rect x="348" y="36" width="60" height="40" rx="8" class="svg-chip"></rect>
+              <text x="378" y="61" class="svg-chip-text" text-anchor="middle">able</text>
+
+              <text x="452" y="26" class="svg-label">token IDs</text>
+              <rect x="446" y="36" width="78" height="40" rx="8" class="svg-box-soft"></rect>
+              <text x="485" y="61" class="svg-id" text-anchor="middle">[ 412 · 88 · 21 ]</text>
+
+              <text x="556" y="26" class="svg-label">model</text>
+              <rect x="556" y="36" width="70" height="40" rx="8" class="svg-box-accent"></rect>
+              <text x="591" y="61" class="svg-model-text" text-anchor="middle">reads</text>
+
+              <line x1="166" y1="56" x2="206" y2="56" class="svg-arrow" marker-end="url(#arrowhead)"></line>
+              <line x1="410" y1="56" x2="444" y2="56" class="svg-arrow" marker-end="url(#arrowhead)"></line>
+              <line x1="526" y1="56" x2="554" y2="56" class="svg-arrow" marker-end="url(#arrowhead)"></line>
+
+              <text x="320" y="118" class="svg-caption" text-anchor="middle">Letters in, integers out. The model only ever sees the integers.</text>
+              <defs>
+                <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>A subword tokenizer keeps common chunks whole and spells rarer words from familiar parts.</figcaption>
+          </figure>
+          <p class="example-note">
+            <em>Guiding question:</em> if the word <code>unbelievable</code> never
+            appeared in training, how can the model still handle it? The answer is that
+            it was never stored as one piece. It was stored as parts the model has seen
+            many times.
+          </p>
+          <div class="idea-flow" aria-label="Chapter flow">
+            <div>
+              <strong>Compare boundaries</strong>
+              <span>See how words, characters, bytes, and subwords disagree on the same text.</span>
+            </div>
+            <div>
+              <strong>Train a tokenizer</strong>
+              <span>Watch BPE, WordPiece, and Unigram learn their pieces from a corpus.</span>
+            </div>
+            <div>
+              <strong>Probe edge cases</strong>
+              <span>Inspect code, emoji, numbers, and rare names, where assumptions break.</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="why" class="band" aria-labelledby="why-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">1. Why tokenization matters</p>
+          <h2 id="why-title">The same sentence can be many different lengths.</h2>
+          <p>
+            Chapter 1 used a simple tokenizer so we could count words. That was fine
+            for counting, but it hides a real decision. Should the unit be a whole
+            <strong>word</strong>, a single <strong>character</strong>, a raw
+            <strong>byte</strong>, or a <strong>subword</strong> chunk in between?
+            Each answer changes how many tokens a sentence becomes, and token count is
+            what you pay for in money, memory, and latency.
+          </p>
+          <p>
+            Whole words are easy to read, but rare words have no entry and break.
+            Characters and bytes can spell anything, but they make long sequences that
+            are slow and expensive. <strong>Subwords</strong> are the middle path used
+            by almost every modern model: keep frequent pieces whole, split rarer
+            words into reusable parts. Type into the box and watch the four views
+            disagree on the very same text.
+          </p>
+          <p>
+            There is a useful little budget hiding here. If a prompt has
+            <code>T</code> tokens, a Transformer attention layer compares tokens to
+            tokens, so the attention score table has about <code>T * T</code> cells.
+            Doubling the token count does not merely double that table; it makes it
+            roughly four times larger. The tokenizer also chooses the size of the
+            embedding table: with <code>V</code> vocabulary pieces and
+            <code>d</code> numbers per vector, the first table has
+            <code>V * d</code> learned numbers. Tokenization is therefore a tradeoff:
+            a larger vocabulary can shorten sequences, but it also creates more rows
+            the model has to learn.
+          </p>
+          <div class="worked-example" aria-label="Token count cost by hand">
+            <h3>Token cost by hand</h3>
+            <p>
+              Imagine one sentence becomes 12 tokens with a good subword tokenizer,
+              but 20 tokens with a byte-heavy tokenizer. The text looks the same to
+              you, but the Transformer does more pairwise comparisons.
+            </p>
+            <div class="formula-stack">
+              <code>attention cells with 12 tokens = 12 * 12 = 144</code>
+              <code>attention cells with 20 tokens = 20 * 20 = 400</code>
+              <code>400 / 144 = 2.8x as many token-to-token scores</code>
+            </div>
+            <p class="microcopy">
+              This is why a word that splits into many pieces has a real token tax:
+              it can cost more memory, more time, and more money even before the model
+              starts reasoning about meaning.
+            </p>
+          </div>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://en.wikipedia.org/wiki/Byte_pair_encoding" target="_blank" rel="noreferrer">byte pair encoding</a>
+            and
+            <a href="https://huggingface.co/learn/nlp-course/chapter6/1" target="_blank" rel="noreferrer">the Hugging Face tokenizers course</a>
+          </p>
+        </div>
+
+        <div class="corpus-picker tokenizer-corpus-picker">
+          <label class="field-label" for="tokenizerCorpusSelect">Corpus the tokenizer learns from</label>
+          <select id="tokenizerCorpusSelect" class="control-input"></select>
+          <div id="tokenizerCorpusStats" class="stat-grid" aria-live="polite"></div>
+        </div>
+
+        <div class="tokenizer-layout">
+          <div class="panel">
+            <label class="field-label" for="tokenizerInput">Text to inspect</label>
+            <textarea id="tokenizerInput" class="corpus-input tokenizer-input" spellcheck="false">Tokenization turns unfamiliar words like microtransformers into useful pieces.</textarea>
+            <p class="microcopy">Try a rare word, a number, or a name and watch the token counts move.</p>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Boundary comparison</h3>
+              <span id="boundarySummary" class="pill">current text</span>
+            </div>
+            <p class="microcopy">Each bar is how many tokens the same text becomes under a different rule. Longer is more expensive.</p>
+            <div id="boundaryPanel" class="tokenizer-comparison" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="algorithms" class="band band-muted" aria-labelledby="algorithms-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">2. Tokenizer algorithms</p>
+          <h2 id="algorithms-title">Let the tokenizer learn its pieces from real text.</h2>
+          <p>
+            A hand-written splitter is easy, but modern tokenizers are
+            <em>trained</em>. They scan a corpus and decide which pieces are worth a
+            slot in the vocabulary. That is why frequent chunks stay short while rare
+            words can still be spelled from smaller, known parts. The tokenizer below
+            trains on the corpus you picked above, so the merges are genuine.
+          </p>
+          <p class="example-note">
+            <em>This lab is small, but real.</em> <strong>BPE</strong> repeatedly
+            merges the most frequent neighboring pair. <strong>WordPiece</strong>-style
+            encoding greedily takes the longest known piece. <strong>Unigram</strong>-style
+            encoding picks the most likely segmentation from a learned set of pieces.
+            <strong>Byte-level</strong> encoding skips training and uses the raw UTF-8
+            bytes. Continuation pieces are shown with a <code>##</code> prefix.
+          </p>
+          <div class="worked-example" aria-label="Tokenizer training math by hand">
+            <h3>Two tokenizer algorithms by hand</h3>
+            <p>
+              <strong>BPE</strong> is a counting algorithm. Start with characters, count
+              adjacent pairs, merge the most frequent pair, then count again. On the
+              tiny corpus <code>hug hug hug hugs hugging hugging</code>, the pairs
+              <code>h u</code> and <code>u g</code> both appear 6 times, so the first
+              merge can turn <code>h + u</code> into <code>hu</code>.
+            </p>
+            <div class="formula-stack">
+              <code>score_BPE(pair) = count(pair in the training corpus)</code>
+              <code>first merge: h + u -> hu because count(h u) = 6</code>
+              <code>next useful merge: hu + g -> hug, so hug becomes one reusable piece</code>
+            </div>
+            <p>
+              <strong>Unigram</strong> thinks differently. It keeps many possible
+              pieces and asks which segmentation has the best total probability. In
+              practice it uses dynamic programming; by hand, you can read it as
+              "choose the pieces with the smaller surprise."
+            </p>
+            <div class="formula-stack">
+              <code>score(segmentation) = sum(-ln p(piece))</code>
+              <code>un + believ + able: 3.22 + 4.61 + 3.00 = 10.83 nats</code>
+              <code>unbelievable as one rare piece: -ln(0.000001) = 13.82 nats</code>
+            </div>
+            <p class="microcopy">
+              Lower score wins, so this toy Unigram model prefers the familiar parts.
+              BPE asks "what pair was frequent?"; Unigram asks "what full spelling is
+              most probable?"
+            </p>
+          </div>
+          <figure class="intuition-figure">
+            <img src="assets/figures/chapter4-bpe-merges.gif" width="720" height="360" alt="Animated BPE merge sequence that starts with h plus u plus g and gradually forms hug, then reuses hug inside hugs and hugging." decoding="async">
+            <figcaption>BPE grows a vocabulary by repeatedly joining frequent neighbors, turning character pieces into reusable chunks.</figcaption>
+          </figure>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://arxiv.org/abs/1508.07909" target="_blank" rel="noreferrer">BPE for rare words</a>,
+            <a href="https://arxiv.org/abs/1804.10959" target="_blank" rel="noreferrer">Unigram subword regularization</a>, and
+            <a href="https://arxiv.org/abs/1808.06226" target="_blank" rel="noreferrer">SentencePiece</a>
+          </p>
+        </div>
+
+        <div class="tokenizer-layout">
+          <div class="panel">
+            <div class="control-grid section-controls">
+              <label class="select-row" for="tokenizerAlgorithmSelect">
+                <span>Algorithm</span>
+                <select id="tokenizerAlgorithmSelect" class="control-input">
+                  <option value="bpe">BPE merges</option>
+                  <option value="wordpiece">WordPiece-style</option>
+                  <option value="unigram">Unigram-style</option>
+                  <option value="byte">Byte-level UTF-8</option>
+                </select>
+              </label>
+              <label class="range-row" for="tokenizerVocabSlider">
+                <span>Target pieces</span>
+                <input id="tokenizerVocabSlider" type="range" min="40" max="180" step="10" value="90">
+                <output id="tokenizerVocabLabel" for="tokenizerVocabSlider">90</output>
+              </label>
+            </div>
+            <p class="microcopy">For trained algorithms, the panel lists the first learned steps. Byte-level has none, by design.</p>
+            <div id="tokenizerTrainingPanel" class="algorithm-flow" aria-live="polite"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Encoded output</h3>
+              <span id="algorithmSummary" class="pill">BPE</span>
+            </div>
+            <p class="microcopy">The text from Section 1 encoded with the current algorithm.</p>
+            <div id="algorithmTokens" class="tokenizer-chip-rail" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <article class="code-cell chapter-code-cell" data-chapter-output="tokenizer">
+          <div class="cell-head">
+            <h3>Train BPE and encode text</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">// Trains BPE on the selected corpus, then encodes the inspect-box text.
+// Try encodeText("your own words here") to use the current algorithm instead.
+return trainBpeAndEncode(tokenizerText, 90);</textarea>
+          <div class="code-output" aria-live="polite"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="edges" class="band" aria-labelledby="edges-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">3. Tokenization edge cases</p>
+          <h2 id="edges-title">Always inspect what the model actually receives.</h2>
+          <p>
+            Edge cases are not trivia. They are where hidden assumptions show up.
+            Multilingual text, code, whitespace, numbers, emoji, rare names, and
+            domain vocabulary can all stretch or distort the token stream. The same
+            algorithm you just trained handles each case below.
+          </p>
+          <p>
+            Pick a case and inspect the output. Sometimes the visible text and the
+            tokenized input are not as similar as they look, and that gap can affect
+            cost, evidence, safety, and fairness. The hidden-text case is a small
+            preview of prompt-injection risks we will revisit much later.
+          </p>
+          <div class="worked-example" aria-label="Token tax edge case by hand">
+            <h3>A token tax is evidence, not destiny</h3>
+            <p>
+              Suppose two names are equally important in the real world, but the
+              tokenizer learned one from many examples and barely saw the other. The
+              common name might be one token while the rare name becomes five pieces.
+              That difference does not prove unfair behavior by itself, but it is a
+              signal worth inspecting.
+            </p>
+            <div class="formula-stack">
+              <code>cost(common name) = 1 token</code>
+              <code>cost(rare name) = 5 tokens</code>
+              <code>same sentence + rare name = 4 extra tokens of context budget</code>
+            </div>
+            <p class="microcopy">
+              This is the quiet fairness lesson in tokenization: representation begins
+              before the neural network. A model can only learn from the pieces its
+              tokenizer gives it.
+            </p>
+          </div>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://tiktokenizer.vercel.app/" target="_blank" rel="noreferrer">an interactive tokenizer for real models</a>
+            and
+            <a href="https://owasp.org/www-project-top-10-for-large-language-model-applications/" target="_blank" rel="noreferrer">OWASP Top 10 for LLM applications</a>
+          </p>
+        </div>
+
+        <div class="tokenizer-layout">
+          <div class="panel">
+            <label class="select-row" for="edgeCaseSelect">
+              <span>Case</span>
+              <select id="edgeCaseSelect" class="control-input">
+                <option value="multilingual">Multilingual text</option>
+                <option value="code">Code and whitespace</option>
+                <option value="numbers">Numbers</option>
+                <option value="emoji">Emoji and Unicode</option>
+                <option value="rare">Rare names</option>
+                <option value="domain">Domain vocabulary</option>
+                <option value="hidden">Hidden text</option>
+              </select>
+            </label>
+            <div id="edgeCasePanel" class="edge-card" aria-live="polite"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Tokenizer output</h3>
+              <span id="edgeCaseSummary" class="pill">edge case</span>
+            </div>
+            <div id="edgeCaseTokens" class="tokenizer-chip-rail" aria-live="polite"></div>
+            <div id="edgeCaseWarnings" class="warning-list" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="references" class="band band-muted" aria-labelledby="references-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">4. Going deeper</p>
+          <h2 id="references-title">Further reading.</h2>
+          <p>
+            Tokenization is small in code and large in consequence. These references
+            move from the core subword algorithms to the libraries and inspection
+            tools used in production systems.
+          </p>
+        </div>
+
+        <ol class="reference-list">
+          <li>
+            <a href="https://arxiv.org/abs/1508.07909" target="_blank" rel="noreferrer">Sennrich, Haddow, and Birch, Neural Machine Translation of Rare Words with Subword Units</a>
+            <span>The influential paper that brought byte pair encoding to neural models.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1804.10959" target="_blank" rel="noreferrer">Kudo, Subword Regularization and Unigram Tokenization</a>
+            <span>The primary source for Unigram language-model tokenization.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1808.06226" target="_blank" rel="noreferrer">Kudo and Richardson, SentencePiece</a>
+            <span>Raw-text subword tokenization and detokenization for neural text processing.</span>
+          </li>
+          <li>
+            <a href="https://github.com/google-research/bert/blob/master/tokenization.py" target="_blank" rel="noreferrer">BERT Tokenization Code</a>
+            <span>A readable implementation reference for BasicTokenizer and WordPieceTokenizer.</span>
+          </li>
+          <li>
+            <a href="https://huggingface.co/learn/nlp-course/chapter6/1" target="_blank" rel="noreferrer">Hugging Face Tokenizers Course</a>
+            <span>A practical, example-driven tour of training and using modern tokenizers.</span>
+          </li>
+          <li>
+            <a href="https://github.com/openai/tiktoken" target="_blank" rel="noreferrer">tiktoken</a>
+            <span>OpenAI's fast byte-level BPE tokenizer, useful for counting real token costs.</span>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="chapter-nav-band" aria-label="Chapter navigation">
+      <div class="section-shell">
+        <nav class="chapter-nav">
+          <a class="chapter-nav-card" href="chapter-3.html">
+            <span>Previous chapter</span>
+            <strong>Chapter 3: The math that makes a model guess</strong>
+            <em>Return to probability, vectors, gradients, and a trained tiny network.</em>
+          </a>
+          <a class="chapter-nav-card" href="chapter-5.html">
+            <span>Next chapter</span>
+            <strong>Chapter 5: Transformers and attention</strong>
+            <em>See how token vectors learn to look at each other.</em>
+          </a>
+        </nav>
+      </div>
+    </section>
+  </main>
+
+  <script src="corpora.js"></script>
+  <script src="chapter4.js"></script>
+</body>
+</html>
+

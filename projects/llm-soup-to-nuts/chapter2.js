@@ -45,7 +45,7 @@ const mixedCorpus = sourceCorpora.length > 1
       license: "Public domain in the United States",
       recommendedContext: "said the",
       holdout: "Alice met Holmes and Elizabeth in a strange little garden.",
-      text: interleaveCorpusTexts(sourceCorpora)
+      text: interleaveCorpusTexts(sourceCorpora.filter((item) => !item.excludeFromMix))
     }
   : null;
 
@@ -74,13 +74,16 @@ const EMBEDDING_KEEP_WORDS = new Set([
   "queen", "king", "duchess", "hatter", "hare", "dormouse", "gryphon",
   "turtle", "caterpillar", "mock", "sister", "dinah", "elizabeth", "darcy",
   "jane", "bingley", "bennet", "wickham", "collins", "holmes", "watson",
-  "sherlock", "doctor", "inspector", "police", "london"
+  "sherlock", "doctor", "inspector", "police", "london",
+  "tweedledum", "tweedledee", "humpty", "dumpty", "knight", "sheep",
+  "unicorn", "lily", "kitty"
 ]);
 
 const EMBEDDING_WATCH_PAIRS = [
   ["she", "her"],
   ["he", "him"],
   ["queen", "king"],
+  ["tweedledum", "tweedledee"],
   ["hatter", "hare"],
   ["mock", "turtle"],
   ["rabbit", "mouse"],
@@ -193,12 +196,21 @@ const dom = {
   edgeCasePanel: document.getElementById("edgeCasePanel"),
   edgeCaseSummary: document.getElementById("edgeCaseSummary"),
   edgeCaseTokens: document.getElementById("edgeCaseTokens"),
-  edgeCaseWarnings: document.getElementById("edgeCaseWarnings")
+  edgeCaseWarnings: document.getElementById("edgeCaseWarnings"),
+  comparisonPanel: document.getElementById("comparisonPanel"),
+  compareWordSelect: document.getElementById("compareWordSelect"),
+  compareAnalogyInput: document.getElementById("compareAnalogyInput"),
+  compareTrained: document.getElementById("compareTrained"),
+  compareGlove: document.getElementById("compareGlove"),
+  compareAnalogyResult: document.getElementById("compareAnalogyResult")
 };
 
+const DEFAULT_CHAPTER_CORPUS_ID = "alice-both-books";
+const initialChapterCorpus = corpora.find((corpus) => corpus.id === DEFAULT_CHAPTER_CORPUS_ID) || corpora[0];
+
 const state = {
-  activeCorpusId: corpora[0].id,
-  text: corpora[0].text,
+  activeCorpusId: initialChapterCorpus.id,
+  text: initialChapterCorpus.text,
   tokens: [],
   wordTokens: [],
   ngrams: null,
@@ -293,8 +305,6 @@ function prepareCorpus() {
   renderSparsity();
   renderTrainingPlaceholder("Ready. Press Train word vectors to learn from this corpus and budget.");
   renderEmbeddingPlaceholder("No word vectors yet. Train them in Section 8, then come back here.");
-  renderTokenizers();
-  renderEdges();
 }
 
 function renderStats() {
@@ -386,7 +396,7 @@ function buildEmbeddingTrainingData() {
   state.wordTokens.forEach((token) => counts.set(token, (counts.get(token) || 0) + 1));
   const focusLimit = 260;
   const contextLimit = 650;
-  const maxPairs = 120000;
+  const maxPairs = 500000;
   const windowSize = 4;
   const vocab = Array.from(counts.entries())
     .filter(([word, count]) => isEmbeddingFocusWord(word, count))
@@ -401,15 +411,31 @@ function buildEmbeddingTrainingData() {
     .map(([word, count], id) => ({ word, count, id }));
   const idByWord = new Map(vocab.map((item) => [item.word, item.id]));
   const contextIdByWord = new Map(contextVocab.map((item) => [item.word, item.id]));
+
+  // Frequent-word subsampling (Word2Vec style): thin out very common glue words
+  // so that content words land closer together inside each context window. Words
+  // in the keep-list (protagonists and pronouns we watch) are never thinned, so
+  // the teaching watch-pairs keep enough evidence to learn from.
+  const totalTokens = Math.max(1, state.wordTokens.length);
+  const subsampleThreshold = 1e-3;
+  const subsampleRng = makeRng(20240517);
+  const keptStream = state.wordTokens.filter((word) => {
+    if (EMBEDDING_KEEP_WORDS.has(word)) return true;
+    const frequency = (counts.get(word) || 0) / totalTokens;
+    if (frequency <= subsampleThreshold) return true;
+    const keepProbability = (Math.sqrt(frequency / subsampleThreshold) + 1) * (subsampleThreshold / frequency);
+    return subsampleRng() < keepProbability;
+  });
+
   const pairs = [];
-  for (let index = 0; index < state.wordTokens.length; index += 1) {
-    const center = idByWord.get(state.wordTokens[index]);
+  for (let index = 0; index < keptStream.length; index += 1) {
+    const center = idByWord.get(keptStream[index]);
     if (center === undefined) continue;
     for (let offset = -windowSize; offset <= windowSize; offset += 1) {
       if (offset === 0) continue;
       const contextIndex = index + offset;
-      if (contextIndex < 0 || contextIndex >= state.wordTokens.length) continue;
-      const context = contextIdByWord.get(state.wordTokens[contextIndex]);
+      if (contextIndex < 0 || contextIndex >= keptStream.length) continue;
+      const context = contextIdByWord.get(keptStream[contextIndex]);
       if (context === undefined) continue;
       pairs.push([center, context]);
       if (pairs.length >= maxPairs) break;
@@ -421,7 +447,7 @@ function buildEmbeddingTrainingData() {
     const profile = contextProfiles[center];
     profile.set(context, (profile.get(context) || 0) + 1);
   });
-  return { vocab, contextVocab, idByWord, contextIdByWord, pairs, contextProfiles, windowSize, focusLimit, contextLimit, maxPairs };
+  return { vocab, contextVocab, idByWord, contextIdByWord, pairs, contextProfiles, windowSize, focusLimit, contextLimit, maxPairs, streamTokens: totalTokens, keptTokens: keptStream.length };
 }
 
 function isEmbeddingFocusWord(word, count) {
@@ -535,12 +561,22 @@ async function trainEmbeddings(job) {
   renderTrainingProgress({ ...training, dimensions, epochs, trainingDepthLabel: depth.label, negativeSamples, losses, epoch: 0, watchRows });
   await yieldToBrowser();
 
+  // Visiting the pairs in a fresh random order each epoch stops the updates from
+  // marching in the book's word order, which gives noticeably steadier vectors.
+  const order = Array.from({ length: training.pairs.length }, (_, index) => index);
+
   for (let epoch = 0; epoch < epochs; epoch += 1) {
     if (job !== state.embeddingJob) return;
     let loss = 0;
     const epochLearningRate = learningRate * (1 - epoch / (epochs + 2));
-    for (let pairIndex = 0; pairIndex < training.pairs.length; pairIndex += 1) {
-      const [center, context] = training.pairs[pairIndex];
+    for (let i = order.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rng() * (i + 1));
+      const swap = order[i];
+      order[i] = order[j];
+      order[j] = swap;
+    }
+    for (let pairIndex = 0; pairIndex < order.length; pairIndex += 1) {
+      const [center, context] = training.pairs[order[pairIndex]];
       loss += trainSgnsPair(input, output, center, context, 1, epochLearningRate);
       for (let sample = 0; sample < negativeSamples; sample += 1) {
         let negative = sampleNegative(cumulative, rng());
@@ -776,6 +812,10 @@ function renderTrainingDetails(model, stateLabel) {
     ["context vocabulary", `${model.contextVocab.length} common context words`],
     ["numbers in each vector", `${model.dimensions}, chosen before training`],
     ["nearby window", `${model.windowSize} words left and right`],
+    ["frequent-word thinning", model.keptTokens && model.streamTokens
+      ? `kept ${formatNumber(model.keptTokens)} of ${formatNumber(model.streamTokens)} tokens`
+      : "on, so common glue words crowd the windows less"],
+    ["pair order", "reshuffled every epoch"],
     ["training passes", `${model.epochs} epochs (${model.trainingDepthLabel})`],
     ["negative examples", `${model.negativeSamples} made-up pairs per real pair`],
     ["training pairs", formatNumber(model.pairs.length)],
@@ -875,6 +915,7 @@ function renderEmbeddingExplorer() {
   window.requestAnimationFrame(resolveEmbeddingLabelCollisions);
   renderNearest(focus);
   renderAnalogy();
+  renderComparison();
 }
 
 function mapLabelWords(model, focus) {
@@ -1058,6 +1099,144 @@ function renderAnalogy() {
     ? `Similarity to the result is ${result.similarity.toFixed(3)}. Small corpora often produce rough or surprising analogies.`
     : "No result was available.";
   dom.analogyPanel.append(title, code, note);
+}
+
+// --- Section 9: side-by-side comparison with real pre-trained GloVe vectors ---
+const COMPARE_WORDS = [
+  "queen", "king", "cat", "dog", "mouse", "rabbit", "sister", "brother",
+  "man", "woman", "garden", "water", "night", "book", "money", "house"
+];
+
+function gloveModel() {
+  return (window.GLOVE_MINI && window.GLOVE_MINI.vectors) ? window.GLOVE_MINI : null;
+}
+
+function gloveNearest(word, limit = 6) {
+  const g = gloveModel();
+  if (!g || !g.vectors[word]) return [];
+  const vec = g.vectors[word];
+  return Object.keys(g.vectors)
+    .filter((other) => other !== word)
+    .map((other) => ({ word: other, similarity: cosine(vec, g.vectors[other]) }))
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, limit);
+}
+
+function gloveAnalogy(a, b, c, limit = 3) {
+  const g = gloveModel();
+  if (!g) return { unavailable: true };
+  if (!g.vectors[a] || !g.vectors[b] || !g.vectors[c]) return { missing: true };
+  const target = g.vectors[a].map((value, dim) => value - g.vectors[b][dim] + g.vectors[c][dim]);
+  const blocked = new Set([a, b, c]);
+  return {
+    results: Object.keys(g.vectors)
+      .filter((word) => !blocked.has(word))
+      .map((word) => ({ word, similarity: cosine(target, g.vectors[word]) }))
+      .sort((x, y) => y.similarity - x.similarity)
+      .slice(0, limit)
+  };
+}
+
+function renderNeighborRows(container, neighbors, emptyText) {
+  container.replaceChildren();
+  if (!neighbors || !neighbors.length) {
+    container.append(notice(emptyText));
+    return;
+  }
+  neighbors.forEach((neighbor) => {
+    const row = document.createElement("div");
+    row.className = "neighbor-row";
+    const word = document.createElement("span");
+    word.textContent = neighbor.word;
+    const track = document.createElement("span");
+    track.className = "neighbor-track";
+    const fill = document.createElement("span");
+    fill.style.width = `${clamp(neighbor.similarity * 100, 2, 100)}%`;
+    track.append(fill);
+    const value = document.createElement("strong");
+    value.textContent = neighbor.similarity.toFixed(2);
+    row.append(word, track, value);
+    container.append(row);
+  });
+}
+
+function populateCompareWords() {
+  if (!dom.compareWordSelect) return;
+  const g = gloveModel();
+  const previous = dom.compareWordSelect.value;
+  const words = COMPARE_WORDS.filter((word) => g && g.vectors[word]);
+  dom.compareWordSelect.replaceChildren();
+  words.forEach((word) => {
+    const option = document.createElement("option");
+    option.value = word;
+    option.textContent = word;
+    dom.compareWordSelect.append(option);
+  });
+  if (words.includes(previous)) dom.compareWordSelect.value = previous;
+}
+
+function renderComparison() {
+  if (!dom.comparisonPanel) return;
+  const g = gloveModel();
+  if (!g) {
+    dom.comparisonPanel.hidden = true;
+    return;
+  }
+  dom.comparisonPanel.hidden = false;
+  const word = dom.compareWordSelect.value || "queen";
+  renderNeighborRows(dom.compareGlove, gloveNearest(word, 6), "Not in the curated GloVe slice.");
+  const model = state.embeddingModel;
+  if (model && model.idByWord.has(word)) {
+    renderNeighborRows(
+      dom.compareTrained,
+      nearestWords(word, 6).neighbors.map((item) => ({ word: item.word, similarity: item.similarity })),
+      "Not in the trained vocabulary."
+    );
+  } else {
+    dom.compareTrained.replaceChildren(notice(
+      model ? `"${word}" was not trained in this corpus.` : "Train word vectors in Section 8 to fill this column."
+    ));
+  }
+  renderComparisonAnalogy();
+}
+
+function renderComparisonAnalogy() {
+  if (!dom.compareAnalogyResult) return;
+  const parts = (dom.compareAnalogyInput.value || "").toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+  dom.compareAnalogyResult.replaceChildren();
+  if (parts.length < 3) {
+    dom.compareAnalogyResult.textContent = "Enter three words, like king - man + woman.";
+    return;
+  }
+  const [a, b, c] = parts;
+  const glove = gloveAnalogy(a, b, c, 3);
+  let gloveText;
+  if (glove.unavailable) gloveText = "GloVe slice is unavailable.";
+  else if (glove.missing) gloveText = `GloVe: one of ${a}, ${b}, ${c} is outside the curated slice.`;
+  else gloveText = `GloVe (6B): ${a} - ${b} + ${c} -> ${glove.results.map((r) => `${r.word} (${r.similarity.toFixed(2)})`).join(", ")}`;
+  const model = state.embeddingModel;
+  let trainedText;
+  if (model && [a, b, c].every((word) => model.idByWord.has(word))) {
+    const target = model.vectors[model.idByWord.get(a)].map((value, dim) => (
+      value - model.vectors[model.idByWord.get(b)][dim] + model.vectors[model.idByWord.get(c)][dim]
+    ));
+    const blocked = new Set([a, b, c]);
+    const best = model.vocab
+      .filter((item) => !blocked.has(item.word))
+      .map((item) => ({ word: item.word, similarity: cosine(target, model.vectors[item.id]) }))
+      .sort((x, y) => y.similarity - x.similarity)[0];
+    trainedText = best ? `Your model: -> ${best.word} (${best.similarity.toFixed(2)})` : "Your model: no result.";
+  } else {
+    trainedText = model
+      ? "Your model: one of these words is not in its small vocabulary."
+      : "Your model: train it in Section 8 first.";
+  }
+  const gloveLine = document.createElement("span");
+  gloveLine.textContent = gloveText;
+  const trainedLine = document.createElement("span");
+  trainedLine.className = "compare-trained-line";
+  trainedLine.textContent = trainedText;
+  dom.compareAnalogyResult.append(gloveLine, document.createElement("br"), trainedLine);
 }
 
 function renderGradient() {
@@ -1427,9 +1606,7 @@ function embeddingTrainingSummary() {
 function makeApi() {
   return {
     focusWord: dom.focusWordSelect.value,
-    tokenizerText: dom.tokenizerInput.value,
     nearestWords,
-    trainBpeAndEncode,
     embeddingTrainingSummary
   };
 }
@@ -1441,7 +1618,7 @@ async function runCodeCell(cell) {
   output.textContent = "Running...";
   try {
     const api = makeApi();
-    const runner = new Function("api", `"use strict"; const { focusWord, tokenizerText, nearestWords, trainBpeAndEncode, embeddingTrainingSummary } = api; return (async () => { ${input.value} })();`);
+    const runner = new Function("api", `"use strict"; const { focusWord, nearestWords, embeddingTrainingSummary } = api; return (async () => { ${input.value} })();`);
     const result = await runner(api);
     output.className = "code-output is-success";
     renderCodeResult(output, result);
@@ -1535,22 +1712,10 @@ function wireEvents() {
   dom.contextCompareInput.addEventListener("input", () => renderSparsity());
   dom.focusWordSelect.addEventListener("change", () => renderEmbeddingExplorer());
   dom.analogyInput.addEventListener("input", () => renderAnalogy());
+  if (dom.compareWordSelect) dom.compareWordSelect.addEventListener("change", () => renderComparison());
+  if (dom.compareAnalogyInput) dom.compareAnalogyInput.addEventListener("input", () => renderComparisonAnalogy());
   dom.recurrentWeightSlider.addEventListener("input", () => renderGradient());
   dom.sequenceStepsSlider.addEventListener("input", () => renderGradient());
-  dom.tokenizerInput.addEventListener("input", () => {
-    renderTokenizers();
-    renderEdges();
-  });
-  dom.tokenizerAlgorithmSelect.addEventListener("change", () => {
-    renderAlgorithm();
-    renderEdges();
-  });
-  dom.tokenizerVocabSlider.addEventListener("input", () => {
-    state.tokenizerModels = null;
-    renderTokenizers();
-    renderEdges();
-  });
-  dom.edgeCaseSelect.addEventListener("change", () => renderEdges());
   document.querySelectorAll(".chapter-code-cell .run-button").forEach((button) => {
     button.addEventListener("click", () => runCodeCell(button.closest(".chapter-code-cell")));
   });
@@ -1585,6 +1750,8 @@ function init() {
   wireEvents();
   prepareCorpus();
   renderGradient();
+  populateCompareWords();
+  renderComparison();
   setupSectionSpy();
 }
 

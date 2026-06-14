@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="chapter3.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="LLM Soup to Nuts overview">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>
+        <strong>LLM Soup to Nuts</strong>
+        <small>Chapter 3</small>
+      </span>
+    </a>
+    <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="index.html">Overview</a>
+      <a href="chapter-1.html">Ch 1</a>
+      <a href="chapter-2.html">Ch 2</a>
+      <a class="is-active" href="chapter-3.html">Ch 3</a>
+      <a href="chapter-4.html">Ch 4</a>
+      <a href="chapter-5.html">Ch 5</a>
+      <a href="chapter-6.html">Ch 6</a>
+    </nav>
+  </header>
+
+  <aside class="lesson-toc" aria-label="Table of contents">
+    <p>Chapter 3</p>
+    <nav>
+      <a href="#overview"><span>00</span>Overview</a>
+      <a href="#math-toolkit"><span>01</span>Surprise and the next word</a>
+      <a href="#vectors"><span>02</span>Words as vectors</a>
+      <a href="#gradients"><span>03</span>Gradients and loss</a>
+      <a href="#softmax"><span>04</span>Softmax and blame</a>
+      <a href="#neural-networks"><span>05</span>Build the forward pass</a>
+      <a href="#warmup-lab"><span>06</span>Watch a network learn</a>
+      <a href="#train-lab"><span>07</span>Train a next-word model</a>
+      <a href="#references"><span>08</span>References</a>
+    </nav>
+  </aside>
+
+  <main id="top">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title">
+      <div class="workbench">
+        <article class="intro-copy">
+          <p class="eyebrow">Learning by doing</p>
+          <h1 id="page-title">The math that makes a model guess the next word.</h1>
+          <p class="lead">
+            Chapters 1 and 2 kept asking one question: what word comes next? This
+            chapter picks up the same question and answers it a new way. Instead of
+            counting word windows, we will build a tiny neural network that
+            <em>learns</em> to predict the next word, and we will train it right here
+            in the browser.
+          </p>
+          <p>
+            To get there we need a small toolkit of math. The good news is that every
+            tool earns its place by solving a problem you can see. Probability
+            measures how surprised the model is by the real next word. Vectors let it
+            compare words. Loss turns a wrong guess into a single number. Gradients
+            say which way to nudge the numbers so the next guess is a little better.
+          </p>
+          <p>
+            We keep the example tiny on purpose, because a tiny model lets you watch
+            the whole loop: words become numbers, numbers become next-word
+            probabilities, a loss is measured, and the parameters move a little. A
+            modern LLM is a much, much larger version of this exact loop.
+          </p>
+          <figure class="diagram-figure">
+            <svg class="pipeline-svg" viewBox="0 0 600 168" role="img" aria-labelledby="loop-title loop-desc">
+              <title id="loop-title">The four-beat training loop</title>
+              <desc id="loop-desc">Context words become vectors, vectors become probabilities, a loss is measured, and the weights are nudged. The cycle repeats for every training example.</desc>
+              <rect x="14" y="40" width="128" height="46" rx="9" class="svg-box-soft"></rect>
+              <text x="78" y="68" class="svg-word" text-anchor="middle">context words</text>
+              <rect x="156" y="40" width="128" height="46" rx="9" class="svg-box-soft"></rect>
+              <text x="220" y="68" class="svg-word" text-anchor="middle">vectors</text>
+              <rect x="298" y="40" width="128" height="46" rx="9" class="svg-box-soft"></rect>
+              <text x="362" y="68" class="svg-word" text-anchor="middle">probabilities</text>
+              <rect x="440" y="40" width="146" height="46" rx="9" class="svg-box-accent"></rect>
+              <text x="513" y="68" class="svg-model-text" text-anchor="middle">loss + nudge</text>
+
+              <line x1="142" y1="63" x2="156" y2="63" class="svg-arrow" marker-end="url(#loop-arrow)"></line>
+              <line x1="284" y1="63" x2="298" y2="63" class="svg-arrow" marker-end="url(#loop-arrow)"></line>
+              <line x1="426" y1="63" x2="440" y2="63" class="svg-arrow" marker-end="url(#loop-arrow)"></line>
+
+              <path d="M513,86 L513,130 L78,130 L78,90" fill="none" class="svg-arrow" marker-end="url(#loop-arrow)"></path>
+              <text x="300" y="150" class="svg-caption" text-anchor="middle">repeat for every training example, nudging the numbers a little each time</text>
+              <defs>
+                <marker id="loop-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>Every section of this chapter builds one beat of this loop; the last section runs the whole thing.</figcaption>
+          </figure>
+          <p class="example-note">
+            <em>Guiding question:</em> how can a pile of numbers learn to finish your
+            sentence, when nobody wrote the grammar rules by hand?
+          </p>
+          <div class="idea-flow" aria-label="Chapter flow">
+            <div>
+              <strong>Measure surprise</strong>
+              <span>Turn next-word counts into probability, entropy, cross-entropy, and perplexity.</span>
+            </div>
+            <div>
+              <strong>Compare with vectors</strong>
+              <span>Give each word numbers, then score candidates with dot products and similarity.</span>
+            </div>
+            <div>
+              <strong>Nudge with gradients</strong>
+              <span>Use loss, gradients, gradient descent, softmax, and backprop.</span>
+            </div>
+            <div>
+              <strong>Train the real thing</strong>
+              <span>Assemble a small neural network and teach it to predict the next word.</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="math-toolkit" class="band" aria-labelledby="math-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">1. Surprise and the next word</p>
+          <h2 id="math-title">Start where Chapter 1 left off: how surprised is the model?</h2>
+          <p>
+            Picture the tiny corpus we will train on at the end of this chapter.
+            Across its sentences, the words <code>the cat</code> are followed by
+            <code>sat</code> 8 times, <code>ran</code> 3 times, and <code>slept</code>
+            once. That is 12 examples, so the conditional probability of
+            <code>sat</code> coming next is
+            <code>P(sat | the cat) = 8 / 12 ≈ 0.67</code>. The vertical bar means
+            "given." We are not asking how common <code>sat</code> is everywhere, only
+            how common it is right after <code>the cat</code>.
+          </p>
+          <p>
+            A good model should put high probability on the words that really do come
+            next. <strong>Cross-entropy</strong> measures how surprised the model is
+            by the real next word, in bits. <strong>Entropy</strong> is the smallest
+            surprise possible, the floor you would hit if your guesses matched the
+            evidence exactly. <strong>Perplexity</strong> rewrites that surprise on a
+            friendlier scale: roughly how many words the model felt torn between.
+          </p>
+          <p class="example-note">
+            <em>Play with the controls.</em> The left sliders are the evidence (how
+            often each word followed the context). The right sliders are the model's
+            guessed probabilities. Watch cross-entropy fall as the guesses move toward
+            the evidence. That is exactly what training will do for us automatically.
+          </p>
+        </div>
+
+        <div class="math-lab-grid">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Next-word counts</h3>
+              <span id="probabilityContextLabel" class="pill">the cat</span>
+            </div>
+            <label class="select-row probability-context-row" for="probabilityContextSelect">
+              <span>Context</span>
+              <select id="probabilityContextSelect" class="control-input">
+                <option value="cat">after "the cat"</option>
+                <option value="dog">after "the dog"</option>
+                <option value="bird">after "the bird"</option>
+              </select>
+            </label>
+            <div class="slider-stack" aria-label="Observed counts">
+              <label class="range-row math-range" for="countA">
+                <span id="countALabel">sat</span>
+                <input id="countA" type="range" min="0" max="20" value="8">
+                <output id="countAValue" for="countA">8</output>
+              </label>
+              <label class="range-row math-range" for="countB">
+                <span id="countBLabel">ran</span>
+                <input id="countB" type="range" min="0" max="20" value="3">
+                <output id="countBValue" for="countB">3</output>
+              </label>
+              <label class="range-row math-range" for="countC">
+                <span id="countCLabel">slept</span>
+                <input id="countC" type="range" min="0" max="20" value="1">
+                <output id="countCValue" for="countC">1</output>
+              </label>
+            </div>
+            <div id="probabilityPanel" class="probability-panel" aria-live="polite"></div>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Model's guessed probabilities</h3>
+              <span id="entropyLabel" class="pill">entropy</span>
+            </div>
+            <div class="slider-stack" aria-label="Model guesses">
+              <label class="range-row math-range" for="guessA">
+                <span id="guessALabel">sat</span>
+                <input id="guessA" type="range" min="0" max="100" value="55">
+                <output id="guessAValue" for="guessA">55</output>
+              </label>
+              <label class="range-row math-range" for="guessB">
+                <span id="guessBLabel">ran</span>
+                <input id="guessB" type="range" min="0" max="100" value="30">
+                <output id="guessBValue" for="guessB">30</output>
+              </label>
+              <label class="range-row math-range" for="guessC">
+                <span id="guessCLabel">slept</span>
+                <input id="guessC" type="range" min="0" max="100" value="15">
+                <output id="guessCValue" for="guessC">15</output>
+              </label>
+            </div>
+            <div id="entropyPanel" class="metric-card-grid" aria-live="polite"></div>
+            <p id="entropyNarrative" class="insight-note"></p>
+          </div>
+        </div>
+
+        <div class="worked-example" aria-label="Cross-entropy by hand">
+          <h3>Cross-entropy by hand</h3>
+          <p>
+            With the evidence <code>sat 8, ran 3, slept 1</code> and a model that
+            guesses <code>sat 55%, ran 30%, slept 15%</code>, the surprise at each
+            real word is <code>-log2(model probability)</code>, weighted by how often
+            that word actually happened:
+          </p>
+          <div class="formula-stack">
+            <code>P(sat) = 8/12 = 0.67, P(ran) = 3/12 = 0.25, P(slept) = 1/12 = 0.08</code>
+            <code>cross-entropy = 0.67·(-log2 0.55) + 0.25·(-log2 0.30) + 0.08·(-log2 0.15)</code>
+            <code>≈ 0.58 + 0.43 + 0.23 = 1.24 bits → perplexity = 2^1.24 ≈ 2.4 words</code>
+          </div>
+          <p class="microcopy">
+            The live panel recomputes these as you drag. A perfect model would reach
+            the entropy floor of about 1.19 bits; the gap above it is the model's
+            avoidable surprise, and training exists to shrink it.
+          </p>
+        </div>
+
+        <article class="toolkit-strip" aria-label="Five words for surprise">
+          <div>
+            <strong>Probability</strong>
+            <span>How much chance the model gives one next word, from 0 to 1.</span>
+          </div>
+          <div>
+            <strong>Conditional probability</strong>
+            <span>The chance of a word given the context, like <code>sat</code> given <code>the cat</code>.</span>
+          </div>
+          <div>
+            <strong>Entropy</strong>
+            <span>The unavoidable surprise when the context truly allows several next words.</span>
+          </div>
+          <div>
+            <strong>Cross-entropy</strong>
+            <span>The model's real surprise at the actual next word. Training drives this down.</span>
+          </div>
+          <div>
+            <strong>Perplexity</strong>
+            <span>Cross-entropy as a count: about how many next words the model is torn between.</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="vectors" class="band band-muted" aria-labelledby="vectors-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">2. Words as vectors</p>
+          <h2 id="vectors-title">Give each word a few numbers, and comparison becomes geometry.</h2>
+          <p>
+            Chapter 2 gave every word a short list of learned numbers, its vector.
+            Stack all those rows together and you have an <strong>embedding
+            matrix</strong>: one row per word. Picking a word is just choosing its row.
+            Here we shrink each word to two numbers so we can draw it as an arrow.
+          </p>
+          <p>
+            Why bother? Because the model scores the next word with a
+            <strong>dot product</strong>. Multiply the matching components of two
+            vectors and add them up. The dot product is large when two arrows point
+            the same way, near zero when they are unrelated, and negative when they
+            point apart. <strong>Cosine similarity</strong> is the same idea using
+            direction only; <strong>distance</strong> asks how far apart the tips are.
+            That single number, the dot product, is how the model will rank every
+            candidate word later.
+          </p>
+        </div>
+
+        <div class="vector-grid">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Move two word vectors</h3>
+              <span id="vectorSummary" class="pill">geometry</span>
+            </div>
+            <p class="microcopy">Think of <strong>A</strong> as the vector for <code>cat</code> and <strong>B</strong> as the vector for <code>dog</code>. Type exact components and watch how similar their directions are.</p>
+            <div class="vector-controls">
+              <label class="number-row vector-number-row" for="vectorAx">
+                <span>A x</span>
+                <input id="vectorAx" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="0.70">
+              </label>
+              <label class="number-row vector-number-row" for="vectorAy">
+                <span>A y</span>
+                <input id="vectorAy" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="0.30">
+              </label>
+              <label class="number-row vector-number-row" for="vectorBx">
+                <span>B x</span>
+                <input id="vectorBx" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="0.35">
+              </label>
+              <label class="number-row vector-number-row" for="vectorBy">
+                <span>B y</span>
+                <input id="vectorBy" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="0.80">
+              </label>
+            </div>
+            <svg id="vectorSvg" class="vector-svg" viewBox="0 0 520 360" role="img" aria-label="Two vectors on a coordinate grid"></svg>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>What the comparison says</h3>
+              <span id="dotProductLabel" class="pill">dot product</span>
+            </div>
+            <div id="vectorMetrics" class="metric-card-grid" aria-live="polite"></div>
+            <p class="insight-note">
+              When the model ranks the next word, it compares a context vector against
+              each candidate word vector with exactly this dot product. Bigger score,
+              higher rank. Attention, much later, runs the same comparison at a far
+              larger scale.
+            </p>
+            <label class="select-row matrix-row" for="embeddingLookupSelect">
+              <span>Inspect a row</span>
+              <select id="embeddingLookupSelect" class="control-input">
+                <option value="cat">cat</option>
+                <option value="dog">dog</option>
+                <option value="mat">mat</option>
+                <option value="rug">rug</option>
+              </select>
+            </label>
+            <div id="embeddingLookupPanel" class="lookup-panel" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="worked-example" aria-label="Dot product by hand">
+          <h3>One dot product, by hand</h3>
+          <p>
+            Say <code>cat = [0.7, 0.3]</code> and <code>dog = [0.6, 0.4]</code>. Their
+            similarity score is just multiply-and-add:
+          </p>
+          <div class="formula-stack">
+            <code>dot(cat, dog) = 0.7×0.6 + 0.3×0.4 = 0.42 + 0.12 = 0.54</code>
+            <code>cosine = dot ÷ (length cat × length dog) ≈ 0.54 ÷ (0.76 × 0.72) ≈ 0.98</code>
+          </div>
+          <p class="microcopy">
+            A cosine near 1 means <code>cat</code> and <code>dog</code> are used in
+            almost the same direction, so the model treats them as interchangeable
+            context. That shared strength is the whole reason Chapter 2 moved from
+            exact counts to learned vectors.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="gradients" class="band" aria-labelledby="gradients-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">3. Gradients, gradient descent, and loss</p>
+          <h2 id="gradients-title">When the guess is wrong, which way do we nudge?</h2>
+          <p>
+            So far we can measure surprise and score words. Training is the part that
+            actually <em>reduces</em> the surprise. To see it clearly, we strip the
+            model down to the simplest thing that can learn: a straight line with two
+            knobs, <code>slope</code> and <code>intercept</code>. The
+            <strong>loss</strong> here is mean squared error, the average squared gap
+            between the line and the dots. Our next-word model will swap in
+            cross-entropy loss instead, but the nudging idea is identical.
+          </p>
+          <p>
+            The <strong>gradient</strong> is the slope of the loss with respect to
+            each knob: which way is downhill. If a knob's gradient is positive,
+            nudging that knob down lowers the loss. <strong>Gradient descent</strong>
+            just repeats that nudge, a small <code>step size</code> at a time. Press
+            <em>Step descent</em> and watch the line walk toward the dots.
+          </p>
+        </div>
+
+        <figure class="intuition-figure">
+          <img src="assets/figures/chapter3-gradient-descent.gif" width="720" height="360" alt="Animated point moving downhill on a loss curve, with one arrow showing the local gradient and another arrow showing the update step." decoding="async">
+          <figcaption>The gradient tells you the local uphill direction. Gradient descent subtracts it, so the parameters take a small downhill step.</figcaption>
+        </figure>
+
+        <div class="gradient-grid">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Fit a line by nudging parameters</h3>
+              <span id="gradientStatus" class="pill">ready</span>
+            </div>
+            <div class="slider-stack">
+              <label class="range-row math-range" for="slopeSlider">
+                <span>Slope</span>
+                <input id="slopeSlider" type="range" min="-200" max="200" value="-40">
+                <output id="slopeLabel" for="slopeSlider">-0.40</output>
+              </label>
+              <label class="range-row math-range" for="interceptSlider">
+                <span>Intercept</span>
+                <input id="interceptSlider" type="range" min="-100" max="100" value="20">
+                <output id="interceptLabel" for="interceptSlider">0.20</output>
+              </label>
+              <label class="range-row math-range" for="lineRateSlider">
+                <span>Step size</span>
+                <input id="lineRateSlider" type="range" min="1" max="30" value="8">
+                <output id="lineRateLabel" for="lineRateSlider">0.08</output>
+              </label>
+            </div>
+            <div class="stepper-row gradient-buttons">
+              <button id="gradientStepButton" class="primary-button" type="button">Step descent</button>
+              <button id="gradientAutoButton" class="ghost-button" type="button">Auto train</button>
+              <button id="gradientResetButton" class="ghost-button" type="button">Reset</button>
+            </div>
+            <svg id="lineFitSvg" class="line-fit-svg" viewBox="0 0 560 360" role="img" aria-label="Line fit and training points"></svg>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Loss and gradients</h3>
+              <span id="lossLabel" class="pill">mean squared error</span>
+            </div>
+            <div id="gradientMetrics" class="metric-card-grid" aria-live="polite"></div>
+            <div id="gradientExplanation" class="gradient-explanation" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="worked-example" aria-label="One gradient step by hand">
+          <h3>One step, by hand</h3>
+          <p>
+            Take a single point <code>(x = 1, y = 1)</code> and a line currently set
+            to <code>slope = 0, intercept = 0</code>, so it predicts
+            <code>0</code>. The squared-error loss and its gradients are:
+          </p>
+          <div class="formula-stack">
+            <code>error = prediction − y = 0 − 1 = −1, loss = error² = 1</code>
+            <code>gradient on slope = 2·error·x = 2·(−1)·1 = −2</code>
+            <code>new slope = slope − stepSize·gradient = 0 − 0.1·(−2) = +0.2</code>
+          </div>
+          <p class="microcopy">
+            A negative gradient means "go up," so the update nudges the slope upward
+            toward the point. Repeat across all points and the line settles into the
+            cloud. Every weight in the next-word model is trained by this same
+            subtraction, just thousands of them at once.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="softmax" class="band band-muted" aria-labelledby="softmax-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">4. Softmax and assigning blame</p>
+          <h2 id="softmax-title">Turn raw word scores into next-word probabilities.</h2>
+          <p>
+            Our network will end with one raw score, called a <strong>logit</strong>,
+            for every word it could predict. Scores are not probabilities, so
+            <strong>softmax</strong> fixes that: it exponentiates each score (making it
+            positive), then divides by the total so the numbers add up to 1.
+            <strong>Temperature</strong> stretches or sharpens the result, the same
+            knob you met when generating text in Chapter 1.
+          </p>
+          <p>
+            Once we have probabilities, cross-entropy asks how much the model put on
+            the word that actually came next. <strong>Backpropagation</strong> is just
+            careful bookkeeping for blame: for the predicted word it says "too high,
+            push down," and for the true word "too low, push up." For softmax with
+            cross-entropy that blame is beautifully simple:
+            <code>probability − target</code>.
+          </p>
+        </div>
+
+        <div class="softmax-grid">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Raw word scores</h3>
+              <span id="softmaxTempLabel" class="pill">temperature</span>
+            </div>
+            <p class="microcopy">Context: <code>the cat</code> ___. These are the model's raw scores for three candidate next words.</p>
+            <div class="slider-stack">
+              <label class="range-row math-range" for="logitA">
+                <span>sat</span>
+                <input id="logitA" type="range" min="-400" max="400" value="170">
+                <output id="logitALabel" for="logitA">1.70</output>
+              </label>
+              <label class="range-row math-range" for="logitB">
+                <span>ran</span>
+                <input id="logitB" type="range" min="-400" max="400" value="80">
+                <output id="logitBLabel" for="logitB">0.80</output>
+              </label>
+              <label class="range-row math-range" for="logitC">
+                <span>slept</span>
+                <input id="logitC" type="range" min="-400" max="400" value="-110">
+                <output id="logitCLabel" for="logitC">-1.10</output>
+              </label>
+              <label class="range-row math-range" for="temperatureSlider">
+                <span>Temp</span>
+                <input id="temperatureSlider" type="range" min="40" max="220" value="100">
+                <output id="temperatureLabel" for="temperatureSlider">1.00</output>
+              </label>
+            </div>
+            <label class="select-row correct-row" for="correctClassSelect">
+              <span>True next word</span>
+              <select id="correctClassSelect" class="control-input">
+                <option value="sat">sat</option>
+                <option value="ran">ran</option>
+                <option value="slept">slept</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Probabilities and blame</h3>
+              <span id="softmaxLossLabel" class="pill">cross-entropy</span>
+            </div>
+            <div id="softmaxPanel" class="probability-panel" aria-live="polite"></div>
+            <div id="backpropPanel" class="backprop-panel" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="neural-networks" class="band" aria-labelledby="nn-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">5. Build the forward pass</p>
+          <h2 id="nn-title">Stack the pieces into a tiny next-word network.</h2>
+          <p>
+            Now we assemble the toolkit. A <strong>neuron</strong> multiplies its
+            inputs by weights, adds a bias, and passes the result through an
+            <strong>activation function</strong>. Activations such as ReLU, tanh, and
+            sigmoid add bends and curves so a stack of layers can learn more than a
+            straight line. Several neurons side by side make a layer; stacked layers
+            make a <strong>multilayer perceptron</strong>, or MLP.
+          </p>
+          <p>
+            Here is the whole forward pass for predicting the next word: look up an
+            <strong>embedding</strong> row for each context word, join them, push them
+            through a hidden layer with an activation, and finish with softmax over
+            the candidate words. Change the context or the activation and watch the
+            prediction move. (These weights are fixed and illustrative; in the next
+            section the model learns its own.)
+          </p>
+        </div>
+
+        <div class="network-grid">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>One forward pass</h3>
+              <span id="forwardSummary" class="pill">MLP</span>
+            </div>
+            <div class="control-grid compact-controls">
+              <label class="select-row activation-row" for="forwardCtxA">
+                <span>Context 1</span>
+                <select id="forwardCtxA" class="control-input">
+                  <option value="the">the</option>
+                  <option value="cat" selected>cat</option>
+                  <option value="dog">dog</option>
+                  <option value="sat">sat</option>
+                  <option value="ran">ran</option>
+                </select>
+              </label>
+              <label class="select-row activation-row" for="forwardCtxB">
+                <span>Context 2</span>
+                <select id="forwardCtxB" class="control-input">
+                  <option value="the">the</option>
+                  <option value="cat">cat</option>
+                  <option value="dog">dog</option>
+                  <option value="sat" selected>sat</option>
+                  <option value="ran">ran</option>
+                </select>
+              </label>
+              <label class="select-row activation-row" for="activationSelect">
+                <span>Activation</span>
+                <select id="activationSelect" class="control-input">
+                  <option value="relu">ReLU</option>
+                  <option value="tanh">tanh</option>
+                  <option value="sigmoid">sigmoid</option>
+                </select>
+              </label>
+            </div>
+            <svg id="networkSvg" class="network-svg" viewBox="0 0 560 300" role="img" aria-label="Tiny next-word network forward pass"></svg>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Inside the pass</h3>
+              <span class="pill">embeddings → softmax</span>
+            </div>
+            <p class="microcopy">
+              Each context word is an index into the embedding table; its row is a
+              parameter the network can tune. Read the steps top to bottom: two lookups,
+              one activated hidden layer, raw logits, then softmax probabilities.
+            </p>
+            <div id="forwardPanel" class="forward-panel" aria-live="polite"></div>
+            <p class="insight-note">
+              This is exactly the shape of the model you are about to train: context
+              words in, a next-word distribution out. The only thing missing is
+              learning, which is the four-beat loop of forward pass, loss, backward
+              pass, and update.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="warmup-lab" class="band band-muted" aria-labelledby="warmup-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">6. Watch a network learn</p>
+          <h2 id="warmup-title">Warm-up: see the four-beat loop succeed where you can watch it.</h2>
+          <p>
+            Before we point the loop at language, let's build trust on a task where the
+            answer is something you can literally see: a boundary between two colors of
+            dots. This is a real two-layer network with random starting weights. Each
+            epoch runs the same four beats, a forward pass, cross-entropy loss, a
+            backward pass, then a parameter update, just like the word model will.
+          </p>
+          <p>
+            The dots are split into training and test sets. <strong>Training
+            accuracy</strong> shows how well the network fits dots it learned from.
+            <strong>Test accuracy</strong> is the generalization check: did it learn
+            the pattern, or just memorize? A big gap between them is the classic sign
+            of <strong>overfitting</strong>.
+          </p>
+        </div>
+
+        <section class="trainer nn-trainer" aria-label="Tiny neural network training controls">
+          <div class="trainer-head">
+            <div>
+              <h3>Training controls</h3>
+              <p>Change the task, capacity, and learning rate, then train for a few epochs.</p>
+            </div>
+            <button id="resetNetworkButton" class="ghost-button" type="button">Reset network</button>
+          </div>
+
+          <div class="control-grid nn-controls">
+            <label class="select-row" for="datasetSelect">
+              <span>Data</span>
+              <select id="datasetSelect" class="control-input">
+                <option value="xor">XOR corners</option>
+                <option value="blobs">Two blobs</option>
+                <option value="ring">Noisy ring</option>
+              </select>
+            </label>
+            <label class="range-row math-range" for="hiddenUnitsSlider">
+              <span>Hidden</span>
+              <input id="hiddenUnitsSlider" type="range" min="2" max="10" step="1" value="6">
+              <output id="hiddenUnitsLabel" for="hiddenUnitsSlider">6</output>
+            </label>
+            <label class="range-row math-range" for="networkRateSlider">
+              <span>Rate</span>
+              <input id="networkRateSlider" type="range" min="1" max="30" value="8">
+              <output id="networkRateLabel" for="networkRateSlider">0.08</output>
+            </label>
+            <label class="range-row math-range" for="epochBatchSlider">
+              <span>Epochs</span>
+              <input id="epochBatchSlider" type="range" min="5" max="120" step="5" value="40">
+              <output id="epochBatchLabel" for="epochBatchSlider">40</output>
+            </label>
+          </div>
+
+          <div class="stepper-row nn-button-row">
+            <button id="trainOneEpochButton" class="ghost-button" type="button">Train 1 epoch</button>
+            <button id="trainBatchButton" class="primary-button" type="button">Train selected epochs</button>
+            <button id="newDataButton" class="ghost-button" type="button">New data split</button>
+          </div>
+
+          <div id="trainingProgress" class="training-progress" aria-live="polite">
+            <div class="training-progress-copy">
+              <strong>Ready to train</strong>
+              <span id="trainingProgressText">One click runs the selected epochs and updates the map as it learns.</span>
+            </div>
+            <div class="training-progress-track" aria-hidden="true">
+              <span id="trainingProgressBar"></span>
+            </div>
+          </div>
+
+          <div class="training-output-grid">
+            <div class="panel decision-panel">
+              <div class="section-title-row">
+                <h3>Decision map</h3>
+                <span id="networkStatus" class="pill">untrained</span>
+              </div>
+              <canvas id="decisionCanvas" class="decision-canvas" width="720" height="480" aria-label="Decision boundary and data points"></canvas>
+            </div>
+            <div class="panel">
+              <div class="section-title-row">
+                <h3>Training signal</h3>
+                <span id="networkEpochLabel" class="pill">0 epochs</span>
+              </div>
+              <div id="networkMetrics" class="metric-card-grid" aria-live="polite"></div>
+              <div id="lossHistory" class="loss-history" aria-live="polite"></div>
+              <div id="generalizationPanel" class="generalization-panel" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <article class="code-cell chapter3-code-cell">
+            <div class="cell-head">
+              <h3>Run the training loop from code</h3>
+              <button class="run-button" type="button">Run</button>
+            </div>
+            <textarea class="code-input" spellcheck="false">return trainTinyNetwork(40);</textarea>
+            <div class="code-output is-empty" aria-live="polite">
+              <div class="output-message">
+                <strong>Ready to run</strong>
+                <span>This calls the same browser training loop used by the buttons.</span>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+    </section>
+
+    <section id="train-lab" class="band" aria-labelledby="train-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">7. Train a next-word model</p>
+          <h2 id="train-title">Now train the real thing: a tiny neural language model.</h2>
+          <p>
+            This is the payoff. Everything above becomes one small network that
+            predicts the next word, trained right here on a tiny corpus. It is a
+            miniature of the neural language model Bengio and colleagues introduced in
+            2003: each context word is looked up in an <strong>embedding</strong>
+            table, the rows are joined and pushed through a hidden layer with a tanh
+            activation, and <strong>softmax</strong> produces a probability for every
+            word in the vocabulary. <strong>Cross-entropy</strong> scores each guess
+            and <strong>backprop</strong> nudges every weight, including the embedding
+            rows themselves.
+          </p>
+          <p>
+            Press <em>Train</em> and watch three things move together: the loss falls,
+            <strong>perplexity</strong> drops from "torn between many words" toward "a
+            confident handful," and the prediction bars for a context like
+            <code>the cat</code> sharpen onto the words that really follow it. Then
+            generate a sentence and see the same math from Chapter 1, sampling one word
+            at a time, but now driven by learned vectors instead of raw counts.
+          </p>
+        </div>
+
+        <div class="corpus-card panel" aria-label="Training corpus">
+          <div class="section-title-row">
+            <h3>The whole training corpus</h3>
+            <span class="pill">12 sentences</span>
+          </div>
+          <p class="microcopy">
+            Small and repetitive on purpose, so a two-word context is genuinely
+            predictive and training finishes in seconds. Every sentence gets a hidden
+            <code>start</code> marker so the first word has a context too.
+          </p>
+          <div class="corpus-lines">
+            <code>the cat sat on the mat</code>
+            <code>the cat ran in the sun</code>
+            <code>the dog sat on the mat</code>
+            <code>the dog ran in the rain</code>
+            <code>a cat sat by the dog</code>
+            <code>a dog sat by the cat</code>
+            <code>the cat saw a bird</code>
+            <code>the dog saw a bird</code>
+            <code>the bird sat on the cat</code>
+            <code>the bird ran from the dog</code>
+            <code>the cat slept on the mat</code>
+            <code>the dog slept in the sun</code>
+          </div>
+        </div>
+
+        <section class="trainer nn-trainer" aria-label="Next-word model training controls">
+          <div class="trainer-head">
+            <div>
+              <h3>Training controls</h3>
+              <p>Pick how many epochs to run, then train. Learning rate is fixed at 0.2 so the focus stays on watching it learn.</p>
+            </div>
+            <button id="nwResetButton" class="ghost-button" type="button">Reset model</button>
+          </div>
+
+          <div class="control-grid nw-controls">
+            <label class="range-row math-range" for="nwEpochsSlider">
+              <span>Epochs</span>
+              <input id="nwEpochsSlider" type="range" min="20" max="400" step="20" value="120">
+              <output id="nwEpochsLabel" for="nwEpochsSlider">120</output>
+            </label>
+            <label class="range-row math-range" for="nwTempSlider">
+              <span>Gen. temp</span>
+              <input id="nwTempSlider" type="range" min="40" max="200" step="5" value="80">
+              <output id="nwTempLabel" for="nwTempSlider">0.80</output>
+            </label>
+          </div>
+
+          <div class="stepper-row nn-button-row">
+            <button id="nwTrainStepButton" class="ghost-button" type="button">Train 10 epochs</button>
+            <button id="nwTrainButton" class="primary-button" type="button">Train next-word model</button>
+            <button id="nwGenerateButton" class="ghost-button" type="button">Generate a sentence</button>
+          </div>
+
+          <div id="nwProgress" class="training-progress" aria-live="polite">
+            <div class="training-progress-copy">
+              <strong>Ready to train</strong>
+              <span id="nwProgressText">One click runs the selected epochs and updates the predictions live.</span>
+            </div>
+            <div class="training-progress-track" aria-hidden="true">
+              <span id="nwProgressBar"></span>
+            </div>
+          </div>
+
+          <div class="training-output-grid">
+            <div class="panel">
+              <div class="section-title-row">
+                <h3>Predict the next word</h3>
+                <span id="nwContextLabel" class="pill">the cat →</span>
+              </div>
+              <div class="control-grid compact-controls">
+                <label class="select-row" for="nwContextSelectA">
+                  <span>Context 1</span>
+                  <select id="nwContextSelectA" class="control-input"></select>
+                </label>
+                <label class="select-row" for="nwContextSelectB">
+                  <span>Context 2</span>
+                  <select id="nwContextSelectB" class="control-input"></select>
+                </label>
+              </div>
+              <p class="microcopy">Top six words the model expects next, by probability.</p>
+              <div id="nwPredictPanel" class="probability-panel" aria-live="polite"></div>
+            </div>
+            <div class="panel">
+              <div class="section-title-row">
+                <h3>Training signal</h3>
+                <span id="nwStatus" class="pill">untrained</span>
+              </div>
+              <div id="nwMetrics" class="metric-card-grid" aria-live="polite"></div>
+              <div id="nwLossHistory" class="loss-history" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <div class="panel nw-generate-card">
+            <div class="section-title-row">
+              <h3>Generated sentence</h3>
+              <span class="pill">sampled</span>
+            </div>
+            <div id="nwGeneratePanel" class="generate-panel" aria-live="polite"></div>
+          </div>
+
+          <article class="code-cell chapter3-code-cell">
+            <div class="cell-head">
+              <h3>Train and sample from code</h3>
+              <button class="run-button" type="button">Run</button>
+            </div>
+            <textarea class="code-input" spellcheck="false">return trainNextWordModel(120);</textarea>
+            <div class="code-output is-empty" aria-live="polite">
+              <div class="output-message">
+                <strong>Ready to run</strong>
+                <span>This trains the same model the buttons use, then returns its loss, perplexity, and a sample.</span>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <p class="insight-note chapter-bridge-note">
+          Take a moment to appreciate what just happened. With nothing but
+          probability, vectors, a dot product, softmax, and a gradient nudge, a pile
+          of numbers taught itself to finish sentences. That is the whole engine of a
+          modern LLM, only tiny. It still has one real limit, though: it reads a fixed
+          two-word window and learns every context on its own, much like the n-grams
+          back in Chapter 1. The rest of the course lifts that limit. Next we pin down
+          how raw text becomes the tokens a model actually reads, and soon after we
+          meet the Transformer, the architecture that finally lets a model look across
+          a whole sentence at once.
+        </p>
+      </div>
+    </section>
+
+    <section id="references" class="band" aria-labelledby="references-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">8. Going deeper</p>
+          <h2 id="references-title">Further reading.</h2>
+          <p>
+            Good next stops once the live examples feel comfortable: the paper behind
+            the model you just trained, neural-network foundations, and the classic
+            sources on backpropagation, softmax, and perplexity.
+          </p>
+        </div>
+
+        <ol class="reference-list">
+          <li>
+            <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">Bengio et al., A Neural Probabilistic Language Model</a>
+            <span>The fixed-window neural language model your next-word lab is a miniature of.</span>
+          </li>
+          <li>
+            <a href="https://web.stanford.edu/~jurafsky/slp3/3.pdf" target="_blank" rel="noreferrer">Jurafsky and Martin, Chapter 3: N-gram Language Models</a>
+            <span>Entropy, cross-entropy, and perplexity in the language-model setting.</span>
+          </li>
+          <li>
+            <a href="https://www.deeplearningbook.org/contents/mlp.html" target="_blank" rel="noreferrer">Goodfellow, Bengio, and Courville, Deep Learning, Chapter 6</a>
+            <span>A rigorous treatment of deep feedforward networks.</span>
+          </li>
+          <li>
+            <a href="https://www.deeplearningbook.org/contents/numerical.html" target="_blank" rel="noreferrer">Deep Learning, Chapter 4: Numerical Computation</a>
+            <span>Gradient-based optimization, numerical stability, and softmax details.</span>
+          </li>
+          <li>
+            <a href="https://www.nature.com/articles/323533a0" target="_blank" rel="noreferrer">Rumelhart, Hinton, and Williams, Learning representations by back-propagating errors</a>
+            <span>The classic backpropagation paper.</span>
+          </li>
+          <li>
+            <a href="https://colah.github.io/posts/2015-08-Backprop/" target="_blank" rel="noreferrer">Christopher Olah, Calculus on Computational Graphs</a>
+            <span>A visual intuition for backpropagation as local gradients moving through a graph.</span>
+          </li>
+          <li>
+            <a href="https://cs231n.github.io/neural-networks-case-study/" target="_blank" rel="noreferrer">CS231n Neural Network Case Study</a>
+            <span>A readable from-scratch classifier with softmax loss and backpropagation.</span>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="chapter-nav-band" aria-label="Chapter navigation">
+      <div class="section-shell">
+        <nav class="chapter-nav">
+          <a class="chapter-nav-card" href="chapter-2.html">
+            <span>Previous chapter</span>
+            <strong>Chapter 2: When count tables need help</strong>
+            <em>Return to learned word vectors and sequence models.</em>
+          </a>
+          <a class="chapter-nav-card" href="chapter-4.html">
+            <span>Next chapter</span>
+            <strong>Chapter 4: Tokenization</strong>
+            <em>See how text becomes the tokens a model reads.</em>
+          </a>
+        </nav>
+      </div>
+    </section>
+  </main>
+
+  <script src="chapter3.js"></script>
+</body>
+</html>
+

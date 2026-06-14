@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pretraining LLMs - LLM Soup to Nuts</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="chapter6.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="LLM Soup to Nuts overview">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>
+        <strong>LLM Soup to Nuts</strong>
+        <small>Chapter 6</small>
+      </span>
+    </a>
+    <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="index.html">Overview</a>
+      <a href="chapter-1.html">Ch 1</a>
+      <a href="chapter-2.html">Ch 2</a>
+      <a href="chapter-3.html">Ch 3</a>
+      <a href="chapter-4.html">Ch 4</a>
+      <a href="chapter-5.html">Ch 5</a>
+      <a class="is-active" href="chapter-6.html">Ch 6</a>
+    </nav>
+  </header>
+
+  <aside class="lesson-toc" aria-label="Table of contents">
+    <p>Chapter 6</p>
+    <nav>
+      <a href="#overview"><span>00</span>Overview</a>
+      <a href="#objectives"><span>01</span>Pretraining objectives</a>
+      <a href="#data"><span>02</span>Training data</a>
+      <a href="#scaling"><span>03</span>Scaling laws</a>
+      <a href="#systems"><span>04</span>Distributed training</a>
+      <a href="#references"><span>05</span>References</a>
+    </nav>
+  </aside>
+
+  <main id="top">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title">
+      <div class="workbench">
+        <article class="intro-copy">
+          <p class="eyebrow">Learning by doing</p>
+          <h1 id="page-title">Pretraining: turn a pile of text into a base model.</h1>
+          <p class="lead">
+            In Chapter 5 you ran a finished Transformer. This chapter is about where
+            that model comes from. <strong>Pretraining</strong> is the long, expensive
+            first phase where a fresh network reads an enormous amount of text and does
+            one simple thing billions of times: predict the next token, check how
+            surprised it was, and nudge its weights. The same four-beat loop from
+            Chapter 3, just very, very large.
+          </p>
+          <p>
+            Three decisions shape the result: the <strong>objective</strong> the model
+            trains on, the <strong>data</strong> it reads, and how much
+            <strong>compute</strong> you spend. Get the balance right and the model
+            keeps improving in a predictable way. This chapter lets you play with each
+            decision and watch the tradeoffs that real labs wrestle with.
+          </p>
+          <p class="example-note">
+            <em>Guiding question:</em> if you had a fixed budget of computer time, would
+            you spend it on a bigger model or on more data? The answer is not obvious,
+            and getting it wrong wastes millions of dollars.
+          </p>
+          <div class="idea-flow" aria-label="Chapter flow">
+            <div>
+              <strong>Pick an objective</strong>
+              <span>See which tokens next-token and masked training actually predict.</span>
+            </div>
+            <div>
+              <strong>Clean the data</strong>
+              <span>Follow raw web text through the filtering and dedup funnel.</span>
+            </div>
+            <div>
+              <strong>Spend compute well</strong>
+              <span>Balance model size against data with a scaling-law explorer.</span>
+            </div>
+            <div>
+              <strong>Fit it on GPUs</strong>
+              <span>Add up training memory and see why it must be sharded.</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="objectives" class="band" aria-labelledby="objectives-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">1. Pretraining objectives</p>
+          <h2 id="objectives-title">What, exactly, is the model trying to predict?</h2>
+          <p>
+            An objective is the game the model plays during training. The dominant one
+            for chat models is <strong>next-token prediction</strong>, also called
+            causal language modeling: read the tokens so far, predict the next one. It
+            matches Chapter 1's question exactly, and because it only ever looks
+            backward, the trained model can generate text left to right.
+          </p>
+          <p>
+            A different objective, <strong>masked language modeling</strong>, hides a
+            few tokens and asks the model to fill them in using context from both
+            sides. That builds rich understanding of a whole sentence, which is why it
+            powers search and classification models, but it does not directly give you
+            a generator. Switch between the two below and watch which tokens become
+            targets and what context each one is allowed to use.
+          </p>
+          <p>
+            Under the hood, next-token pretraining is still the cross-entropy story
+            from Chapter 3. At position <code>t</code>, the model reads the earlier
+            tokens <code>x_&lt;t</code>, assigns a probability to the real next token
+            <code>x_t</code>, and pays surprise <code>-ln p(x_t | x_&lt;t)</code>.
+            Average that over billions of positions and you have the training loss.
+          </p>
+          <div class="worked-example" aria-label="Next-token loss by hand">
+            <h3>One next-token loss by hand</h3>
+            <p>
+              Suppose the context is <code>the cat sat on the</code> and the real next
+              token is <code>mat</code>. If the model assigns <code>mat</code> a
+              probability of 0.40, the loss for this one position is:
+            </p>
+            <div class="formula-stack">
+              <code>loss = -ln p(real next token | previous tokens)</code>
+              <code>loss = -ln 0.40 = 0.92 nats</code>
+              <code>if average loss = 1.20 nats, perplexity = exp(1.20) = 3.3 tokens</code>
+            </div>
+            <p class="microcopy">
+              Perplexity is back: it is the model's average uncertainty written as an
+              effective number of next-token choices.
+            </p>
+          </div>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://jalammar.github.io/illustrated-bert/" target="_blank" rel="noreferrer">masked vs causal pretraining</a>
+            and
+            <a href="https://arxiv.org/abs/1910.10683" target="_blank" rel="noreferrer">the T5 denoising study</a>
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Objective controls">
+          <div class="choice-row" role="group" aria-label="Training objective">
+            <span class="choice-label">Objective</span>
+            <div class="choice-group">
+              <button class="choice-pill" type="button" data-objective="causal">Next-token (GPT)</button>
+              <button class="choice-pill" type="button" data-objective="masked">Masked (BERT)</button>
+            </div>
+          </div>
+          <label class="range-row" id="causalControls" for="causalPosSlider">
+            <span>Predict position</span>
+            <input id="causalPosSlider" type="range" min="0" max="5" step="1" value="3">
+            <output id="causalPosLabel" for="causalPosSlider">position 4</output>
+          </label>
+        </div>
+
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>The training example</h3>
+            <span class="pill">the cat sat on the mat</span>
+          </div>
+          <div id="objectiveRail" class="objective-rail" aria-live="polite"></div>
+          <p id="objectiveExplain" class="insight-note" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="data" class="band band-muted" aria-labelledby="data-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">2. Training data</p>
+          <h2 id="data-title">Most of pretraining is really data preparation.</h2>
+          <p>
+            A base model is a mirror of its training data, so labs spend enormous
+            effort on what goes in. Raw web text is huge but messy. It gets filtered
+            for language and quality, <strong>deduplicated</strong> so repeated pages
+            do not dominate, stripped of personal information and unsafe content, and
+            checked so that test benchmarks do not leak in. Only then is it tokenized
+            into the stream the model actually trains on.
+          </p>
+          <figure class="diagram-figure">
+            <svg class="pipeline-svg" viewBox="0 0 600 196" role="img" aria-labelledby="data-title-svg data-desc">
+              <title id="data-title-svg">The data preparation funnel</title>
+              <desc id="data-desc">Raw web crawl is reduced by quality filtering, deduplication, and safety and contamination removal, then tokenized into a much smaller, cleaner training set.</desc>
+              <rect x="14" y="40" width="96" height="104" rx="8" class="svg-box-soft"></rect>
+              <text x="62" y="96" class="svg-word" text-anchor="middle">raw</text>
+              <text x="62" y="112" class="svg-word" text-anchor="middle">crawl</text>
+              <rect x="156" y="56" width="96" height="72" rx="8" class="svg-box-plain"></rect>
+              <text x="204" y="88" class="svg-word" text-anchor="middle">quality</text>
+              <text x="204" y="104" class="svg-word" text-anchor="middle">filter</text>
+              <rect x="298" y="66" width="96" height="52" rx="8" class="svg-box-plain"></rect>
+              <text x="346" y="96" class="svg-word" text-anchor="middle">dedup</text>
+              <rect x="440" y="72" width="96" height="40" rx="8" class="svg-box-plain"></rect>
+              <text x="488" y="96" class="svg-word" text-anchor="middle">safety</text>
+              <rect x="552" y="74" width="40" height="36" rx="7" class="svg-box-accent"></rect>
+              <text x="572" y="96" class="svg-model-text" text-anchor="middle">tok</text>
+              <line x1="110" y1="92" x2="154" y2="92" class="svg-arrow" marker-end="url(#d-arrow)"></line>
+              <line x1="252" y1="92" x2="296" y2="92" class="svg-arrow" marker-end="url(#d-arrow)"></line>
+              <line x1="394" y1="92" x2="438" y2="92" class="svg-arrow" marker-end="url(#d-arrow)"></line>
+              <line x1="536" y1="92" x2="550" y2="92" class="svg-arrow" marker-end="url(#d-arrow)"></line>
+              <text x="300" y="176" class="svg-caption" text-anchor="middle">Each stage throws away more text. The clean training set is a small fraction of the raw crawl.</text>
+              <defs>
+                <marker id="d-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>The data funnel: raw crawl shrinks through quality filtering, deduplication, and safety checks before tokenization.</figcaption>
+          </figure>
+          <p>
+            The choices here are not just technical. Licensing and copyright, removing
+            personal data, filtering toxic content, and avoiding benchmark
+            contamination are all decisions with real consequences, and they are
+            increasingly documented in dataset and model cards.
+          </p>
+          <div class="worked-example" aria-label="Data filtering and mixture math by hand">
+            <h3>Data preparation by hand</h3>
+            <p>
+              Deduplication is not just storage cleanup; it changes what the model is
+              trained to pay attention to. If one page appears 100 times beside 900
+              single-copy pages, that one page is 10% of the examples before dedup.
+              After exact deduplication, it is just one page out of 901.
+            </p>
+            <div class="formula-stack">
+              <code>before dedup: repeated page share = 100 / (100 + 900) = 10%</code>
+              <code>after dedup: repeated page share = 1 / (1 + 900) = 0.11%</code>
+              <code>mixture example: 100B tokens * 20% code = 20B code tokens</code>
+            </div>
+            <p class="microcopy">
+              The model does not know what "important" means. It sees frequency,
+              mixture weights, and loss. Data preparation is where humans decide what
+              evidence gets repeated and what gets removed.
+            </p>
+          </div>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://arxiv.org/abs/2101.00027" target="_blank" rel="noreferrer">the Pile dataset</a>
+            and
+            <a href="https://arxiv.org/abs/2306.01116" target="_blank" rel="noreferrer">filtering web data at scale</a>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="scaling" class="band" aria-labelledby="scaling-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">3. Scaling laws</p>
+          <h2 id="scaling-title">Spend a fixed compute budget: bigger model or more data?</h2>
+          <p>
+            Here is one of the most useful results in modern AI: model loss falls in a
+            smooth, predictable way as you add parameters and data. A good
+            approximation is <code>loss = E + A / N^&#945; + B / D^&#946;</code>, where
+            <code>N</code> is the number of parameters and <code>D</code> is the number
+            of training tokens. Training compute is roughly <code>C &#8776; 6 &middot; N &middot; D</code>.
+          </p>
+          <p>
+            That last equation is the catch. For a fixed compute budget you cannot
+            grow both <code>N</code> and <code>D</code> at once: a bigger model must
+            train on less data, and vice versa. Pick a budget, then slide the model
+            size along it. The curve shows the predicted loss, and the marked point is
+            the <strong>compute-optimal</strong> balance, the lesson made famous by the
+            Chinchilla result: most early large models were too big and badly
+            undertrained.
+          </p>
+          <div class="worked-example" aria-label="Scaling law compute by hand">
+            <h3>Compute by hand</h3>
+            <p>
+              A rough training-compute rule for dense decoder Transformers is
+              <code>C &asymp; 6ND</code>. It is not exact engineering accounting, but
+              it is good enough to feel the tradeoff. If you train a 1B-parameter model
+              on 20B tokens, the run costs about <code>1.2 * 10^20</code> FLOPs.
+            </p>
+            <div class="formula-stack">
+              <code>C = 6 * 1B parameters * 20B tokens = 1.2e20 FLOPs</code>
+              <code>same C with 10B parameters gives D = C / (6N) = 2B tokens</code>
+              <code>tokens per parameter: 2B / 10B = 0.2, far below the ~20 Chinchilla-style target</code>
+            </div>
+            <p class="microcopy">
+              Bigger is not automatically better. With the same compute, a much bigger
+              model may see too little data and stay undertrained.
+            </p>
+          </div>
+          <figure class="intuition-figure">
+            <img src="assets/figures/chapter6-compute-balance.gif" width="720" height="360" alt="Animated seesaw showing a fixed compute budget, where increasing model size N reduces the amount of training data D, and a balanced middle point is marked." decoding="async">
+            <figcaption>For a fixed compute budget, model size and training data trade off against each other. The sweet spot is a balance, not the largest model you can name.</figcaption>
+          </figure>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noreferrer">the Chinchilla scaling paper</a>
+            and
+            <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noreferrer">the original scaling laws</a>
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Scaling controls">
+          <label class="range-row" for="computeSlider">
+            <span>Compute budget</span>
+            <input id="computeSlider" type="range" min="18" max="24" step="1" value="21">
+            <output id="computeLabel" for="computeSlider">budget</output>
+          </label>
+          <label class="range-row" for="sizeSlider">
+            <span>Model size along the budget</span>
+            <input id="sizeSlider" type="range" min="0" max="100" step="1" value="50">
+            <output id="sizeLabel" for="sizeSlider">size</output>
+          </label>
+        </div>
+
+        <div class="two-column">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Predicted loss at this budget</h3>
+              <span class="pill">lower is better</span>
+            </div>
+            <div id="scalingChart" class="scaling-chart" aria-live="polite"></div>
+            <p class="microcopy">The large dot is your choice; the vertical line marks the compute-optimal model size.</p>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Your run</h3>
+              <span class="pill">N, D, and loss</span>
+            </div>
+            <div id="scalingReadout" class="detail-list" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="systems" class="band band-muted" aria-labelledby="systems-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">4. Distributed training</p>
+          <h2 id="systems-title">Why one GPU is never enough.</h2>
+          <p>
+            Training memory is dominated not by the weights but by everything you keep
+            <em>around</em> them. For each parameter you typically store fp16 weights,
+            fp16 gradients, and the optimizer's fp32 momentum, variance, and master
+            copy, roughly <strong>16 bytes per parameter</strong> before you even count
+            activations. Slide the model size below and watch the total blow past a
+            single GPU almost immediately.
+          </p>
+          <p>
+            That is why large runs spread the work across many GPUs.
+            <strong>Data parallelism</strong> copies the model and splits the batch.
+            <strong>Tensor</strong> and <strong>pipeline parallelism</strong> split a
+            single model across devices. <strong>ZeRO</strong> and
+            <strong>FSDP</strong> shard the weights, gradients, and optimizer state so
+            no single GPU holds all of it. The sharding slider shows the effect on
+            per-GPU memory directly.
+          </p>
+          <p>
+            The <code>16 bytes</code> estimate is only the training state for the
+            parameters. Real training also needs activation memory for the forward
+            pass, temporary communication buffers, and room for batches. That is why
+            "fits the optimizer state" is necessary but not sufficient.
+          </p>
+          <div class="worked-example" aria-label="Training memory by hand">
+            <h3>Training memory by hand</h3>
+            <p>
+              With Adam-style training, a single parameter is not just one fp16 weight.
+              You also keep its gradient, two optimizer statistics, and often an fp32
+              master copy. That rough accounting gives the 16-byte rule used below.
+            </p>
+            <div class="formula-stack">
+              <code>bytes per parameter = 2 weight + 2 gradient + 8 Adam state + 4 master weight = 16</code>
+              <code>7B parameters * 16 bytes = 112GB before activations</code>
+              <code>70B parameters * 16 bytes = 1,120GB = 1.12TB before activations</code>
+            </div>
+            <p class="microcopy">
+              Sharding does not make the model smaller; it divides the state across
+              devices so each GPU carries only part of the burden.
+            </p>
+          </div>
+          <p class="learn-more">
+            Learn more:
+            <a href="https://arxiv.org/abs/1910.02054" target="_blank" rel="noreferrer">the ZeRO memory paper</a>
+            and
+            <a href="https://huggingface.co/docs/transformers/perf_train_gpu_many" target="_blank" rel="noreferrer">a guide to model parallelism</a>
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Memory controls">
+          <label class="range-row" for="memSlider">
+            <span>Model size</span>
+            <input id="memSlider" type="range" min="60" max="120" step="1" value="90">
+            <output id="memLabel" for="memSlider">params</output>
+          </label>
+          <label class="range-row" for="shardSlider">
+            <span>Shard across</span>
+            <input id="shardSlider" type="range" min="1" max="64" step="1" value="1">
+            <output id="shardLabel" for="shardSlider">1 GPU</output>
+          </label>
+        </div>
+
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Training memory budget</h3>
+            <span class="pill">~16 bytes per parameter</span>
+          </div>
+          <div id="memPanel" class="detail-list" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="references" class="band" aria-labelledby="references-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">5. Going deeper</p>
+          <h2 id="references-title">Further reading.</h2>
+          <p>
+            These references cover the objectives, the data, the scaling laws, and the
+            systems that make pretraining possible at scale.
+          </p>
+        </div>
+
+        <ol class="reference-list">
+          <li>
+            <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noreferrer">Kaplan et al., Scaling Laws for Neural Language Models</a>
+            <span>The first clear power-law relationship between loss, model size, data, and compute.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noreferrer">Hoffmann et al., Training Compute-Optimal Large Language Models (Chinchilla)</a>
+            <span>The result that most large models were undertrained, and how to balance N and D.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2101.00027" target="_blank" rel="noreferrer">Gao et al., The Pile</a>
+            <span>A widely used, openly documented pretraining dataset.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1910.02054" target="_blank" rel="noreferrer">Rajbhandari et al., ZeRO</a>
+            <span>Memory optimizations that shard optimizer state, gradients, and weights.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1909.08053" target="_blank" rel="noreferrer">Shoeybi et al., Megatron-LM</a>
+            <span>Tensor and pipeline parallelism for training very large Transformers.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1910.10683" target="_blank" rel="noreferrer">Raffel et al., T5</a>
+            <span>A careful study of pretraining objectives and transfer with a unified text-to-text setup.</span>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="chapter-nav-band" aria-label="Chapter navigation">
+      <div class="section-shell">
+        <nav class="chapter-nav">
+          <a class="chapter-nav-card" href="chapter-5.html">
+            <span>Previous chapter</span>
+            <strong>Chapter 5: Transformers and attention</strong>
+            <em>Return to the attention mechanism and a real GPT model.</em>
+          </a>
+          <span class="chapter-nav-card is-disabled">
+            <span>Next chapter</span>
+            <strong>More chapters coming</strong>
+            <em>This chapter is the current end of the path.</em>
+          </span>
+        </nav>
+      </div>
+    </section>
+  </main>
+
+  <script src="chapter6.js"></script>
+</body>
+</html>
+

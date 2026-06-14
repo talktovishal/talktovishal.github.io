@@ -138,7 +138,7 @@ const dom = {
 };
 
 const state = {
-  activeCorpusId: corpora[0].id,
+  activeCorpusId: (corpora.find((corpus) => corpus.id === "alice-both-books") || corpora[0]).id,
   customCorpusMeta: null,
   activeIndex: 0,
   isPlayingWindows: false,
