@@ -52,8 +52,9 @@ a {
   text-decoration: none;
 }
 
-/* Inline links inside reading prose should look like links: colored + underlined. */
-.intro-copy p a,
+/* Inline links inside reading prose should look like links: colored + underlined.
+   Exclude anchors that are styled as buttons/cards so they keep their own look. */
+.intro-copy p a:not(.primary-button):not(.ghost-button),
 .section-heading p:not(.learn-more) a,
 .example-note a,
 .insight-note a,
@@ -68,7 +69,7 @@ figcaption a {
   font-weight: 750;
 }
 
-.intro-copy p a:hover,
+.intro-copy p a:not(.primary-button):not(.ghost-button):hover,
 .section-heading p:not(.learn-more) a:hover,
 .example-note a:hover,
 .insight-note a:hover,
