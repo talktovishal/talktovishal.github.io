@@ -166,7 +166,10 @@ const state = {
   networkSeed: 17,
   networkHistory: [],
   networkTrainingRun: 0,
-  isNetworkTraining: false
+  isNetworkTraining: false,
+  hasExploredProbability: false,
+  hasExploredGradient: false,
+  hasTrainedNetwork: false
 };
 
 function formatNumber(value, digits = 3) {
@@ -289,7 +292,6 @@ function renderProbability() {
   const extraSurprise = crossEntropy - entropy;
 
   dom.probabilityContextLabel.textContent = preset.title;
-  dom.entropyLabel.textContent = `${formatNumber(entropy, 2)} bits`;
   preset.labels.forEach((label, index) => {
     dom.countLabels[index].textContent = label;
     dom.guessLabels[index].textContent = label;
@@ -297,6 +299,14 @@ function renderProbability() {
     dom.guessValues[index].textContent = guessesRaw[index];
   });
 
+  if (!state.hasExploredProbability) {
+    dom.entropyLabel.textContent = "\u2014 bits";
+    dom.probabilityPanel.replaceChildren(createElement("div", "empty-state", "Move a count or guess slider (or pick a context) to see probabilities, entropy, and surprise."));
+    dom.entropyPanel.replaceChildren(createElement("div", "empty-state", "Adjust the sliders to compute entropy, cross-entropy, and perplexity."));
+    return;
+  }
+
+  dom.entropyLabel.textContent = `${formatNumber(entropy, 2)} bits`;
   dom.probabilityPanel.replaceChildren();
   preset.labels.forEach((label, index) => {
     const detail = `${counts[index]} / ${total || 0} = ${formatPercent(target[index])}`;
@@ -503,6 +513,13 @@ function lineLossAndGradients(w, b) {
 
 function renderGradient() {
   const { w, b } = readLineParams();
+  if (!state.hasExploredGradient) {
+    dom.gradientStatus.textContent = "press Step";
+    renderLineFitPlaceholder();
+    dom.gradientMetrics.replaceChildren(createElement("div", "empty-state", "Move the slope, intercept, or rate slider \u2014 or press Step \u2014 to fit the line and see the gradients."));
+    dom.gradientExplanation.replaceChildren();
+    return;
+  }
   const info = lineLossAndGradients(w, b);
   dom.gradientStatus.textContent = `loss ${formatNumber(info.loss, 3)}`;
   renderLineFitSvg(w, b);
@@ -526,6 +543,14 @@ function renderGradient() {
   const p = createElement("p");
   p.textContent = `Next descent step: slope = slope - stepSize * ${formatNumber(info.dw, 3)}, intercept = intercept - stepSize * ${formatNumber(info.db, 3)}. That small subtraction is the parameter update.`;
   dom.gradientExplanation.replaceChildren(p);
+}
+
+function renderLineFitPlaceholder() {
+  const svg = dom.lineFitSvg;
+  svg.replaceChildren();
+  const text = createSvgElement("text", { x: 280, y: 180, "text-anchor": "middle", fill: "#6a6a6a", "font-size": "15" });
+  text.textContent = "Adjust a slider or press Step to fit the line.";
+  svg.append(text);
 }
 
 function renderLineFitSvg(w, b) {
@@ -999,12 +1024,14 @@ async function trainTinyNetworkAnimated(epochs = 40) {
 function beginOneEpochTraining(event) {
   event?.preventDefault();
   if (state.isNetworkTraining) return;
+  state.hasTrainedNetwork = true;
   trainTinyNetworkAnimated(1);
 }
 
 function beginBatchTraining(event) {
   event?.preventDefault();
   if (state.isNetworkTraining) return;
+  state.hasTrainedNetwork = true;
   trainTinyNetworkAnimated(Number(dom.epochBatchSlider.value));
 }
 
@@ -1025,6 +1052,7 @@ function networkSummary() {
 
 function resetNetwork({ newData = false } = {}) {
   state.networkTrainingRun += 1;
+  state.hasTrainedNetwork = false;
   setNetworkTrainingControls(false);
   if (newData) state.dataSeed += 17;
   state.networkSeed += 13;
@@ -1044,6 +1072,15 @@ function renderNetworkControls() {
 
 function renderNetworkLab() {
   renderNetworkControls();
+  if (!state.hasTrainedNetwork) {
+    dom.networkStatus.textContent = "untrained";
+    dom.networkEpochLabel.textContent = "0 epochs";
+    dom.networkMetrics.replaceChildren(createElement("div", "empty-state", "Press \u201cTrain selected epochs\u201d to train the network and reveal its metrics."));
+    dom.lossHistory.replaceChildren(createElement("div", "empty-state", "Loss history appears once training starts."));
+    dom.generalizationPanel.replaceChildren(createElement("p", "", "Train the network to compare train and test accuracy."));
+    drawDecisionMapPlaceholder();
+    return;
+  }
   const summary = networkSummary();
   dom.networkStatus.textContent = state.network.epochs === 0 ? "untrained" : "trained";
   dom.networkEpochLabel.textContent = `${state.network.epochs} epochs`;
@@ -1112,6 +1149,19 @@ function renderGeneralization(summary) {
     p.textContent = "Training is in progress. More epochs or a different hidden size may help, but a noisy dataset can keep the test score imperfect.";
   }
   dom.generalizationPanel.replaceChildren(p);
+}
+
+function drawDecisionMapPlaceholder() {
+  const canvas = dom.decisionCanvas;
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#f4efe6";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#6a6a6a";
+  context.font = "16px system-ui, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText("Press \u201cTrain selected epochs\u201d to draw the decision boundary.", canvas.width / 2, canvas.height / 2);
 }
 
 function drawDecisionMap() {
@@ -1199,7 +1249,7 @@ const NW_RATE = 0.2;
 let nwData = buildNextWordData();
 let nwModel = null;
 let nwHistory = [];
-const nwState = { isTraining: false, run: 0, seed: 91 };
+const nwState = { isTraining: false, run: 0, seed: 91, hasTrained: false };
 
 function nwLabel(token) {
   if (token === NW_START) return "start";
@@ -1408,17 +1458,20 @@ async function trainNextWordAnimated(epochs) {
 function beginNextWordTraining(event) {
   event?.preventDefault();
   if (nwState.isTraining) return;
+  nwState.hasTrained = true;
   trainNextWordAnimated(Number(dom.nwEpochsSlider.value));
 }
 
 function beginNextWordStep(event) {
   event?.preventDefault();
   if (nwState.isTraining) return;
+  nwState.hasTrained = true;
   trainNextWordAnimated(10);
 }
 
 function resetNextWord() {
   nwState.run += 1;
+  nwState.hasTrained = false;
   setNwTrainingControls(false);
   nwModel = makeNextWordModel(nwState.seed);
   nwHistory = [nwEvaluate(nwModel).loss];
@@ -1446,8 +1499,12 @@ function populateContextSelects() {
 function renderNwPrediction() {
   const wordA = dom.nwContextSelectA.value;
   const wordB = dom.nwContextSelectB.value;
-  const context = [nwData.index.get(wordA), nwData.index.get(wordB)];
   dom.nwContextLabel.textContent = `${nwLabel(wordA)} ${nwLabel(wordB)} →`;
+  if (!nwState.hasTrained) {
+    dom.nwPredictPanel.replaceChildren(createElement("div", "empty-state", "Train the model to see next-word probabilities for this context."));
+    return;
+  }
+  const context = [nwData.index.get(wordA), nwData.index.get(wordB)];
   const { probs } = nwForward(nwModel, context);
   const ranked = probs
     .map((probability, i) => ({ word: nwData.vocab[i], probability }))
@@ -1479,6 +1536,13 @@ function renderNextWordLab() {
   if (!nwModel) return;
   dom.nwEpochsLabel.textContent = dom.nwEpochsSlider.value;
   dom.nwTempLabel.textContent = formatNumber(Number(dom.nwTempSlider.value) / 100, 2);
+  if (!nwState.hasTrained) {
+    dom.nwStatus.textContent = "untrained";
+    dom.nwMetrics.replaceChildren(createElement("div", "empty-state", "Press Train (or Train one step) to train the model and reveal its metrics."));
+    dom.nwLossHistory.replaceChildren(createElement("div", "empty-state", "Loss history appears once training starts."));
+    renderNwPrediction();
+    return;
+  }
   const evaluation = nwEvaluate(nwModel);
   dom.nwStatus.textContent = nwModel.epochs === 0 ? "untrained" : `${nwModel.epochs} epochs`;
   renderMetricCards(dom.nwMetrics, [
@@ -1537,19 +1601,19 @@ function renderCodeResult(output, result) {
 }
 
 function wireEvents() {
-  dom.probabilityContextSelect.addEventListener("change", applyProbabilityPreset);
+  dom.probabilityContextSelect.addEventListener("change", () => { state.hasExploredProbability = true; applyProbabilityPreset(); });
   [...dom.countSliders, ...dom.guessSliders].forEach((slider) => {
-    slider.addEventListener("input", renderProbability);
+    slider.addEventListener("input", () => { state.hasExploredProbability = true; renderProbability(); });
   });
   [dom.vectorAx, dom.vectorAy, dom.vectorBx, dom.vectorBy].forEach((slider) => {
     slider.addEventListener("input", renderVectors);
   });
   dom.embeddingLookupSelect.addEventListener("change", renderEmbeddingLookup);
   [dom.slopeSlider, dom.interceptSlider, dom.lineRateSlider].forEach((slider) => {
-    slider.addEventListener("input", renderGradient);
+    slider.addEventListener("input", () => { state.hasExploredGradient = true; renderGradient(); });
   });
-  dom.gradientStepButton.addEventListener("click", stepGradientDescent);
-  dom.gradientAutoButton.addEventListener("click", toggleAutoGradient);
+  dom.gradientStepButton.addEventListener("click", () => { state.hasExploredGradient = true; stepGradientDescent(); });
+  dom.gradientAutoButton.addEventListener("click", () => { state.hasExploredGradient = true; toggleAutoGradient(); });
   dom.gradientResetButton.addEventListener("click", resetGradient);
   [dom.logitA, dom.logitB, dom.logitC, dom.temperatureSlider].forEach((slider) => {
     slider.addEventListener("input", renderSoftmax);

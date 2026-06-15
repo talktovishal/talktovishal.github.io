@@ -84,7 +84,8 @@ const dom = {
 const state = {
   activeCorpusId: corpora[0].id,
   wordTokens: [],
-  tokenizerModels: null
+  tokenizerModels: null,
+  hasExploredBoundary: false
 };
 
 // --- tokenization helpers ---
@@ -315,13 +316,23 @@ function ensureTokenizerModels() {
   return state.tokenizerModels;
 }
 
-function encodeWithCurrentAlgorithm(text) {
-  const algorithm = dom.tokenizerAlgorithmSelect.value;
+function encodeAlgo(algorithm, text) {
   const models = ensureTokenizerModels();
   if (algorithm === "bpe") return { tokens: encodeBpe(text, models.bpe), steps: models.bpe.merges, label: "BPE" };
   if (algorithm === "wordpiece") return { tokens: encodeWordPiece(text, models.wordpiece), steps: models.wordpiece.merges, label: "WordPiece-style" };
   if (algorithm === "unigram") return { tokens: encodeUnigram(text, models.unigram), steps: Array.from(models.unigram.probs.entries()).slice(0, 12).map(([pair, count]) => ({ pair, count: Math.round(count * 100000) })), label: "Unigram-style" };
   return { tokens: byteTokens(text), steps: [], label: "Byte-level UTF-8" };
+}
+
+function encodeWithCurrentAlgorithm(text) {
+  return encodeAlgo(dom.tokenizerAlgorithmSelect.value || "bpe", text);
+}
+
+function compareAlgorithms(text) {
+  return ["bpe", "wordpiece", "unigram", "byte"].map((algorithm) => {
+    const encoded = encodeAlgo(algorithm, text);
+    return { algorithm: encoded.label, tokens: encoded.tokens.length };
+  });
 }
 
 function renderTokenizers() {
@@ -331,6 +342,11 @@ function renderTokenizers() {
 
 function renderBoundaryComparison() {
   const text = dom.tokenizerInput.value;
+  if (!state.hasExploredBoundary) {
+    dom.boundarySummary.textContent = "click the text box";
+    dom.boundaryPanel.replaceChildren(notice("Click into the text box above (or edit it) to compare how words, characters, bytes, and BPE split it."));
+    return;
+  }
   const models = ensureTokenizerModels();
   const rows = [
     ["Words", wordAndPunctuationTokens(text)],
@@ -362,6 +378,12 @@ function renderAlgorithm() {
   const targetPieces = Number(dom.tokenizerVocabSlider.value);
   dom.tokenizerVocabLabel.textContent = String(targetPieces);
   dom.tokenizerVocabLabel.value = String(targetPieces);
+  if (!dom.tokenizerAlgorithmSelect.value) {
+    dom.algorithmSummary.textContent = "choose an algorithm";
+    dom.algorithmTokens.replaceChildren(notice("Choose a tokenizer algorithm above to see how it splits the text."));
+    dom.tokenizerTrainingPanel.replaceChildren(notice("Choose an algorithm to see the merge or vocabulary steps it learns."));
+    return;
+  }
   state.tokenizerModels = null;
   const encoded = encodeWithCurrentAlgorithm(dom.tokenizerInput.value);
   dom.algorithmSummary.textContent = `${encoded.label} | ${encoded.tokens.length} tokens`;
@@ -409,6 +431,13 @@ function renderTokenChips(container, tokens) {
 }
 
 function renderEdges() {
+  if (!dom.edgeCaseSelect.value) {
+    dom.edgeCasePanel.replaceChildren(notice("Choose an edge case above to inspect how the tokenizer handles it."));
+    dom.edgeCaseSummary.textContent = "choose a case";
+    dom.edgeCaseTokens.replaceChildren();
+    dom.edgeCaseWarnings.replaceChildren();
+    return;
+  }
   const item = edgeCases[dom.edgeCaseSelect.value] || edgeCases.multilingual;
   const encoded = encodeWithCurrentAlgorithm(item.text);
   dom.edgeCasePanel.replaceChildren();
@@ -420,7 +449,7 @@ function renderEdges() {
   const note = document.createElement("p");
   note.textContent = item.note;
   dom.edgeCasePanel.append(title, sample, note);
-  dom.edgeCaseSummary.textContent = `${encoded.tokens.length} tokens`;
+  dom.edgeCaseSummary.textContent = `${encoded.label} | ${encoded.tokens.length} tokens`;
   renderTokenChips(dom.edgeCaseTokens, encoded.tokens);
   dom.edgeCaseWarnings.replaceChildren();
   warningsForText(item.text, item.warnings).forEach((warning) => {
@@ -456,7 +485,8 @@ function makeApi() {
   return {
     tokenizerText: dom.tokenizerInput.value,
     trainBpeAndEncode,
-    encodeText: (text) => encodeWithCurrentAlgorithm(String(text))
+    encodeText: (text) => encodeWithCurrentAlgorithm(String(text)),
+    compareAlgorithms: (text) => compareAlgorithms(String(text ?? dom.tokenizerInput.value))
   };
 }
 
@@ -467,7 +497,7 @@ async function runCodeCell(cell) {
   output.textContent = "Running...";
   try {
     const api = makeApi();
-    const runner = new Function("api", `"use strict"; const { tokenizerText, trainBpeAndEncode, encodeText } = api; return (async () => { ${input.value} })();`);
+    const runner = new Function("api", `"use strict"; const { tokenizerText, trainBpeAndEncode, encodeText, compareAlgorithms } = api; return (async () => { ${input.value} })();`);
     const result = await runner(api);
     output.className = "code-output is-success";
     renderCodeResult(output, result);
@@ -480,7 +510,10 @@ async function runCodeCell(cell) {
 function renderCodeResult(output, result) {
   const visual = document.createElement("div");
   visual.className = "output-visual";
-  if (result && Array.isArray(result.tokens)) {
+  if (Array.isArray(result)) {
+    const cols = result.length ? Object.keys(result[0]) : [];
+    appendResultTable(visual, cols, result.map((row) => cols.map((col) => row[col])));
+  } else if (result && Array.isArray(result.tokens)) {
     appendMetrics(visual, [["algorithm", result.algorithm || result.label || "tokens"], ["tokens", result.tokens.length], ["merges", result.learnedMerges || 0]]);
     const rail = document.createElement("div");
     rail.className = "tokenizer-chip-rail";
@@ -568,7 +601,12 @@ function wireEvents() {
       renderEdges();
     });
   }
+  dom.tokenizerInput.addEventListener("focus", () => {
+    state.hasExploredBoundary = true;
+    renderTokenizers();
+  });
   dom.tokenizerInput.addEventListener("input", () => {
+    state.hasExploredBoundary = true;
     renderTokenizers();
   });
   dom.tokenizerAlgorithmSelect.addEventListener("change", () => {

@@ -84,6 +84,7 @@ const dom = {
   tokenCount: document.getElementById("tokenCount"),
   vocabCount: document.getElementById("vocabCount"),
   contextInput: document.getElementById("contextInput"),
+  seedSelect: document.getElementById("seedSelect"),
   generateButton: document.getElementById("generateButton"),
   resetButton: document.getElementById("resetButton"),
   activeSettings: document.getElementById("activeSettings"),
@@ -145,7 +146,13 @@ const state = {
   vocab: [],
   models: {},
   generatedTokens: [],
-  generatedSeedCount: 0
+  generatedSeedCount: 0,
+  hasGenerated: false,
+  hasSteppedWindows: false,
+  hasExploredProbability: false,
+  hasComparedGeneration: false,
+  hasUsedBackoff: false,
+  hasEvaluated: false
 };
 
 let animationTimer = null;
@@ -303,6 +310,7 @@ function renderAll() {
   renderWindowInspector();
   renderNgramCards();
   renderContextChoices();
+  renderSeedChoices();
   renderPredictions();
   renderGenerationComparison();
   renderBackoffAndSmoothing();
@@ -359,6 +367,11 @@ function makeTokenChip(text, options = {}) {
 }
 
 function renderMemoryTokenRail() {
+  if (!state.hasSteppedWindows) {
+    dom.memoryTokenLabel.textContent = `${nNames[currentN()]} preview`;
+    dom.memoryTokenRail.replaceChildren(emptyState("Press Play or Next to highlight a training window in the token stream."));
+    return;
+  }
   const n = currentN();
   const maxVisible = MAX_VISIBLE_TOKENS;
   const total = state.tokens.length;
@@ -402,6 +415,11 @@ function renderMemoryTokenRail() {
 }
 
 function renderWindowInspector() {
+  if (!state.hasSteppedWindows) {
+    dom.windowCountLabel.textContent = "window 0";
+    dom.windowInspector.replaceChildren(emptyState("Press Play or Next to split a window into its context and the token that came next."));
+    return;
+  }
   const n = currentN();
   const model = state.models[n];
   const active = model.ngrams[state.activeIndex];
@@ -447,6 +465,12 @@ function makeWindowToken(text, className) {
 }
 
 function renderNgramCards() {
+  if (!state.hasSteppedWindows) {
+    dom.countsMode.textContent = nNames[currentN()];
+    dom.ngramTitle.textContent = `3. Count repeated ${nNames[currentN()]} windows`;
+    dom.ngramCards.replaceChildren(emptyState("Press Play or Next to tally how often each window repeats in the corpus."));
+    return;
+  }
   const n = currentN();
   const model = state.models[n];
   const active = model.ngrams[state.activeIndex];
@@ -638,6 +662,54 @@ function renderContextChoices() {
   dom.contextSelect.value = n === 1 ? "" : currentLabel;
 }
 
+const SEED_CUSTOM_VALUE = "__custom__";
+
+function renderSeedChoices() {
+  if (!dom.seedSelect) return;
+  const n = currentN();
+  const model = state.models[n];
+  const currentLabel = labelForTokens(contextTokensFromText(dom.contextInput.value, n));
+  const choices = [];
+
+  if (n === 1) {
+    choices.push({ label: "no starting phrase needed (unigram)", value: "" });
+  } else if (model) {
+    Array.from(model.contexts.values())
+      .filter((context) => context.contextTokens.length === n - 1)
+      .filter((context) => context.contextTokens.every((token) => /[a-z0-9]/i.test(token)))
+      .sort((a, b) => b.total - a.total || labelForTokens(a.contextTokens).localeCompare(labelForTokens(b.contextTokens)))
+      .slice(0, 12)
+      .forEach((context) => {
+        const label = labelForTokens(context.contextTokens);
+        choices.push({ label, value: label });
+      });
+  }
+
+  const hasCurrent = choices.some((choice) => choice.value === currentLabel);
+
+  dom.seedSelect.replaceChildren();
+  choices.forEach((choice) => {
+    const option = document.createElement("option");
+    option.value = choice.value;
+    option.textContent = choice.label;
+    dom.seedSelect.append(option);
+  });
+
+  const custom = document.createElement("option");
+  custom.value = SEED_CUSTOM_VALUE;
+  custom.textContent = "Custom\u2026 (type your own)";
+  dom.seedSelect.append(custom);
+
+  dom.seedSelect.value = n === 1 ? "" : hasCurrent ? currentLabel : SEED_CUSTOM_VALUE;
+}
+
+function syncSeedSelectValue() {
+  if (!dom.seedSelect) return;
+  const currentLabel = labelForTokens(contextTokensFromText(dom.contextInput.value, currentN()));
+  const match = Array.from(dom.seedSelect.options).some((option) => option.value === currentLabel);
+  dom.seedSelect.value = match ? currentLabel : SEED_CUSTOM_VALUE;
+}
+
 function updateTokenChoices(prediction) {
   const previous = state.selectedToken;
   dom.tokenSelect.replaceChildren();
@@ -678,18 +750,33 @@ function renderPredictions() {
         : "smoothed guess"
     : "unseen context";
 
-  dom.predictionStatus.textContent = status;
   dom.probabilityMode.textContent = prediction.rows.length ? `${nNames[prediction.usedOrder]} rows` : "no rows";
   dom.graphMode.textContent = contextLabel;
-  dom.predictionBars.replaceChildren();
   updateTokenChoices(prediction);
+
+  // Section 3 visuals (probability map and table) stay blank until the learner picks a context here.
+  if (state.hasExploredProbability) {
+    renderChainSvg(prediction, contextLabel);
+    renderProbabilityTable(prediction);
+    renderSelectedProbability(prediction);
+  } else {
+    renderProbabilityPlaceholder();
+  }
+
+  // Section 2 bars stay blank until the learner presses Generate.
+  if (!state.hasGenerated) {
+    dom.predictionStatus.textContent = "press Generate";
+    dom.predictionBars.replaceChildren(emptyState("Pick a starting phrase above and press Generate to see the next-token bars."));
+    dom.formulaLine.textContent = "";
+    return;
+  }
+
+  dom.predictionStatus.textContent = status;
+  dom.predictionBars.replaceChildren();
 
   if (!rows.length) {
     dom.predictionBars.append(emptyState("No count for this context. Try lower memory, add smoothing, or enable backoff."));
     dom.formulaLine.textContent = `The model has not seen "${contextLabel}" in this corpus.`;
-    renderChainSvg(prediction, contextLabel);
-    renderProbabilityTable(prediction);
-    renderSelectedProbability(prediction);
     return;
   }
 
@@ -720,9 +807,6 @@ function renderPredictions() {
 
   const top = rows[0];
   dom.formulaLine.textContent = `For "${contextLabel}", P("${top.token}") = (${top.count} + ${alpha.toFixed(1)}) / (${prediction.total} + ${alpha.toFixed(1)} * ${state.vocab.length}) = ${percent(top.probability)}.`;
-  renderChainSvg(prediction, contextLabel);
-  renderProbabilityTable(prediction);
-  renderSelectedProbability(prediction);
 }
 
 function renderProbabilityTable(prediction) {
@@ -775,6 +859,16 @@ function renderSelectedProbability(prediction) {
   }
 
   dom.selectedProbability.textContent = `"${state.selectedToken}" appeared ${row.count} time${row.count === 1 ? "" : "s"} after this context, so its probability is ${percent(row.probability)}.`;
+}
+
+function renderProbabilityPlaceholder() {
+  const ns = "http://www.w3.org/2000/svg";
+  dom.chainSvg.replaceChildren();
+  const text = svgEl(ns, "text", { x: "320", y: "160", class: "chain-label", "text-anchor": "middle" });
+  text.textContent = "Pick a context below to draw the probability map.";
+  dom.chainSvg.append(text);
+  dom.probabilityTable.replaceChildren(emptyState("Pick a context or next token to see the probability table."));
+  dom.selectedProbability.textContent = "Pick a context and a next token to inspect one probability.";
 }
 
 function renderChainSvg(prediction, contextLabel) {
@@ -925,6 +1019,12 @@ function svgEl(ns, name, attrs = {}) {
 }
 
 function generateContinuation() {
+  if (!state.hasGenerated) {
+    state.generatedTokens = [];
+    state.generatedSeedCount = 0;
+    dom.generatedOutput.replaceChildren(emptyState("Press Generate to let the model write a continuation, one token at a time."));
+    return;
+  }
   const result = generateTokensWithModels(state.models, state.vocab, currentN(), dom.contextInput.value, {
     alpha: currentAlpha(),
     backoff: dom.backoffToggle.checked,
@@ -1018,6 +1118,13 @@ function renderGenerated(container, tokens, seedCount) {
 }
 
 function renderGenerationComparison(options = {}) {
+  if (!state.hasComparedGeneration) {
+    dom.topRunCount.textContent = "0 runs";
+    dom.sampleRunCount.textContent = "0 runs";
+    dom.topPickOutput.replaceChildren(emptyState("Press \u201cRun top-pick\u201d or \u201cCompare again\u201d to generate with the strongest-guess strategy."));
+    dom.sampleOutput.replaceChildren(emptyState("Press \u201cRun sample\u201d or \u201cCompare again\u201d to generate with weighted sampling."));
+    return;
+  }
   const shouldTop = options.top !== false;
   const shouldSample = options.sample !== false;
 
@@ -1050,6 +1157,14 @@ function renderGenerationComparison(options = {}) {
 }
 
 function renderBackoffAndSmoothing() {
+  if (!state.hasUsedBackoff) {
+    dom.backoffStatus.textContent = "press Use in prediction";
+    dom.smoothingStatus.textContent = `alpha ${currentAlpha().toFixed(1)}`;
+    dom.backoffLadder.replaceChildren(emptyState("Set a context and press \u201cUse in prediction\u201d (or move the alpha slider) to see the backoff ladder."));
+    dom.smoothingPanel.replaceChildren(emptyState("Move the alpha slider or press \u201cUse in prediction\u201d to compare smoothing."));
+    if (dom.stuckSummary) dom.stuckSummary.textContent = "";
+    return;
+  }
   const n = currentN();
   const alpha = currentAlpha();
   const contextText = currentStuckContext();
@@ -1227,6 +1342,13 @@ function evaluateTokenizedModels(models, vocab, testTokens, config = {}) {
 }
 
 function renderEvaluation() {
+  if (!state.hasEvaluated) {
+    dom.evalSettings.textContent = "press Evaluate";
+    dom.evaluationPanel.replaceChildren(emptyState("Choose a holdout and press Evaluate to compare model perplexity."));
+    if (dom.perplexitySummary) dom.perplexitySummary.textContent = "";
+    dom.surprisePanel.replaceChildren(emptyState("Press Evaluate to trace token-by-token surprise on the holdout."));
+    return;
+  }
   const results = evaluateTokenizedModels(state.models, state.vocab, tokenize(dom.holdoutInput.value), {
     alpha: currentAlpha(),
     backoff: dom.backoffToggle.checked
@@ -1937,6 +2059,12 @@ function resetTransientState() {
   state.sampleRuns = 0;
   state.topComparison = null;
   state.sampleComparison = null;
+  state.hasGenerated = false;
+  state.hasSteppedWindows = false;
+  state.hasExploredProbability = false;
+  state.hasComparedGeneration = false;
+  state.hasUsedBackoff = false;
+  state.hasEvaluated = false;
 }
 
 function loadCorpus(corpusId) {
@@ -2008,7 +2136,10 @@ function renderInteractiveViews({ includeMemory = false, includeContextChoices =
     renderWindowInspector();
     renderNgramCards();
   }
-  if (includeContextChoices) renderContextChoices();
+  if (includeContextChoices) {
+    renderContextChoices();
+    renderSeedChoices();
+  }
   renderPredictions();
   renderBackoffAndSmoothing();
   if (includeEvaluation) renderEvaluation();
@@ -2035,6 +2166,7 @@ function wireEvents() {
   });
 
   dom.alphaSlider.addEventListener("input", () => {
+    state.hasUsedBackoff = true;
     invalidateGeneratedComparisons();
     renderInteractiveViews();
     scheduleContinuationRefresh();
@@ -2042,6 +2174,7 @@ function wireEvents() {
   });
 
   dom.backoffToggle.addEventListener("change", () => {
+    state.hasUsedBackoff = true;
     invalidateGeneratedComparisons();
     renderInteractiveViews();
     generateContinuation();
@@ -2062,10 +2195,33 @@ function wireEvents() {
   dom.nextWindowButton.addEventListener("click", () => stepWindow(1));
   dom.playWindowButton.addEventListener("click", () => {
     state.isPlayingWindows = !state.isPlayingWindows;
+    if (state.isPlayingWindows && !state.hasSteppedWindows) {
+      state.hasSteppedWindows = true;
+      renderMemoryTokenRail();
+      renderWindowInspector();
+      renderNgramCards();
+    }
     updateWindowPlayback();
   });
 
+  dom.seedSelect.addEventListener("change", () => {
+    if (dom.seedSelect.value === SEED_CUSTOM_VALUE) {
+      dom.contextInput.focus();
+      dom.contextInput.select();
+      return;
+    }
+    dom.contextInput.value = dom.seedSelect.value;
+    state.selectedToken = "";
+    invalidateGeneratedComparisons();
+    renderContextChoices();
+    renderPredictions();
+    renderBackoffAndSmoothing();
+    generateContinuation();
+    debounceRunCells();
+  });
+
   dom.contextSelect.addEventListener("change", () => {
+    state.hasExploredProbability = true;
     dom.contextInput.value = dom.contextSelect.value;
     state.selectedToken = "";
     invalidateGeneratedComparisons();
@@ -2076,21 +2232,33 @@ function wireEvents() {
   });
 
   dom.tokenSelect.addEventListener("change", () => {
+    state.hasExploredProbability = true;
     state.selectedToken = dom.tokenSelect.value;
     renderPredictions();
     debounceRunCells();
   });
 
-  dom.rerunTopButton.addEventListener("click", () => renderGenerationComparison({ top: true, sample: false, count: true }));
-  dom.rerunSampleButton.addEventListener("click", () => renderGenerationComparison({ top: false, sample: true, count: true }));
-  dom.rerunBothButton.addEventListener("click", () => renderGenerationComparison({ top: true, sample: true, count: true }));
+  dom.rerunTopButton.addEventListener("click", () => {
+    state.hasComparedGeneration = true;
+    renderGenerationComparison({ top: true, sample: false, count: true });
+  });
+  dom.rerunSampleButton.addEventListener("click", () => {
+    state.hasComparedGeneration = true;
+    renderGenerationComparison({ top: false, sample: true, count: true });
+  });
+  dom.rerunBothButton.addEventListener("click", () => {
+    state.hasComparedGeneration = true;
+    renderGenerationComparison({ top: true, sample: true, count: true });
+  });
 
   dom.stuckContextInput.addEventListener("input", () => {
+    state.hasUsedBackoff = true;
     renderBackoffAndSmoothing();
     debounceRunCells();
   });
 
   dom.tryStuckButton.addEventListener("click", () => {
+    state.hasUsedBackoff = true;
     dom.contextInput.value = currentStuckContext();
     state.selectedToken = "";
     invalidateGeneratedComparisons();
@@ -2102,12 +2270,14 @@ function wireEvents() {
   });
 
   dom.holdoutPresetSelect.addEventListener("change", () => {
+    state.hasEvaluated = true;
     applyHoldoutPreset();
     renderEvaluation();
     debounceRunCells();
   });
 
   dom.evaluateButton.addEventListener("click", () => {
+    state.hasEvaluated = true;
     renderEvaluation();
     markCodeCellsStale();
   });
@@ -2126,6 +2296,7 @@ function wireEvents() {
 
   dom.contextInput.addEventListener("input", () => {
     state.selectedToken = "";
+    syncSeedSelectValue();
     invalidateGeneratedComparisons();
     renderContextChoices();
     renderPredictions();
@@ -2135,12 +2306,15 @@ function wireEvents() {
   });
 
   dom.holdoutInput.addEventListener("input", () => {
+    state.hasEvaluated = true;
     dom.holdoutPresetSelect.value = "custom";
     renderEvaluation();
     debounceRunCells();
   });
 
   dom.generateButton.addEventListener("click", () => {
+    state.hasGenerated = true;
+    renderPredictions();
     generateContinuation();
     markCodeCellsStale();
   });
@@ -2172,6 +2346,7 @@ function stepWindow(delta) {
   const n = currentN();
   const total = state.models[n] ? state.models[n].ngrams.length : 0;
   if (!total) return;
+  state.hasSteppedWindows = true;
   state.activeIndex = (state.activeIndex + delta + total) % total;
   renderMemoryTokenRail();
   renderWindowInspector();

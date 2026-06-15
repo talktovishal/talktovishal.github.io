@@ -234,6 +234,10 @@
             <h3>Self-attention matrix</h3>
             <span id="heatmapStatus" class="pill">full attention</span>
           </div>
+          <label class="check-row">
+            <input id="causalToggleHeatmap" type="checkbox">
+            <span>Causal mask (each token sees only itself and earlier tokens)</span>
+          </label>
           <p class="microcopy">Rows are the query token; columns are the key token. Each number is the attention weight as a percent.</p>
           <div id="attentionHeatmap" class="attention-heatmap" aria-live="polite"></div>
         </div>

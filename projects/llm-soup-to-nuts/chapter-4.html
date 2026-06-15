@@ -260,6 +260,7 @@
               <label class="select-row" for="tokenizerAlgorithmSelect">
                 <span>Algorithm</span>
                 <select id="tokenizerAlgorithmSelect" class="control-input">
+                  <option value="" selected>Choose an algorithm…</option>
                   <option value="bpe">BPE merges</option>
                   <option value="wordpiece">WordPiece-style</option>
                   <option value="unigram">Unigram-style</option>
@@ -287,12 +288,12 @@
 
         <article class="code-cell chapter-code-cell" data-chapter-output="tokenizer">
           <div class="cell-head">
-            <h3>Train BPE and encode text</h3>
+            <h3>Compare tokenizers on one text</h3>
             <button class="run-button" type="button">Run</button>
           </div>
-          <textarea class="code-input" spellcheck="false">// Trains BPE on the selected corpus, then encodes the inspect-box text.
-// Try encodeText("your own words here") to use the current algorithm instead.
-return trainBpeAndEncode(tokenizerText, 90);</textarea>
+          <textarea class="code-input" spellcheck="false">// Encodes the same text with each algorithm and counts the pieces.
+// Fewer tokens means a shorter, cheaper sequence for the model.
+return compareAlgorithms(tokenizerText);</textarea>
           <div class="code-output" aria-live="polite"></div>
         </article>
       </div>
@@ -342,6 +343,7 @@ return trainBpeAndEncode(tokenizerText, 90);</textarea>
             <label class="select-row" for="edgeCaseSelect">
               <span>Case</span>
               <select id="edgeCaseSelect" class="control-input">
+                <option value="" selected>Choose an edge case…</option>
                 <option value="multilingual">Multilingual text</option>
                 <option value="code">Code and whitespace</option>
                 <option value="numbers">Numbers</option>

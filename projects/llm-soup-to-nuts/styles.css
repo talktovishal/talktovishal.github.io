@@ -935,6 +935,17 @@ input[type="range"] {
   gap: 10px;
 }
 
+.seed-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.seed-hint {
+  margin-top: 8px;
+}
+
 .prediction-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.18fr) minmax(190px, 0.82fr);
@@ -2443,6 +2454,10 @@ a.chapter-nav-card:hover {
   }
 
   .inline-action {
+    grid-template-columns: 1fr;
+  }
+
+  .seed-controls {
     grid-template-columns: 1fr;
   }
 

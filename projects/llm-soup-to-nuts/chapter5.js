@@ -65,7 +65,9 @@ const state = {
   queryIndex: 2, // default: "sat"
   causal: false,
   model: null,
-  modelLoading: false
+  modelLoading: false,
+  hasExploredQkv: false,
+  hasViewedHeatmap: false
 };
 
 const dom = {
@@ -74,6 +76,7 @@ const dom = {
   qkvFormula: document.getElementById("qkvFormula"),
   qkvOutput: document.getElementById("qkvOutput"),
   causalToggle: document.getElementById("causalToggle"),
+  causalToggleHeatmap: document.getElementById("causalToggleHeatmap"),
   heatmap: document.getElementById("attentionHeatmap"),
   heatmapStatus: document.getElementById("heatmapStatus"),
   loadModelButton: document.getElementById("loadModelButton"),
@@ -88,7 +91,20 @@ const dom = {
 
 // --- Section 1: query/key/value as weighted lookup -------------------------
 
+function notice(text) {
+  const el = document.createElement("div");
+  el.className = "empty-state";
+  el.textContent = text;
+  return el;
+}
+
 function renderQkv() {
+  if (!state.hasExploredQkv) {
+    dom.qkvScores.replaceChildren(notice("Pick a query token above to see how much it attends to each token."));
+    dom.qkvFormula.textContent = "";
+    dom.qkvOutput.replaceChildren(notice("The blended output vector appears once you pick a query token."));
+    return;
+  }
   const { rawScores, weights, output } = attentionRow(state.queryIndex, state.causal);
   const queryWord = TOKENS[state.queryIndex].word;
   dom.qkvScores.replaceChildren();
@@ -140,9 +156,15 @@ function renderQkv() {
 
 function renderHeatmap() {
   const causal = state.causal;
-  dom.heatmapStatus.textContent = causal ? "causal mask on" : "full attention";
   const grid = dom.heatmap;
   grid.replaceChildren();
+  if (!state.hasViewedHeatmap) {
+    dom.heatmapStatus.textContent = "toggle the mask";
+    grid.style.gridTemplateColumns = "1fr";
+    grid.append(notice("Toggle the causal mask to build the attention map for every token at once."));
+    return;
+  }
+  dom.heatmapStatus.textContent = causal ? "causal mask on" : "full attention";
   grid.style.gridTemplateColumns = `auto repeat(${TOKENS.length}, 1fr)`;
 
   // top-left corner
@@ -321,13 +343,28 @@ function populateQuerySelect() {
   dom.querySelect.value = String(state.queryIndex);
 }
 
+function setCausal(value) {
+  state.causal = value;
+  if (dom.causalToggle) dom.causalToggle.checked = value;
+  if (dom.causalToggleHeatmap) dom.causalToggleHeatmap.checked = value;
+}
+
 function wireEvents() {
   dom.querySelect.addEventListener("change", () => {
+    state.hasExploredQkv = true;
     state.queryIndex = Number(dom.querySelect.value);
     renderQkv();
   });
   dom.causalToggle.addEventListener("change", () => {
-    state.causal = dom.causalToggle.checked;
+    state.hasExploredQkv = true;
+    state.hasViewedHeatmap = true;
+    setCausal(dom.causalToggle.checked);
+    renderQkv();
+    renderHeatmap();
+  });
+  dom.causalToggleHeatmap.addEventListener("change", () => {
+    state.hasViewedHeatmap = true;
+    setCausal(dom.causalToggleHeatmap.checked);
     renderQkv();
     renderHeatmap();
   });

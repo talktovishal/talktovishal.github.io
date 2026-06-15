@@ -217,7 +217,10 @@ const state = {
   embeddingModel: null,
   tokenizerModels: null,
   embeddingRun: 0,
-  embeddingJob: 0
+  embeddingJob: 0,
+  hasCheckedSparsity: false,
+  hasExploredGradient: false,
+  hasComparedVectors: false
 };
 
 function wordAndPunctuationTokens(text, keepWhitespace = false) {
@@ -362,6 +365,10 @@ function renderSparsity() {
   if (!state.ngrams) return;
   const lines = dom.contextCompareInput.value.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   dom.sparsitySummary.textContent = `${lines.length} phrase${lines.length === 1 ? "" : "s"}`;
+  if (!state.hasCheckedSparsity) {
+    dom.sparsityPanel.replaceChildren(notice("Click into the phrases above (or edit them) to check which contexts the model has actually seen."));
+    return;
+  }
   dom.sparsityPanel.replaceChildren();
 
   lines.forEach((line) => {
@@ -884,6 +891,20 @@ function nearestWords(word, limit = 8) {
   };
 }
 
+function wordVector(word) {
+  const model = state.embeddingModel;
+  if (!model) return { word: word || "(none)", note: "Train word vectors in Section 8 first.", vector: [] };
+  const id = model.idByWord.get(String(word));
+  if (id === undefined) return { word, note: "That word is not in the trained vocabulary.", vector: [] };
+  const entry = model.vocab.find((item) => item.id === id);
+  return {
+    word,
+    dimensions: model.dimensions,
+    count: entry ? entry.count : 0,
+    vector: Array.from(model.vectors[id], (n) => Number(n.toFixed(3)))
+  };
+}
+
 function renderEmbeddingExplorer() {
   const model = state.embeddingModel;
   if (!model) {
@@ -1175,11 +1196,28 @@ function populateCompareWords() {
   if (words.includes(previous)) dom.compareWordSelect.value = previous;
 }
 
+function renderComparisonPlaceholder() {
+  if (!dom.comparisonPanel) return;
+  const g = gloveModel();
+  if (!g) {
+    dom.comparisonPanel.hidden = true;
+    return;
+  }
+  dom.comparisonPanel.hidden = false;
+  if (dom.compareTrained) dom.compareTrained.replaceChildren(notice("Pick a word or type an analogy to compare your model with GloVe."));
+  if (dom.compareGlove) dom.compareGlove.replaceChildren(notice("Pick a word above to see GloVe's nearest neighbors."));
+  if (dom.compareAnalogyResult) dom.compareAnalogyResult.textContent = "Type three words like king - man + woman to compare an analogy.";
+}
+
 function renderComparison() {
   if (!dom.comparisonPanel) return;
   const g = gloveModel();
   if (!g) {
     dom.comparisonPanel.hidden = true;
+    return;
+  }
+  if (!state.hasComparedVectors) {
+    renderComparisonPlaceholder();
     return;
   }
   dom.comparisonPanel.hidden = false;
@@ -1239,7 +1277,19 @@ function renderComparisonAnalogy() {
   dom.compareAnalogyResult.append(gloveLine, document.createElement("br"), trainedLine);
 }
 
+function renderGradientPlaceholder() {
+  dom.recurrentWeightLabel.textContent = Number(dom.recurrentWeightSlider.value).toFixed(2);
+  dom.sequenceStepsLabel.textContent = String(Number(dom.sequenceStepsSlider.value));
+  dom.gradientMode.textContent = "waiting";
+  dom.gradientSummary.textContent = "Move the weight or step-count slider to watch the learning signal grow or shrink across time steps.";
+  dom.gradientPanel.replaceChildren(notice("Move a slider above to chart how the signal changes step by step."));
+}
+
 function renderGradient() {
+  if (!state.hasExploredGradient) {
+    renderGradientPlaceholder();
+    return;
+  }
   const weight = Number(dom.recurrentWeightSlider.value);
   const steps = Number(dom.sequenceStepsSlider.value);
   dom.recurrentWeightLabel.textContent = weight.toFixed(2);
@@ -1607,6 +1657,7 @@ function makeApi() {
   return {
     focusWord: dom.focusWordSelect.value,
     nearestWords,
+    wordVector,
     embeddingTrainingSummary
   };
 }
@@ -1618,7 +1669,7 @@ async function runCodeCell(cell) {
   output.textContent = "Running...";
   try {
     const api = makeApi();
-    const runner = new Function("api", `"use strict"; const { focusWord, nearestWords, embeddingTrainingSummary } = api; return (async () => { ${input.value} })();`);
+    const runner = new Function("api", `"use strict"; const { focusWord, nearestWords, wordVector, embeddingTrainingSummary } = api; return (async () => { ${input.value} })();`);
     const result = await runner(api);
     output.className = "code-output is-success";
     renderCodeResult(output, result);
@@ -1650,6 +1701,18 @@ function renderCodeResult(output, result) {
     });
     visual.append(rail);
     appendResultTable(visual, ["merge", "count"], (result.firstMerges || []).map((row) => [row.merge, row.count]));
+  } else if (result && Array.isArray(result.vector)) {
+    appendMetrics(visual, [["word", result.word], ["numbers per vector", result.dimensions || 0], ["times in corpus", result.count || 0]]);
+    if (result.vector.length) {
+      const wrap = document.createElement("div");
+      wrap.className = "vector-readout";
+      const code = document.createElement("code");
+      code.textContent = `[ ${result.vector.join(", ")} ]`;
+      wrap.append(code);
+      visual.append(wrap);
+    } else if (result.note) {
+      visual.append(notice(result.note));
+    }
   } else {
     appendMetrics(visual, Object.entries(result || {}).slice(0, 3));
     const pre = document.createElement("pre");
@@ -1709,13 +1772,14 @@ function wireEvents() {
   dom.tokenBudgetSlider.addEventListener("input", () => prepareCorpus());
   dom.trainingDepthSelect.addEventListener("change", () => markEmbeddingSettingsChanged());
   dom.trainButton.addEventListener("click", () => startEmbeddingTraining());
-  dom.contextCompareInput.addEventListener("input", () => renderSparsity());
+  dom.contextCompareInput.addEventListener("input", () => { state.hasCheckedSparsity = true; renderSparsity(); });
+  dom.contextCompareInput.addEventListener("focus", () => { state.hasCheckedSparsity = true; renderSparsity(); });
   dom.focusWordSelect.addEventListener("change", () => renderEmbeddingExplorer());
   dom.analogyInput.addEventListener("input", () => renderAnalogy());
-  if (dom.compareWordSelect) dom.compareWordSelect.addEventListener("change", () => renderComparison());
-  if (dom.compareAnalogyInput) dom.compareAnalogyInput.addEventListener("input", () => renderComparisonAnalogy());
-  dom.recurrentWeightSlider.addEventListener("input", () => renderGradient());
-  dom.sequenceStepsSlider.addEventListener("input", () => renderGradient());
+  if (dom.compareWordSelect) dom.compareWordSelect.addEventListener("change", () => { state.hasComparedVectors = true; renderComparison(); });
+  if (dom.compareAnalogyInput) dom.compareAnalogyInput.addEventListener("input", () => { state.hasComparedVectors = true; renderComparison(); });
+  dom.recurrentWeightSlider.addEventListener("input", () => { state.hasExploredGradient = true; renderGradient(); });
+  dom.sequenceStepsSlider.addEventListener("input", () => { state.hasExploredGradient = true; renderGradient(); });
   document.querySelectorAll(".chapter-code-cell .run-button").forEach((button) => {
     button.addEventListener("click", () => runCodeCell(button.closest(".chapter-code-cell")));
   });
@@ -1749,9 +1813,9 @@ function init() {
   dom.corpusSelect.value = state.activeCorpusId;
   wireEvents();
   prepareCorpus();
-  renderGradient();
+  renderGradientPlaceholder();
   populateCompareWords();
-  renderComparison();
+  renderComparisonPlaceholder();
   setupSectionSpy();
 }
 

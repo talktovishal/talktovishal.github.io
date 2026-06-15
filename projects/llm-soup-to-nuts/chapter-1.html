@@ -47,7 +47,7 @@
       <div class="workbench">
         <article class="intro-copy">
           <p class="eyebrow">Learning by doing</p>
-          <h1 id="page-title">Language Models Before before ChatGPT (LLMs) :-).</h1>
+          <h1 id="page-title">Language Models before ChatGPT (LLMs) :-).</h1>
           <p class="lead">
             Language modeling from first principles: let's build a tiny next-word
             predictor.
@@ -270,10 +270,10 @@ return {
           </p>
           <p>
             Now let's introduce the concept of <a href="https://en.wikipedia.org/wiki/N-gram" target="_blank" rel="noreferrer"><strong>n-gram</strong></a>. It just means a <a href="https://en.wikipedia.org/wiki/Word_n-gram_language_model" target="_blank" rel="noreferrer">window of <code>n</code> tokens</a>. A
-            <strong>unigram</strong> is a one-token window, so it mostly knows what
+            <strong>unigram</strong> is a one-token window, so it only knows what
             tokens are common overall. A <strong>bigram</strong> is a two-token
             window, so it can remember one previous token. A <strong>trigram</strong>
-            is a three-token window, so it can remember two previous tokens.
+            is a three-token window, so it can remember two previous tokens. In probability terms, the trigram model calculates the probability of a word <strong>conditioned on</strong> the two previous words.
           </p>
           <p>
             So when the context is <code>said the</code>, a trigram asks, "When this
@@ -281,7 +281,7 @@ return {
             <code>said</code> and only asks what followed <code>the</code>. A unigram
             ignores the local context and asks what tokens are common in general. The
             tradeoff is the heart of this section: more memory can be more precise,
-            but it also creates more exact contexts the model may never have seen. This is an important concept in natural language processing (NLP). More context can be better, but it also means that you are more specialized in the types of patterns you can recognize. Hence, we will see later how to manage when you see context which you have not seen before. How can you still make the predictions? Say I have seen <i>the <code>cat</code> sat on the mat</i>, and now I see the phrase <i>the <code>dog</code> sat on the ...</i>. As a human, we will guess the next token to be <code>mat</code> since we know that cat and dog are both animals that can sit on a mat. However, our current model doesn't know this.We will see later how to make our model more robust in handling such cases.
+            but it also creates more exact contexts the model may never have seen. This is an important concept in natural language processing (NLP). More context can be better, but it also means that you are more specialized in the types of patterns you can recognize. Hence, we will see later how to manage when you see context which you have not seen before. How can you still make the predictions? Say I have seen <i>the <code>cat</code> sat on the mat</i>, and now I see the phrase <i>the <code>dog</code> sat on the ...</i>. As a human, we will guess the next token to be <code>mat</code> since we know that cat and dog are both animals that can sit on a mat. However, our current model doesn't know this. We will see later how to make our model more robust in handling such cases.
           </p>
           <figure class="diagram-figure">
             <svg class="pipeline-svg" viewBox="0 0 580 150" role="img" aria-labelledby="ngram-title ngram-desc">
@@ -353,23 +353,48 @@ return {
         </div>
 
         <div class="predict-box section-predict-box">
-          <label class="field-label" for="contextInput">Ask the current n-gram model what comes next after</label>
-          <div class="inline-action">
-            <input id="contextInput" class="control-input" type="text" value="said the" autocomplete="off">
+          <label class="field-label" for="seedSelect">Ask the model what comes next &mdash; pick a starting phrase, or type your own</label>
+          <div class="seed-controls">
+            <select id="seedSelect" class="control-input" aria-label="Pick a common starting phrase from this corpus"></select>
+            <input id="contextInput" class="control-input" type="text" value="said the" autocomplete="off" aria-label="Type your own starting phrase">
             <button id="generateButton" class="primary-button" type="button">Generate</button>
           </div>
           <p id="activeSettings" class="microcopy"></p>
+          <p class="microcopy seed-hint">Press <strong>Generate</strong> to see the model's next-token bars on the left and a full continuation on the right.</p>
+        </div>
+
+        <div class="panel prediction-panel">
+          <div class="prediction-layout">
+            <div>
+              <div class="section-title-row">
+                <h3>What the model predicts next</h3>
+                <span id="predictionStatus" class="pill">press Generate</span>
+              </div>
+              <div id="predictionBars" class="prediction-bars" aria-live="polite"></div>
+              <p id="formulaLine" class="formula-line"></p>
+            </div>
+
+            <div>
+              <div class="section-title-row">
+                <h3>Generated continuation</h3>
+                <span class="pill">18 tokens</span>
+              </div>
+              <div id="generatedOutput" class="generated-output" aria-live="polite"></div>
+            </div>
+          </div>
         </div>
         <p class="microcopy section-note">
-          For now, read the bars as count-based evidence: taller bars mean this next
-          token followed the current context more often. In the next section, we turn
-          that idea into the probability formula.
+          The bars are the model's one-step answer; the continuation is what happens
+          when it keeps choosing, one token at a time. For now, read the bars as
+          count-based evidence: taller bars mean this next token followed the current
+          context more often. In the next section, we turn that idea into the
+          probability formula.
         </p>
 
         <div class="window-control-bar" aria-label="Training-window controls">
           <div>
-            <strong>Walk through training windows</strong>
-            <span>Move the highlight in the three panels below. Gold tokens are the remembered context; the warm token is what came next.</span>
+            <strong>Where do those bar heights come from?</strong>
+            <span>Press Play, or step through the training windows the model counted. Gold tokens are the remembered context; the warm token is what came next.</span>
           </div>
           <div class="window-button-row">
             <button id="prevWindowButton" class="ghost-button icon-button" type="button" aria-label="Previous training window">
@@ -410,24 +435,6 @@ return {
               <span id="countsMode" class="pill">trigram</span>
             </div>
             <div id="ngramCards" class="ngram-cards" aria-live="polite"></div>
-          </div>
-        </div>
-
-        <div class="panel prediction-panel">
-          <div class="prediction-layout">
-            <div>
-              <div class="section-title-row">
-                <h3>4. Next-token probabilities for your context</h3>
-                <span id="predictionStatus" class="pill">exact context</span>
-              </div>
-              <div id="predictionBars" class="prediction-bars" aria-live="polite"></div>
-              <p id="formulaLine" class="formula-line"></p>
-            </div>
-
-            <div>
-              <h3>Generated continuation</h3>
-              <div id="generatedOutput" class="generated-output" aria-live="polite"></div>
-            </div>
           </div>
         </div>
 
@@ -832,7 +839,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             </select>
           </label>
           <div class="stepper-row">
-            <button id="evaluateButton" class="primary-button" type="button">Evaluate again</button>
+            <button id="evaluateButton" class="primary-button" type="button">Evaluate</button>
           </div>
         </div>
 

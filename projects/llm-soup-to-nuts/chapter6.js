@@ -35,7 +35,10 @@ const state = {
   computeExp: 21,
   sizeFraction: 0.5,
   memLogParams: 9, // 10^9 = 1B
-  shardGpus: 1
+  shardGpus: 1,
+  hasExploredObjective: false,
+  hasExploredScaling: false,
+  hasExploredMemory: false
 };
 
 const dom = {
@@ -60,9 +63,21 @@ const dom = {
   memPanel: document.getElementById("memPanel")
 };
 
+function notice(text) {
+  const el = document.createElement("div");
+  el.className = "empty-state";
+  el.textContent = text;
+  return el;
+}
+
 function renderObjective() {
   const causal = state.objective === "causal";
   dom.causalControls.hidden = !causal;
+  if (!state.hasExploredObjective) {
+    dom.objectiveRail.replaceChildren(notice("Pick an objective (or move the predict-position slider) to see which tokens are context and which are predicted."));
+    dom.objectiveExplain.replaceChildren();
+    return;
+  }
   dom.objectiveRail.replaceChildren();
   SENTENCE.forEach((word, index) => {
     const chip = document.createElement("span");
@@ -136,9 +151,14 @@ function optimalForCompute(C) {
 function renderScaling() {
   const C = Math.pow(10, state.computeExp);
   const chosen = scalingPointFromFraction(C, state.sizeFraction);
-  const optimal = optimalForCompute(C);
   dom.computeLabel.textContent = formatFlops(C);
   dom.sizeLabel.textContent = `${formatBig(chosen.N)} params`;
+  if (!state.hasExploredScaling) {
+    dom.scalingChart.replaceChildren(notice("Move the compute or model-size slider to plot the loss curve and find the compute-optimal point."));
+    dom.scalingReadout.replaceChildren();
+    return;
+  }
+  const optimal = optimalForCompute(C);
 
   // Build the loss curve along the isocompute line.
   const { logNmin, logNmax } = optimal;
@@ -271,6 +291,10 @@ function renderMemory() {
   const shards = state.shardGpus;
   dom.memLabel.textContent = `${formatBig(N)} params`;
   dom.shardLabel.textContent = `${shards} GPU${shards === 1 ? "" : "s"}`;
+  if (!state.hasExploredMemory) {
+    dom.memPanel.replaceChildren(notice("Move the model-size or sharding slider to see how training memory splits across GPUs."));
+    return;
+  }
 
   const bytesPerParam = Object.values(BYTES_PER_PARAM).reduce((s, b) => s + b, 0);
   const totalBytes = N * bytesPerParam;
@@ -324,26 +348,31 @@ function setObjective(value) {
 
 function wireEvents() {
   dom.objectiveButtons.forEach((btn) => {
-    btn.addEventListener("click", () => setObjective(btn.dataset.objective));
+    btn.addEventListener("click", () => { state.hasExploredObjective = true; setObjective(btn.dataset.objective); });
   });
   dom.causalPosSlider.addEventListener("input", () => {
+    state.hasExploredObjective = true;
     state.causalPos = Number(dom.causalPosSlider.value);
     dom.causalPosLabel.textContent = `position ${state.causalPos + 1}`;
     renderObjective();
   });
   dom.computeSlider.addEventListener("input", () => {
+    state.hasExploredScaling = true;
     state.computeExp = Number(dom.computeSlider.value);
     renderScaling();
   });
   dom.sizeSlider.addEventListener("input", () => {
+    state.hasExploredScaling = true;
     state.sizeFraction = Number(dom.sizeSlider.value) / 100;
     renderScaling();
   });
   dom.memSlider.addEventListener("input", () => {
+    state.hasExploredMemory = true;
     state.memLogParams = Number(dom.memSlider.value) / 10;
     renderMemory();
   });
   dom.shardSlider.addEventListener("input", () => {
+    state.hasExploredMemory = true;
     state.shardGpus = Number(dom.shardSlider.value);
     renderMemory();
   });

@@ -586,10 +586,12 @@ small rabbit</textarea>
 
         <article class="code-cell chapter-code-cell" data-chapter-output="neighbors">
           <div class="cell-head">
-            <h3>Find nearby trained words</h3>
+            <h3>Inspect the raw word vector</h3>
             <button class="run-button" type="button">Run</button>
           </div>
-          <textarea class="code-input" spellcheck="false">return nearestWords(focusWord, 8);</textarea>
+          <textarea class="code-input" spellcheck="false">// The neighbor list above is computed from raw numbers like these.
+// This returns the actual trained vector (one row) for the selected word.
+return wordVector(focusWord);</textarea>
           <div class="code-output" aria-live="polite"></div>
         </article>
       </div>
