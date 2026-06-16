@@ -47,16 +47,19 @@
           <p class="eyebrow">Learning by doing</p>
           <h1 id="page-title">When counting words is no longer sufficient.</h1>
           <p class="lead">
-            In Chapter 1, our model remembered exact word windows. That was useful.
-            It was also strict. If the exact window was missing, the model had very
-            little to say.
+            In Chapter 1 we built a real little language model out of nothing but
+            counts. It worked! But it was also a strict librarian: if it had never
+            seen the exact phrase before, it mostly just shrugged.
           </p>
           <p>
-            Suppose the text has seen <code>the cat slept</code>, but not
-            <code>the dog slept</code>. A count table treats those as two unrelated
-            cases. You and I see the connection right away: cats and dogs tend to
-            show up in the same kinds of places. What we want is for the model to
-            learn a little of that connection too.
+            Here is the moment that nagged at me. Suppose our text has seen
+            <code>the cat slept</code> but never <code>the dog slept</code>. You and I
+            read that and instantly think, "well, of course a dog can sleep too" -
+            cats and dogs turn up in the same kinds of places. But our count table
+            keeps <code>cat</code> and <code>dog</code> in completely separate boxes,
+            so every bit of evidence we gathered for one is useless to the other.
+            Remember our motto from Chapter 1, <i>you are known by the company you
+            keep</i>? Wouldn't it be lovely if the model knew that too?
           </p>
           <figure class="diagram-figure">
             <svg class="pipeline-svg" viewBox="0 0 580 188" role="img" aria-labelledby="ev-title ev-desc">
@@ -85,17 +88,50 @@
             <figcaption>Counts keep words in separate boxes; vectors place similar words near each other, so cat can lend evidence to dog.</figcaption>
           </figure>
           <p>
-            This chapter is about that next step. We still ask the same practical
-            question: what word might come next? First we will watch exact counts
-            fail. Then we will build a new kind of evidence, slowly, from the words
-            around each word. After that, longer memory will feel less mysterious
-            too.
+            So this chapter chases exactly that wish. We still ask the same
+            down-to-earth question from Chapter 1 - what word might come next? - but we
+            hand the model a new superpower: a sense that some words are
+            <em>alike</em>. First we will watch the old count table fail. Then we will
+            build a new kind of evidence, slowly and by hand, out of the company each
+            word keeps, and then train it live in your browser. By the end, even
+            remembering a clue from far away in a sentence will feel less mysterious.
           </p>
           <p class="example-note">
-            <em>Guiding question:</em> can a model use evidence from similar words,
-            not just identical word windows? That is the bridge from n-grams to
-            neural language models.
+            <em>Guiding question:</em> can a model lean on evidence from
+            <em>similar</em> words, not just identical word windows? That one idea is
+            the bridge from the n-grams of Chapter 1 to the neural language models that
+            power modern LLMs.
           </p>
+          <div class="example-note prereq-note">
+            <p><em>Before we dive in, a few prerequisites are in order.</em> This chapter builds directly on Chapter 1, and every new idea is introduced slowly the moment we need it. Still, a little comfort with the following will make the ride smoother. Please use the links as quick refreshers if anything feels new.</p>
+            <ul>
+              <li>
+                <strong>Chapter 1.</strong> We reuse tokens, counts, and the question
+                <code>P(next | context)</code>. If "what word comes next" already feels
+                natural, you are ready.
+              </li>
+              <li>
+                <strong>A <a href="https://en.wikipedia.org/wiki/Euclidean_vector" target="_blank" rel="noreferrer">list of numbers</a> (a vector).</strong>
+                The whole chapter rests on giving each word a short row of numbers, like
+                <code>[0.42, -0.10, 0.31]</code>. No prior vector-math background is
+                needed; we build the few operations we use right where they show up.
+              </li>
+              <li>
+                <strong>Multiplying and adding.</strong> Our one workhorse is the
+                <a href="https://en.wikipedia.org/wiki/Dot_product" target="_blank" rel="noreferrer">dot product</a>:
+                multiply two lists position by position, then add the results. We will
+                do it by hand before any code runs.
+              </li>
+              <li>
+                <strong>Reading a little code.</strong> Just like last chapter, short
+                runnable snippets you can change and re-run. Reading them is enough;
+                writing any is optional.
+              </li>
+            </ul>
+            <p>What you do <strong>not</strong> need yet: no calculus, no matrix
+              algebra, and no neural-network experience. Those arrive in Chapter 3,
+              right when we put them to work.</p>
+          </div>
         </article>
       </div>
     </section>
@@ -106,24 +142,29 @@
           <p class="eyebrow">1. Limits of n-grams</p>
           <h2 id="limits-title">The count table breaks when exact evidence disappears.</h2>
           <p>
-            N-grams are a great first model: they count word windows, then lean on
-            those counts to guess the next word. But the rule is very literal. If the
-            exact context is missing, the model has no real way to borrow help from a
-            similar context it has already seen.
+            Let's start by feeling the problem for ourselves, because it is too easy
+            to wave away in words. The n-gram from Chapter 1 was a wonderful first
+            model: count the word windows, then lean on those counts to guess what
+            comes next. But it is a very literal creature. If it has never seen the
+            exact context, it cannot borrow a hunch from a similar context it
+            <em>has</em> seen - even when, to us, the two are obviously cousins.
           </p>
           <p>
             Try the small lab below. Type one two-word phrase per line. The model
-            first looks for that exact two-word phrase. If it cannot find it, the
-            table shows a simpler fallback: it keeps only the last word and asks what
-            usually came after that word.
+            first hunts for that exact two-word phrase. If it cannot find it, it does
+            the only thing it knows: it drops the first word and falls back to asking
+            what usually followed just the last word. Watch how often the precise
+            phrase simply is not there.
           </p>
           <p class="example-note">
             <em>Start simple.</em> Compare <code>brave queen</code> and
             <code>small rabbit</code>. Neither exact two-word phrase appears in this
-            corpus, so the model drops the first word. But the fallback words are
-            different: <code>queen</code> leads toward <code>said</code>, while
-            <code>rabbit</code> leads toward <code>hole</code>. That is why the
-            fallback guesses can differ.
+            Alice corpus, so in both cases the model shrugs and drops the first word.
+            But look at what is left: the fallback now leans entirely on the last word,
+            so <code>queen</code> points toward <code>said</code> while
+            <code>rabbit</code> points toward <code>hole</code>. The very adjective we
+            cared about - <code>brave</code>, <code>small</code> - was thrown away
+            completely. Useful, but blunt.
           </p>
         </div>
 
@@ -153,24 +194,31 @@ small rabbit</textarea>
           <p class="eyebrow">2. Neural probabilistic language models</p>
           <h2 id="neural-title">First, give each word a small row of numbers.</h2>
           <p>
-            Section 7 showed the problem. A count table only trusts exact phrases.
-            If it has seen <code>the cat slept</code> but not <code>the dog slept</code>,
-            it has no built-in reason to let <code>cat</code> help <code>dog</code>.
-            <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">Neural language models</a> changed that by giving each word a learned
-            representation.
+            The section above let us feel the problem: a count table only trusts exact
+            phrases. If it has seen <code>the cat slept</code> but not
+            <code>the dog slept</code>, it has no built-in reason to let
+            <code>cat</code> lend a hand to <code>dog</code>. The fix, introduced by
+            <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">neural language models</a>,
+            is lovely to state: stop treating words as separate boxes, and give each
+            one a learned <strong>representation</strong> instead.
           </p>
           <p>
-            A representation can sound fancy, so let's make it plain. A word vector
-            is just a short list of numbers for one word. At the start, those numbers
-            are almost random. During training, the model nudges them. Words that
-            show up in similar neighborhoods get nudged toward similar numbers.
+            "Representation" can sound fancy, so let me make it plain. A word vector is
+            just a short list of numbers that stands in for one word - that is the
+            whole idea. At the very start those numbers are basically random noise.
+            Then training gently nudges them, over and over, and here is the quiet
+            magic: words that keep showing up in similar company get nudged toward
+            similar numbers. The company a word keeps slowly becomes the numbers a word
+            carries.
           </p>
           <p>
-            This browser demo now uses <strong>36 numbers per word</strong>. That number
-            is not a law of nature. It is a choice we make before training, called a
-            hyperparameter. Larger systems often use many more numbers. We use 36 so
-            the training is still browser-sized, but rich enough to show real
-            neighborhood patterns.
+            Our browser demo uses <strong>36 numbers per word</strong>. There is
+            nothing sacred about 36 - it is a knob we pick before training, the kind of
+            choice we call a <strong>hyperparameter</strong>. Real systems often use
+            hundreds. We choose 36 so the training still finishes in a few seconds in
+            your browser, yet it is rich enough to show real neighborhood patterns. Do
+            you already feel the tradeoff? More numbers can capture more nuance, but
+            cost more to train and store.
           </p>
         </div>
 
@@ -178,9 +226,10 @@ small rabbit</textarea>
           <div class="panel concept-panel">
             <h3>A vector is a row of learned numbers</h3>
             <p>
-              The numbers below are only a sketch. The browser learns its own
-              numbers from the selected text. The useful part is the shape: one word,
-              one row, many small values.
+              The three rows below are just a sketch to fix the picture in your mind -
+              the browser will learn its own numbers from your text. Do not read
+              meaning into any single value; the useful part is simply the shape: one
+              word, one row, a handful of small numbers.
             </p>
             <div class="vector-table" aria-label="Example word vectors">
               <div class="vector-row">
@@ -206,9 +255,12 @@ small rabbit</textarea>
           <div class="panel concept-panel">
             <h3>What skip-gram trains on</h3>
             <p>
-              Skip-gram starts with a center word. It asks: which nearby words really
-              appeared around this center word? Then negative sampling adds a few
-              made-up pairs, so the model also learns what does not fit.
+              Skip-gram plays a simple guessing game. It picks a center word and asks:
+              which words really showed up nearby? Those genuine pairs are the ones to
+              reward. Then <a href="https://arxiv.org/abs/1310.4546" target="_blank" rel="noreferrer">negative sampling</a>
+              tosses in a few made-up pairs that never occurred, so the model also
+              learns what does <em>not</em> belong together. Pull real pairs close, push
+              fake pairs apart - that is the whole trick.
             </p>
             <div class="skipgram-diagram" aria-label="Skip-gram with negative sampling example">
               <div class="sentence-strip" aria-label="Example sentence">
@@ -249,10 +301,12 @@ small rabbit</textarea>
           <div class="panel training-math-card">
             <h3>What one training step does</h3>
             <p>
-              Each word starts with a small list of random numbers. Training is the
-              repeated work of making those numbers less random. In one step, the
-              model takes a center word such as <code>rabbit</code> and one word
-              from its nearby window, such as <code>watch</code>.
+              Every word starts life as a small list of random numbers. Training is
+              just the patient work of making those numbers less random, one tiny
+              correction at a time. Here is a single step: the model grabs a center
+              word such as <code>rabbit</code> and one word from its nearby window,
+              such as <code>watch</code>, and checks how well their current numbers
+              agree.
             </p>
             <ol class="training-step-list">
               <li>Look up the current vector for <code>rabbit</code>.</li>
@@ -340,17 +394,17 @@ small rabbit</textarea>
             <div>
               <h3>Now choose the text and train</h3>
               <p>
-                Pick a corpus and how much of it to use. Then press the button.
-                The default uses both Alice books, Wonderland and Looking-Glass, so
-                there are extra repeated characters and scenes for the map to
-                organize, and it still trains in just a few seconds. The other books
-                and the balanced mix are there if you want to compare different
-                worlds. More epochs can lower loss, but in a small browser model
-                they can also over-specialize. Use the neighbor evidence, not just
-                the final loss number, to judge the run. The browser thins out the
-                most common glue words and reshuffles the pairs on every pass, so
-                content words land closer together; it still uses common words as
-                context evidence.
+                This is the fun part: pick a corpus, decide how much of it to use, and
+                press the button to watch the numbers actually move. The default uses
+                both Alice books, Wonderland and Looking-Glass, so there are extra
+                repeated characters and scenes for the map to organize, and it still
+                trains in just a few seconds. The other books and the balanced mix are
+                there if you want to compare different worlds. More epochs can lower
+                loss, but in a small browser model they can also over-specialize, so
+                judge a run by the neighbor evidence, not just the final loss number.
+                The browser thins out the most common glue words and reshuffles the
+                pairs on every pass, so content words land closer together; it still
+                uses common words as context evidence.
               </p>
               <p>
                 As it runs, keep an eye on the word-pair panel: those cosine bars
@@ -443,26 +497,32 @@ small rabbit</textarea>
           <p class="eyebrow">3. Word embeddings</p>
           <h2 id="embeddings-title">Now inspect the word vectors you trained.</h2>
           <p>
-            A word embedding is the trained vector for one word. In this chapter,
-            <code>rabbit</code> gets one vector, <code>queen</code> gets one vector,
-            and so on. These are static embeddings: the same word has the same row of
-            numbers wherever it appears in this small model.
+            That trained list of numbers for a word has a name: a <strong>word
+            embedding</strong>. In this chapter <code>rabbit</code> gets one embedding,
+            <code>queen</code> gets one, and so on. Ours are <em>static</em>
+            embeddings - the same word carries the same row of numbers everywhere it
+            appears. (Hold on to that word "static"; in the Transformer chapter we will
+            meet embeddings that change with context, and that contrast is the whole
+            point.)
           </p>
           <p>
-            The browser trains vectors for up to <strong>260 focus words</strong>
-            from your selected text. The focus vocabulary keeps characters, names,
-            places, and other content words. It removes most high-frequency glue
-            words from the map, because a cloud of <code>the</code>, <code>of</code>,
-            and <code>and</code> is not the lesson we want here.
+            The browser trains vectors for up to <strong>260 focus words</strong> from
+            your text, and it deliberately keeps the interesting ones: characters,
+            names, places, and other content words. It quietly drops most of the
+            high-frequency glue - <code>the</code>, <code>of</code>, <code>and</code> -
+            because a map crowded with those would teach us nothing about meaning.
           </p>
           <p>
-            <a href="https://arxiv.org/abs/1301.3781" target="_blank" rel="noreferrer">Word2Vec</a> learns from local prediction. <a href="https://aclanthology.org/D14-1162/" target="_blank" rel="noreferrer">GloVe</a> learns from a larger
-            co-occurrence table. Both helped popularize the same practical idea:
-            words can be represented by learned numbers, and nearby vectors often
-            reflect related usage. This is not the same as a dictionary definition.
-            In the Alice corpus, <code>queen</code> may sit near other characters,
-            court words, or shouted-dialogue words because those are the situations
-            where the book uses her.
+            Two famous methods popularized this idea.
+            <a href="https://arxiv.org/abs/1301.3781" target="_blank" rel="noreferrer">Word2Vec</a>,
+            which is the recipe we train here, learns from local prediction, while
+            <a href="https://aclanthology.org/D14-1162/" target="_blank" rel="noreferrer">GloVe</a>
+            learns from a big table of how often words co-occur. Different recipes, same
+            practical payoff: words become learned numbers, and nearby vectors tend to
+            reflect related <em>usage</em>. Notice I said usage, not meaning. In the
+            Alice corpus, <code>queen</code> may sit near other characters or
+            shouted-dialogue words simply because that is how the book uses her - not
+            because of any dictionary definition.
           </p>
         </div>
 
@@ -603,22 +663,26 @@ return wordVector(focusWord);</textarea>
           <p class="eyebrow">4. Sequence models before Transformers</p>
           <h2 id="sequences-title">What if the useful clue is far away?</h2>
           <p>
-            Think of finishing a sentence like "I grew up in France, so I speak
-            fluent ___." The word that fits is <code>french</code>, but the clue that
-            points to it sits all the way back at the start. A fixed n-gram window
-            only sees the last word or two, so by the time we reach the blank that
-            evidence is long gone. Recurrent neural networks tried a gentler idea:
-            read one token at a time, and carry a small learned note forward as you
-            go. That running note is called a hidden state.
+            Embeddings fixed one problem - similar words can finally help each other -
+            but a quiet limitation is still hiding. Try finishing this: "I grew up in
+            France, so I speak fluent ___." You said <code>french</code> instantly, and
+            the clue that told you sits all the way back at the very start of the
+            sentence. A fixed n-gram window only sees the last word or two, so by the
+            time it reaches the blank, "France" is long gone.
+            <a href="https://en.wikipedia.org/wiki/Recurrent_neural_network" target="_blank" rel="noreferrer">Recurrent neural networks</a>
+            tried a gentler idea: read one token at a time and carry a small learned
+            note forward as you go. That running note has a name worth remembering - the
+            <strong>hidden state</strong>.
           </p>
           <p>
-            The hard part is training that memory. A learning signal from far back in
-            the sentence has to travel through many steps, and at each step it gets
-            multiplied again. That repeated multiplying is unforgiving: a factor of
-            0.9 applied twenty times shrinks to about 0.12, while a factor of 1.1
-            applied twenty times grows to roughly 6.7. So the signal tends to either
-            fade to almost nothing or blow up. LSTMs and GRUs added gates to tame that
-            flow.
+            The catch is training that memory. A learning signal from far back has to
+            travel through many steps, and at every step it gets multiplied again. That
+            repeated multiplying is brutal: multiply by 0.9 twenty times and you fade to
+            about 0.12; multiply by 1.1 twenty times and you balloon to roughly 6.7. So
+            the signal tends to either vanish to nothing or explode - the famous
+            <a href="https://en.wikipedia.org/wiki/Vanishing_gradient_problem" target="_blank" rel="noreferrer">vanishing and exploding gradient</a>
+            problem. Move the sliders below and watch it happen for yourself; then we
+            will see how LSTMs and GRUs added gates to tame the flow.
           </p>
         </div>
 

@@ -307,7 +307,7 @@ function prepareCorpus() {
   renderStats();
   renderSparsity();
   renderTrainingPlaceholder("Ready. Press Train word vectors to learn from this corpus and budget.");
-  renderEmbeddingPlaceholder("No word vectors yet. Train them in Section 8, then come back here.");
+  renderEmbeddingPlaceholder("No word vectors yet. Press Train word vectors above, then come back here.");
 }
 
 function renderStats() {
@@ -636,7 +636,7 @@ function markEmbeddingSettingsChanged() {
   state.embeddingJob += 1;
   state.embeddingModel = null;
   renderTrainingPlaceholder("Ready. Press Train word vectors to learn with the current corpus, text amount, and training depth.");
-  renderEmbeddingPlaceholder("No word vectors yet for these settings. Train them in Section 8, then inspect them here.");
+  renderEmbeddingPlaceholder("No word vectors yet for these settings. Press Train word vectors above, then inspect them here.");
 }
 
 function makeWatchPairs(idByWord) {
@@ -893,7 +893,7 @@ function nearestWords(word, limit = 8) {
 
 function wordVector(word) {
   const model = state.embeddingModel;
-  if (!model) return { word: word || "(none)", note: "Train word vectors in Section 8 first.", vector: [] };
+  if (!model) return { word: word || "(none)", note: "Train word vectors above first.", vector: [] };
   const id = model.idByWord.get(String(word));
   if (id === undefined) return { word, note: "That word is not in the trained vocabulary.", vector: [] };
   const entry = model.vocab.find((item) => item.id === id);
@@ -908,7 +908,7 @@ function wordVector(word) {
 function renderEmbeddingExplorer() {
   const model = state.embeddingModel;
   if (!model) {
-    renderEmbeddingPlaceholder("No word vectors yet. Train them in Section 8, then come back here.");
+    renderEmbeddingPlaceholder("No word vectors yet. Press Train word vectors above, then come back here.");
     return;
   }
   const focus = dom.focusWordSelect.value || model.vocab[0]?.word || "";
@@ -1122,7 +1122,7 @@ function renderAnalogy() {
   dom.analogyPanel.append(title, code, note);
 }
 
-// --- Section 9: side-by-side comparison with real pre-trained GloVe vectors ---
+// --- Side-by-side comparison with real pre-trained GloVe vectors ---
 const COMPARE_WORDS = [
   "queen", "king", "cat", "dog", "mouse", "rabbit", "sister", "brother",
   "man", "woman", "garden", "water", "night", "book", "money", "house"
@@ -1232,7 +1232,7 @@ function renderComparison() {
     );
   } else {
     dom.compareTrained.replaceChildren(notice(
-      model ? `"${word}" was not trained in this corpus.` : "Train word vectors in Section 8 to fill this column."
+      model ? `"${word}" was not trained in this corpus.` : "Train word vectors above to fill this column."
     ));
   }
   renderComparisonAnalogy();
@@ -1267,7 +1267,7 @@ function renderComparisonAnalogy() {
   } else {
     trainedText = model
       ? "Your model: one of these words is not in its small vocabulary."
-      : "Your model: train it in Section 8 first.";
+      : "Your model: train it above first.";
   }
   const gloveLine = document.createElement("span");
   gloveLine.textContent = gloveText;
@@ -1631,7 +1631,7 @@ function embeddingTrainingSummary() {
   if (!model) {
     return {
       status: "not trained yet",
-      nextStep: "Press Train word vectors in Section 8.",
+      nextStep: "Press Train word vectors above.",
       corpus: getActiveCorpus().title,
       textAmount: `${formatNumber(state.wordTokens.length)} word tokens ready`,
       selectedTrainingDepth: trainingDepth().label
