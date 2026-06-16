@@ -529,6 +529,19 @@ code {
   margin-bottom: 12px;
 }
 
+.prereq-note ul {
+  margin: 10px 0 12px;
+  padding-left: 22px;
+}
+
+.prereq-note li {
+  margin: 6px 0;
+}
+
+.prereq-note p:last-child {
+  margin-bottom: 0;
+}
+
 .math-note p {
   margin: 0;
 }
@@ -1130,7 +1143,7 @@ input[type="range"] {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr);
   gap: clamp(18px, 3vw, 28px);
-  align-items: stretch;
+  align-items: start;
 }
 
 .evaluation-input-stack {

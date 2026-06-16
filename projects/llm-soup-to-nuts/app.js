@@ -865,10 +865,10 @@ function renderProbabilityPlaceholder() {
   const ns = "http://www.w3.org/2000/svg";
   dom.chainSvg.replaceChildren();
   const text = svgEl(ns, "text", { x: "320", y: "160", class: "chain-label", "text-anchor": "middle" });
-  text.textContent = "Pick a context below to draw the probability map.";
+  text.textContent = "Choose a context or next token above to draw the probability map.";
   dom.chainSvg.append(text);
-  dom.probabilityTable.replaceChildren(emptyState("Pick a context or next token to see the probability table."));
-  dom.selectedProbability.textContent = "Pick a context and a next token to inspect one probability.";
+  dom.probabilityTable.replaceChildren(emptyState("Choose a context or next token above to see the probability table."));
+  dom.selectedProbability.textContent = "Choose a context and a next token above to inspect one probability.";
 }
 
 function renderChainSvg(prediction, contextLabel) {
@@ -2238,6 +2238,16 @@ function wireEvents() {
     debounceRunCells();
   });
 
+  // Opening either menu counts as exploring, so the map and table fill in even if
+  // the learner re-selects the value that was already showing.
+  [dom.contextSelect, dom.tokenSelect].forEach((select) => {
+    select.addEventListener("pointerdown", () => {
+      if (state.hasExploredProbability) return;
+      state.hasExploredProbability = true;
+      renderPredictions();
+    });
+  });
+
   dom.rerunTopButton.addEventListener("click", () => {
     state.hasComparedGeneration = true;
     renderGenerationComparison({ top: true, sample: false, count: true });
@@ -2332,8 +2342,20 @@ function wireEvents() {
     loadCorpus(corpora[0].id);
   });
 
+  // Running a section's code cell also reveals that section's visual output, so the
+  // Run button is never a dead end: the learner sees the panel above fill in too.
+  const revealForOutputType = {
+    probability: () => { state.hasExploredProbability = true; renderPredictions(); },
+    generation: () => { state.hasComparedGeneration = true; renderGenerationComparison(); },
+    backoff: () => { state.hasUsedBackoff = true; renderBackoffAndSmoothing(); },
+    evaluation: () => { state.hasEvaluated = true; renderEvaluation(); }
+  };
   document.querySelectorAll(".code-cell").forEach((cell) => {
-    cell.querySelector(".run-button").addEventListener("click", () => runCodeCell(cell));
+    cell.querySelector(".run-button").addEventListener("click", () => {
+      runCodeCell(cell);
+      const reveal = revealForOutputType[cell.dataset.outputType];
+      if (reveal) reveal();
+    });
   });
 }
 

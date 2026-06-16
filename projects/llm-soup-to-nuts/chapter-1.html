@@ -85,6 +85,38 @@
               <span>From prefixes - initial words, generate the next word and then measure surprise.</span>
             </div>
           </div>
+          <div class="example-note prereq-note">
+            <p><em>Before we dive in, a few needed prerequisites are in order.</em> We build every idea slowly inside the chapter and cover the necessary concepts. However some basics are required. Please use the links as quick refreshers if any of the concepts feel new to you.</p>
+            <ul>
+              <li>
+                <strong><a href="https://en.wikipedia.org/wiki/Probability" target="_blank" rel="noreferrer">Probability</a> basics.</strong>
+                A probability is just a number from 0 to 1 (or 0&ndash;100%). We lean a lot on
+                <a href="https://en.wikipedia.org/wiki/Conditional_probability" target="_blank" rel="noreferrer">conditional probability</a> &dash;
+                the chance of the next word <em>given</em> the words so far, written
+                <code>P(next | context)</code> &dash; and on the idea that the chances for
+                all the options add up to 1.
+              </li>
+              <li>
+                <strong>Fractions, division, and percentages.</strong> We turn counts
+                into probabilities by dividing, for example <code>41 / 303 = 13.5%</code>.
+              </li>
+              <li>
+                <strong><a href="https://en.wikipedia.org/wiki/Logarithm" target="_blank" rel="noreferrer">Logarithms</a> and exponents.</strong>
+                These appear in one place, the surprise and perplexity section. Knowing
+                roughly what <code>log</code> does, and that <code>exp</code> undoes it, is
+                enough; we build up the rest there.
+              </li>
+              <li>
+                <strong>Reading a little code.</strong> The exercises show short snippets of
+                <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank" rel="noreferrer">JavaScript</a>
+                you can run and tweak. You never have to write any from scratch, but being
+                comfortable reading a function and its <code>return</code> value helps.
+              </li>
+            </ul>
+            <p>What you do <strong>not</strong> need yet: no calculus, no vectors or
+              linear algebra, and no prior machine-learning background. Those ideas arrive
+              in later chapters, right at the moment we put them to use.</p>
+          </div>
         </article>
       </div>
     </section>
@@ -467,36 +499,34 @@ return {
     <section id="probability" class="band" aria-labelledby="probability-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">3. From counts to chances</p>
+          <p class="eyebrow">3. Calculating probabilities from counts</p>
           <h2 id="probability-title">Turn repeated patterns into next-token probabilities.</h2>
           <p>
-            At this point, nothing mystical has happened. We have a pile of examples,
-            and we have counted small windows inside that pile. For each context, the
-            model can ask a plain question: "When I saw this before, what came next?"
-            If one continuation happened many times and another happened once, we want
-            the model to treat the first continuation as more likely.
+            At this point, we have counted small windows aka contexts inside the corpus. For each context, the
+            model can ask a plain question: "When I saw this before, what toekn came next?"
+            If one token occurred many times and another happened once, we want
+            the model to treat the first token as more likely.
           </p>
           <p>
             The move from counts to probability is division. We count how often a
             next token appeared after a context, then divide by the total number of
             times that context appeared:
             <code>P(next | context) = count(context, next) / count(context)</code>.
-            The vertical bar means "given." So I read <code>P(king | said the)</code>
+            The vertical bar means "given." or "conditioned on." So I read <code>P(king | said the)</code>
             as "the probability of <code>king</code> given that the current context is
             <code>said the</code>."
           </p>
           <p class="example-note">
             <em>Example:</em> if <code>king</code> followed <code>said the</code> 41
             times, and <code>said the</code> appeared 303 times total, then
-            <code>P(king | said the) = 41 / 303 = 13.5%</code>. We are not guessing
-            by feel. We are asking what share of the evidence points to this next
+            <code>P(king | said the) = 41 / 303 = 13.5%</code>. We are calculating the share of the evidence points to this next
             token.
           </p>
           <p>
             Here is a small but reassuring detail. If you add up these shares across
             every token that ever followed <code>said the</code>, they come to exactly
             1, which is just another way of writing 100%. That is what makes this a
-            real probability distribution and not a loose handful of percentages: the
+            real probability distribution: the
             context has one whole unit of confidence to give away, and it only has to
             decide how much of it each possible next token deserves.
           </p>
@@ -521,6 +551,19 @@ return {
           </label>
         </div>
 
+        <article class="code-cell" data-output-type="probability">
+          <div class="cell-head">
+            <h3>Calculate one probability</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">// Pick a context above, then run this.
+// Probability is the count for one next token divided by
+// the total count for that context.
+return explainProbability(sampleText, settings.n, currentContext, selectedToken);</textarea>
+          <div class="code-output" aria-live="polite"></div>
+        </article>
+
+        
         <div class="visual-grid">
           <div class="panel">
             <div class="section-title-row">
@@ -540,25 +583,14 @@ return {
           </div>
         </div>
 
-        <article class="code-cell" data-output-type="probability">
-          <div class="cell-head">
-            <h3>Calculate one probability</h3>
-            <button class="run-button" type="button">Run</button>
-          </div>
-          <textarea class="code-input" spellcheck="false">// Pick a context above, then run this.
-// Probability is the count for one next token divided by
-// the total count for that context.
-return explainProbability(sampleText, settings.n, currentContext, selectedToken);</textarea>
-          <div class="code-output" aria-live="polite"></div>
-        </article>
       </div>
     </section>
 
     <section id="generate" class="band band-muted" aria-labelledby="generate-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">4. Prediction becomes generation</p>
-          <h2 id="generate-title">Write forward one token at a time.</h2>
+          <p class="eyebrow">4. Prediction leads to generation</p>
+          <h2 id="generate-title">Print one token at a time.</h2>
           <p>
             Once the model can predict one next token, we can ask it to keep going.
             This is the moment our little model starts to feel like the phone keyboard
@@ -573,7 +605,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             <strong>top-pick</strong>: always take the token with the largest
             probability. That is stable and easy to inspect, but it can become
             repetitive. Another rule is <strong>sampling</strong>: choose randomly,
-            but weight the random choice by the probabilities.
+            but weigh the random choice by the probabilities.
           </p>
           <p class="example-note">
             <em>Think of it like a weighted draw.</em> If one token has 70%
@@ -626,6 +658,8 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <textarea class="code-input" spellcheck="false">return generateText(sampleText, settings.n, currentContext, {
   // Try "top" and "sample" here.
   strategy: "sample",
+  // alpha (smoothing) and backoff are explained later, in section 5.
+  // Leave them as-is for now; they just pass through the current settings.
   alpha: settings.alpha,
   backoff: settings.backoff,
   steps: 18
@@ -649,17 +683,17 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           </p>
           <p>
             This is why <a href="https://en.wikipedia.org/wiki/Katz%27s_back-off_model" target="_blank" rel="noreferrer"><strong>backoff</strong></a> exists. I like to think of it as
-            lowering the ambition of the question. If the detailed question has no
+            relaxing the question. If the detailed question has no
             evidence, ask a simpler question. Instead of "what followed
             <code>softly said</code>?", ask "what followed <code>said</code>?" If
-            that also fails, fall back again to the unigram model. We lose precision,
+            that also fails, fall back again to the unigram model i.e just predict based on the most common tokens. We lose precision,
             but we often gain enough evidence to keep moving.
           </p>
           <p class="example-note">
             <em>Backoff is not magic.</em> It does not know what
             <code>softly said</code> should mean. It simply notices that the exact
-            trigram is missing and reuses a shorter, better-supported context. Watch
-            the ladder below: the highlighted row is the evidence the model actually
+            trigram is missing and reuses a shorter, better-supported context. In the excercise below, watch
+            the chain of evidence: the highlighted row is the evidence the model actually
             uses.
           </p>
           <p>
@@ -671,7 +705,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             just did not happen in the slice of text we trained on."
           </p>
           <p>
-            Suppose the model is using the context <code>said the</code>, which appears
+            Let me explain. Suppose the model is using the context <code>said the</code>, which appears
             often in the Alice corpus. The count table may say that
             <code>king</code>, <code>hatter</code>, and <code>mock</code> followed that
             context, while a known word such as <code>rabbit</code> never did. Raw
@@ -704,7 +738,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
         <div class="control-grid section-controls" aria-label="Backoff and smoothing controls">
           <label class="check-row">
             <input id="backoffToggle" type="checkbox">
-            <span>Use backoff ladder</span>
+            <span>Enable backoff to shorter contexts</span>
           </label>
           <label class="range-row" for="alphaSlider">
             <span>Smoothing alpha</span>
@@ -769,14 +803,13 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
     <section id="evaluate" class="band band-muted" aria-labelledby="evaluate-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">6. Test on held-out text</p>
+          <p class="eyebrow">6. Test (Evaluate) on held-out (aka unseen) text</p>
           <h2 id="evaluate-title">Measure surprise with perplexity.</h2>
           <p>
-            After we generate a few amusing sentences, I think we owe the model a more
-            honest question: is it actually any good at prediction? One common way to
-            test that is to keep a small piece of text aside, not train on it, and then
+            Now that the model can generate a few amusing sentences, is it actually any good at prediction? One common way to
+            test that is to keep a small piece of text\corpora separate from the training data, not train on it, and then
             ask the model to predict it token by token. That kept-aside text is called a
-            <strong>holdout</strong>.
+            <strong>holdout</strong> set.
           </p>
           <p>
             For each token in the holdout, we look at the probability the model gave
@@ -793,6 +826,71 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             <code>PPL = exp(H)</code>. Good predictions make the <code>p_i</code>
             values larger, which makes the surprise smaller, which pushes perplexity
             down.
+          </p>
+          <p>
+            That formula looks dense, so let me build it up one step at a time.
+          </p>
+          <p>
+            <strong>Step 1, the surprise of one guess: <code>-log(p_i)</code>.</strong>
+            We want a surprise score that is zero when the model was sure and correct,
+            and grows as the probability it gave the true token shrinks. The function
+            <code>-log(p)</code> does exactly that. When <code>p = 1</code> the model
+            was certain, and <code>-log(1) = 0</code>: no surprise at all. As
+            <code>p</code> slides toward zero the score climbs without limit. The neat
+            part is that every time the probability is cut in half, the surprise goes
+            up by the same fixed step. That matches how surprise actually feels: moving
+            from "even odds" to "one in four" is the same jump as moving from "one in
+            four" to "one in eight."
+          </p>
+          <div class="math-note">
+            <p><strong>Each halving of probability adds one constant step of surprise (here, one bit):</strong></p>
+            <p><code>p = 1 &rarr; 0</code> &nbsp;&nbsp; <code>p = 1/2 &rarr; 1</code> &nbsp;&nbsp; <code>p = 1/4 &rarr; 2</code> &nbsp;&nbsp; <code>p = 1/8 &rarr; 3</code></p>
+            <p class="microcopy">The base of the log just sets the unit (base 2 gives bits, the natural log gives "nats"). It does not change perplexity, as long as the final <code>exp</code> uses the same base as the <code>log</code>.</p>
+          </div>
+          <p>
+            <strong>Step 2, why a logarithm, and why the pieces add up?</strong> To
+            score the whole holdout text, we need to calculate the probability the model
+            assigns to the <em>entire</em> passage. By the chain rule, that is the
+            product of every per-token probability:
+            <code>p_1 &times; p_2 &times; ... &times; p_N</code>. Multiplying hundreds
+            of small numbers collapses toward zero and is impossible to read. A
+            logarithm rescues us, because it turns a product into a sum:
+            <code>log(p_1 &times; ... &times; p_N) = log(p_1) + ... + log(p_N)</code>.
+            So adding up the per-token surprises is not an arbitrary trick; it is just
+            measuring the (negative) log-probability of the whole text, one token at a
+            time.
+          </p>
+          <p>
+            <strong>Step 3, why divide by <code>N</code>?</strong> A longer passage
+            piles up more total surprise simply because it has more tokens, so a raw
+            sum would punish a holdout just for being long. Dividing by the number of
+            tokens <code>N</code> turns the total into an <em>average</em> surprise per
+            token. That per-token rate, which we call <code>H</code>, is what lets us
+            compare a short sentence against a long paragraph fairly.
+          </p>
+          <p>
+            <strong>Step 4, why take an exponential at the end?</strong> <code>H</code> is
+            measured in log units, which are abstract on their own. Exponentiating
+            undoes the log and lands us back on something we can actually picture: an
+            effective count of choices. If a model spread its probability evenly over
+            <code>K</code> equally likely words at every step, each <code>p_i</code>
+            would be <code>1/K</code>, the average surprise would be
+            <code>log(K)</code>, and <code>exp(log(K)) = K</code> exactly. So
+            <code>PPL = exp(H)</code> is answering a concrete question: how many
+            equally likely words is the model effectively choosing between?
+          </p>
+          <p class="example-note">
+            <em>Concrete example.</em> Suppose the model makes two guesses and gives the
+            true token a probability of <code>1/2</code> each time. Each guess costs
+            <code>-log(1/2)</code> of surprise, so the average is
+            <code>H = -log(1/2)</code> and <code>PPL = exp(-log(1/2)) = 2</code>: the
+            model was as unsure as a fair coin flip between two words. A quick way to
+            sanity-check the whole formula is this shortcut: when the model gives the
+            true token the <em>same</em> probability <code>p</code> at every step,
+            perplexity comes out to exactly <code>1/p</code>. Give it <code>1/2</code>
+            each time and perplexity is 2; give it <code>1/4</code> each time and
+            perplexity is 4, which is exactly the "how many equally likely options"
+            reading.
           </p>
           <p>
             If that formula still feels abstract, here is the picture I keep in my
@@ -843,36 +941,37 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           </div>
         </div>
 
-        <div class="evaluation-grid">
-          <div class="evaluation-input-stack">
-            <label class="field-label" for="holdoutInput">Holdout text</label>
-            <textarea id="holdoutInput" class="corpus-input holdout-input" spellcheck="false"></textarea>
-            <article class="code-cell" data-output-type="evaluation">
-              <div class="cell-head">
-                <h3>Evaluate the models</h3>
-                <button class="run-button" type="button">Run</button>
-              </div>
-              <textarea class="code-input" spellcheck="false">return evaluateModels(sampleText, holdoutText, {
+        <div class="evaluation-input-stack">
+          <label class="field-label" for="holdoutInput">Holdout text</label>
+          <textarea id="holdoutInput" class="corpus-input holdout-input" spellcheck="false"></textarea>
+        </div>
+
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Model comparison</h3>
+            <span id="evalSettings" class="pill">current settings</span>
+          </div>
+          <div id="evaluationPanel" class="evaluation-panel" aria-live="polite"></div>
+          <p id="perplexitySummary" class="insight-note" aria-live="polite"></p>
+        </div>
+
+        <div class="panel surprise-trace-panel">
+          <div id="surprisePanel" class="surprise-panel" aria-live="polite"></div>
+        </div>
+
+        <article class="code-cell" data-output-type="evaluation">
+          <div class="cell-head">
+            <h3>Evaluate the models</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">return evaluateModels(sampleText, holdoutText, {
   // Perplexity is a measure of surprise.
   // Lower is better. Infinity means the model hit a zero probability.
   alpha: settings.alpha,
   backoff: settings.backoff
 });</textarea>
-              <div class="code-output" aria-live="polite"></div>
-            </article>
-          </div>
-          <div class="panel">
-            <div class="section-title-row">
-              <h3>Model comparison</h3>
-              <span id="evalSettings" class="pill">current settings</span>
-            </div>
-            <div id="evaluationPanel" class="evaluation-panel" aria-live="polite"></div>
-            <p id="perplexitySummary" class="insight-note" aria-live="polite"></p>
-          </div>
-        </div>
-        <div class="panel surprise-trace-panel">
-          <div id="surprisePanel" class="surprise-panel" aria-live="polite"></div>
-        </div>
+          <div class="code-output" aria-live="polite"></div>
+        </article>
       </div>
     </section>
 
@@ -882,9 +981,8 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <p class="eyebrow">7. Bridge to modern LLMs</p>
           <h2 id="bridge-title">What this tiny model teaches about LLMs.</h2>
           <p>
-            I like ending with n-grams because they make the larger LLM story less
-            mysterious. Modern neural language models do not keep a simple count table
-            like this one, but the learning loop should now feel familiar: learn from
+            I like starting with n-grams because they are simple and intuitive. Modern neural language models, aka LLMs like the one that power ChatGPT, do not keep a simple count table
+            like this one, but the learning loop will be  familiar. They will learn from
             text, represent context, estimate next-token probabilities, choose from
             those probabilities, and test on text the model did not train on.
           </p>
@@ -912,7 +1010,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           </p>
           <p class="learn-more">
             Next:
-            <a href="chapter-2.html">open Chapter 2, When Count Tables Need Help</a>
+            <a href="chapter-2.html">Chapter 2, When Count Tables Need Help</a>
           </p>
         </div>
       </div>
