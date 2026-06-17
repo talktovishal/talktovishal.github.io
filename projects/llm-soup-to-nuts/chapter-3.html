@@ -21,10 +21,6 @@
       <a href="index.html">Overview</a>
       <a href="chapter-1.html">Ch 1</a>
       <a href="chapter-2.html">Ch 2</a>
-      <a class="is-active" href="chapter-3.html">Ch 3</a>
-      <a href="chapter-4.html">Ch 4</a>
-      <a href="chapter-5.html">Ch 5</a>
-      <a href="chapter-6.html">Ch 6</a>
     </nav>
   </header>
 
@@ -47,6 +43,10 @@
     <section id="overview" class="workbench-band" aria-labelledby="page-title">
       <div class="workbench">
         <article class="intro-copy">
+          <div class="progress-banner" role="status">
+            <span class="progress-banner-badge">In Progress</span>
+            <p class="progress-banner-text">This chapter is still being written and reviewed &mdash; it is not finished yet, so parts may be rough or change. <a href="index.html#stay-notified">Get notified</a> when it is officially published.</p>
+          </div>
           <p class="eyebrow">Learning by doing</p>
           <h1 id="page-title">The math that makes a model guess the next word.</h1>
           <p class="lead">
@@ -700,6 +700,16 @@
               <h3>Run the training loop from code</h3>
               <button class="run-button" type="button">Run</button>
             </div>
+            <div class="code-quiz" data-quiz-type="predict" data-explain="Training is the process of lowering the error. As the network sees the data over more epochs, its loss generally falls and the decision boundary fits the points better.">
+              <p class="quiz-prompt">Predict first: this runs the training loop for several epochs. As it trains, the network's <strong>loss</strong> (its error) should usually&hellip;</p>
+              <div class="quiz-options" role="group" aria-label="Predict what happens to the loss">
+                <button class="quiz-option" type="button" data-correct="true">Go down</button>
+                <button class="quiz-option" type="button">Go up</button>
+                <button class="quiz-option" type="button">Stay flat</button>
+              </div>
+              <p class="quiz-feedback" aria-live="polite" hidden></p>
+              <button class="quiz-skip" type="button">Just show me the code</button>
+            </div>
             <textarea class="code-input" spellcheck="false">return trainTinyNetwork(40);</textarea>
             <div class="code-output is-empty" aria-live="polite">
               <div class="output-message">
@@ -844,6 +854,16 @@
               <h3>Train and sample from code</h3>
               <button class="run-button" type="button">Run</button>
             </div>
+            <div class="code-quiz" data-quiz-type="predict" data-explain="Perplexity is surprise: roughly how many words the model is choosing between. A model that has learned the patterns is rarely surprised, so its perplexity is low.">
+              <p class="quiz-prompt">Predict first: this trains a tiny next-word model and reports its <strong>perplexity</strong>. A model that has learned to predict the next word well will have a perplexity that is&hellip;</p>
+              <div class="quiz-options" role="group" aria-label="Predict the perplexity of a trained model">
+                <button class="quiz-option" type="button" data-correct="true">Low &mdash; it is rarely surprised</button>
+                <button class="quiz-option" type="button">High &mdash; it is usually surprised</button>
+                <button class="quiz-option" type="button">Unrelated to how well it learned</button>
+              </div>
+              <p class="quiz-feedback" aria-live="polite" hidden></p>
+              <button class="quiz-skip" type="button">Just show me the code</button>
+            </div>
             <textarea class="code-input" spellcheck="false">return trainNextWordModel(120);</textarea>
             <div class="code-output is-empty" aria-live="polite">
               <div class="output-message">
@@ -915,16 +935,11 @@
 
     <section class="chapter-nav-band" aria-label="Chapter navigation">
       <div class="section-shell">
-        <nav class="chapter-nav">
-          <a class="chapter-nav-card" href="chapter-2.html">
-            <span>Previous chapter</span>
-            <strong>Chapter 2: When count tables need help</strong>
-            <em>Return to learned word vectors and sequence models.</em>
-          </a>
-          <a class="chapter-nav-card" href="chapter-4.html">
-            <span>Next chapter</span>
-            <strong>Chapter 4: Tokenization</strong>
-            <em>See how text becomes the tokens a model reads.</em>
+        <nav class="chapter-nav chapter-nav-single">
+          <a class="chapter-nav-card" href="index.html">
+            <span>Course overview</span>
+            <strong>Back to the overview</strong>
+            <em>See the chapter map and the chapters that are ready to read now.</em>
           </a>
         </nav>
       </div>
@@ -934,6 +949,7 @@
   <script src="chapter3.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script defer src="code-highlight.js"></script>
+  <script defer src="code-quiz.js"></script>
   <script src="site.js" defer></script>
 </body>
 </html>

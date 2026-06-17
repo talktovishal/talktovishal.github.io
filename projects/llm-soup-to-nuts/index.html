@@ -20,10 +20,6 @@
       <a class="is-active" href="index.html">Overview</a>
       <a href="chapter-1.html">Ch 1</a>
       <a href="chapter-2.html">Ch 2</a>
-      <a href="chapter-3.html">Ch 3</a>
-      <a href="chapter-4.html">Ch 4</a>
-      <a href="chapter-5.html">Ch 5</a>
-      <a href="chapter-6.html">Ch 6</a>
     </nav>
   </header>
 
@@ -114,8 +110,13 @@
             If you want the full journey, start at Chapter 1 and read in order; each
             chapter builds on the one before it. If you already know an earlier idea,
             feel free to jump straight to the part you are curious about.
-          </p>  
-        </div>  
+          </p>
+          <p class="example-note">
+            <em>Heads up:</em> Chapters 1 and 2 are ready to read now. Chapters 3 to 6
+            are still in progress and coming soon &mdash; <a href="#stay-notified">get
+            notified</a> when each one goes live.
+          </p>
+        </div>
     
             <div class="chapter-map">
               <article class="chapter-map-card">
@@ -138,8 +139,8 @@
               the first real step from simple shallow learning to what we call as <b>deep learning</b> :-).
             </p>
           </article>
-          <article class="chapter-map-card">
-            <a href="chapter-3.html">Chapter 3 · The math that makes a model guess</a>
+          <article class="chapter-map-card is-upcoming">
+            <span class="chapter-map-title">Chapter 3 · The math that makes a model guess <span class="soon-badge">Coming soon</span></span>
             <p>
               This is the friendly math chapter, and nothing is assumed. One piece at a
               time, you'll build the small toolkit a model actually uses, probability,
@@ -148,8 +149,8 @@
               shows up only when it solves a problem you can see.
             </p>
           </article>
-          <article class="chapter-map-card">
-            <a href="chapter-4.html">Chapter 4 · Tokenization</a>
+          <article class="chapter-map-card is-upcoming">
+            <span class="chapter-map-title">Chapter 4 · Tokenization <span class="soon-badge">Coming soon</span></span>
             <p>
               When we eat something we take small bits of the food, correct? In the same way when the  model sees a big book it chops the text into pieces
               called tokens. It sounds boring, but how you cut matters a lot: it
@@ -157,8 +158,8 @@
               watch the same sentence get split in surprisingly different ways.
             </p>
           </article>
-          <article class="chapter-map-card">
-            <a href="chapter-5.html">Chapter 5 · Transformers and attention</a>
+          <article class="chapter-map-card is-upcoming">
+            <span class="chapter-map-title">Chapter 5 · Transformers and attention <span class="soon-badge">Coming soon</span></span>
             <p>
               This is the big one, the idea behind nearly every AI tool you have heard
               of. You'll build attention from scratch, the trick that lets every word
@@ -167,8 +168,8 @@
               the word Transformer won't feel like magic anymore. Once again, don't worry you will learn it all :-)
             </p>
           </article>
-          <article class="chapter-map-card">
-            <a href="chapter-6.html">Chapter 6 · Pretraining LLMs</a>
+          <article class="chapter-map-card is-upcoming">
+            <span class="chapter-map-title">Chapter 6 · Pretraining LLMs <span class="soon-badge">Coming soon</span></span>
             <p>
               Finally, you'll zoom out to how these models get trained on enormous
               amounts of text. You'll play with the real tradeoffs that AI labs argue
@@ -178,6 +179,34 @@
             </p>
           </article>
         </div>
+      </div>
+    </section>
+
+    <section id="stay-notified" class="band" aria-labelledby="notify-title">
+      <div class="section-shell notify-shell">
+        <div class="section-heading">
+          <p class="eyebrow">Stay in the loop</p>
+          <h2 id="notify-title">Get notified when new chapters go live.</h2>
+          <p>
+            Chapters 3 to 6 are still in progress. Drop your email and I'll let you
+            know the moment a new chapter is ready. No spam, just a short note when
+            there is something new to read.
+          </p>
+        </div>
+        <form class="notify-form embeddable-buttondown-form"
+              action="https://buttondown.com/api/emails/embed-subscribe/talktovishal"
+              method="post" target="popupwindow"
+              onsubmit="window.open('https://buttondown.com/talktovishal', 'popupwindow')">
+          <label class="notify-label" for="bd-email">Email address</label>
+          <div class="notify-row">
+            <input class="notify-input" type="email" name="email" id="bd-email"
+                   placeholder="you@example.com" autocomplete="email" required>
+            <button class="primary-button notify-submit" type="submit">Notify me</button>
+          </div>
+          <p class="notify-fineprint">
+            Powered by <a href="https://buttondown.com/talktovishal" target="_blank" rel="noreferrer">Buttondown</a>. Unsubscribe anytime.
+          </p>
+        </form>
       </div>
     </section>
 

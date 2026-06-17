@@ -21,10 +21,6 @@
       <a href="index.html">Overview</a>
       <a href="chapter-1.html">Ch 1</a>
       <a class="is-active" href="chapter-2.html">Ch 2</a>
-      <a href="chapter-3.html">Ch 3</a>
-      <a href="chapter-4.html">Ch 4</a>
-      <a href="chapter-5.html">Ch 5</a>
-      <a href="chapter-6.html">Ch 6</a>
     </nav>
   </header>
 
@@ -485,6 +481,16 @@ small rabbit</textarea>
             <h3>Inspect what was trained</h3>
             <button class="run-button" type="button">Run</button>
           </div>
+          <div class="code-quiz" data-quiz-type="predict" data-explain="Training nudges each word's vector based on its neighbors, so words that appear in similar contexts (like two character names) drift closer together.">
+            <p class="quiz-prompt">Predict first: training nudges a word's vector using the words around it. Two words that keep showing up in <em>similar</em> contexts should end up with vectors that are&hellip;</p>
+            <div class="quiz-options" role="group" aria-label="Predict what training does to similar words">
+              <button class="quiz-option" type="button" data-correct="true">Closer together (more similar)</button>
+              <button class="quiz-option" type="button">Farther apart</button>
+              <button class="quiz-option" type="button">Exactly identical</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+            <button class="quiz-skip" type="button">Just show me the code</button>
+          </div>
           <textarea class="code-input" spellcheck="false">return embeddingTrainingSummary();</textarea>
           <div class="code-output" aria-live="polite"></div>
         </article>
@@ -649,6 +655,16 @@ small rabbit</textarea>
             <h3>Inspect the raw word vector</h3>
             <button class="run-button" type="button">Run</button>
           </div>
+          <div class="code-quiz" data-quiz-type="predict" data-explain="An embedding is just a row of numbers (a vector). The neighbor list and every cosine similarity are computed from these raw numbers.">
+            <p class="quiz-prompt">Predict first: this cell returns a word's trained <strong>embedding</strong>. What does an embedding actually look like?</p>
+            <div class="quiz-options" role="group" aria-label="Predict what an embedding is">
+              <button class="quiz-option" type="button" data-correct="true">A row of numbers (a vector)</button>
+              <button class="quiz-option" type="button">A single number &mdash; the word's count</button>
+              <button class="quiz-option" type="button">A list of the word's synonyms</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+            <button class="quiz-skip" type="button">Just show me the code</button>
+          </div>
           <textarea class="code-input" spellcheck="false">// The neighbor list above is computed from raw numbers like these.
 // This returns the actual trained vector (one row) for the selected word.
 return wordVector(focusWord);</textarea>
@@ -774,11 +790,11 @@ return wordVector(focusWord);</textarea>
             <strong>Chapter 1: Build a tiny next-word predictor</strong>
             <em>Return to tokens, n-grams, smoothing, and perplexity.</em>
           </a>
-          <a class="chapter-nav-card" href="chapter-3.html">
+          <span class="chapter-nav-card is-disabled">
             <span>Next chapter</span>
-            <strong>Chapter 3: Math and neural networks from first principles</strong>
-            <em>Build the probability, vector, gradient, and backprop toolkit.</em>
-          </a>
+            <strong>More chapters coming soon</strong>
+            <em>Chapters 3&ndash;6 are in progress. <a href="index.html#stay-notified">Get notified</a> when they go live.</em>
+          </span>
         </nav>
       </div>
     </section>
@@ -789,6 +805,7 @@ return wordVector(focusWord);</textarea>
   <script src="chapter2.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script defer src="code-highlight.js"></script>
+  <script defer src="code-quiz.js"></script>
   <script src="site.js" defer></script>
 </body>
 </html>

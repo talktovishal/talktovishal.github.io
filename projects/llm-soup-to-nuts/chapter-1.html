@@ -20,10 +20,6 @@
       <a href="index.html">Overview</a>
       <a class="is-active" href="chapter-1.html">Ch 1</a>
       <a href="chapter-2.html">Ch 2</a>
-      <a href="chapter-3.html">Ch 3</a>
-      <a href="chapter-4.html">Ch 4</a>
-      <a href="chapter-5.html">Ch 5</a>
-      <a href="chapter-6.html">Ch 6</a>
     </nav>
   </header>
 
@@ -238,6 +234,21 @@
           <div class="cell-head">
             <h3>Run the tokenizer</h3>
             <button class="run-button" type="button">Run</button>
+          </div>
+          <div class="code-quiz" data-quiz-type="complete" data-explain="[...new Set(tokens)] keeps each token once, in first-seen order. That deduplicated list is exactly the vocabulary.">
+            <p class="quiz-prompt">Take a guess before the code appears. The <strong>vocabulary</strong> is the set of <em>unique</em> tokens. Which expression turns the token list into that vocabulary?</p>
+            <pre class="quiz-code-preview" aria-hidden="true">const tokens = simpleTokenize(sampleText, { ... });
+
+// The vocabulary is the set of unique tokens.
+const vocabulary = <span class="quiz-blank">?</span>;</pre>
+            <div class="quiz-options" role="group" aria-label="Choose the expression that builds the vocabulary">
+              <button class="quiz-option" type="button" data-correct="true">[...new Set(tokens)]</button>
+              <button class="quiz-option" type="button" data-feedback="tokens.slice() just copies the list, so every repeat is still there.">tokens.slice()</button>
+              <button class="quiz-option" type="button" data-feedback="tokens.sort() reorders the tokens but keeps every repeat, so it is not the unique set.">tokens.sort()</button>
+              <button class="quiz-option" type="button">Object.keys(tokens)</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+            <button class="quiz-skip" type="button">Just show me the code</button>
           </div>
           <div class="control-grid code-controls" aria-label="Tokenization controls">
             <label class="check-row">
@@ -475,6 +486,16 @@ return {
             <h3>Build the count table</h3>
             <button class="run-button" type="button">Run</button>
           </div>
+          <div class="code-quiz" data-quiz-type="predict" data-explain="A trigram fixes two context words instead of one, so there are many more distinct contexts and each one shows up fewer times.">
+            <p class="quiz-prompt">Predict first: if you switch the model from <strong>bigrams</strong> (one word of context) to <strong>trigrams</strong> (two words of context), the number of <em>distinct</em> contexts in the table will usually&hellip;</p>
+            <div class="quiz-options" role="group" aria-label="Predict how trigrams change the number of contexts">
+              <button class="quiz-option" type="button" data-correct="true">Go up</button>
+              <button class="quiz-option" type="button">Go down</button>
+              <button class="quiz-option" type="button">Stay about the same</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+            <button class="quiz-skip" type="button">Just show me the code</button>
+          </div>
           <textarea class="code-input" spellcheck="false">const n = settings.n;
 const tokens = simpleTokenize(sampleText, {
   lowercase: settings.lowercase,
@@ -555,6 +576,16 @@ return {
           <div class="cell-head">
             <h3>Calculate one probability</h3>
             <button class="run-button" type="button">Run</button>
+          </div>
+          <div class="code-quiz" data-quiz-type="predict" data-explain="A probability is the next-token count divided by the context count: 41 / 303 = 13.5%. The raw count on its own is not a probability.">
+            <p class="quiz-prompt">Predict first: <code>king</code> followed <code>said the</code> <strong>41</strong> times, and <code>said the</code> appeared <strong>303</strong> times in all. What is <code>P(king | said the)</code>?</p>
+            <div class="quiz-options" role="group" aria-label="Predict the probability">
+              <button class="quiz-option" type="button" data-correct="true">About 13.5% (41 &divide; 303)</button>
+              <button class="quiz-option" type="button">About 7.4 (303 &divide; 41)</button>
+              <button class="quiz-option" type="button">41 &mdash; the raw count</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+            <button class="quiz-skip" type="button">Just show me the code</button>
           </div>
           <textarea class="code-input" spellcheck="false">// Pick a context above, then run this.
 // Probability is the count for one next token divided by
@@ -654,6 +685,16 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <div class="cell-head">
             <h3>Generate text</h3>
             <button class="run-button" type="button">Run</button>
+          </div>
+          <div class="code-quiz" data-quiz-type="predict" data-explain="Top-pick always takes the single most likely token, so it repeats. Sampling draws with weighted randomness, so lower-probability tokens sometimes slip in and the text varies.">
+            <p class="quiz-prompt">Predict first: which decoding rule produces <em>more varied</em> text from the same starting context?</p>
+            <div class="quiz-options" role="group" aria-label="Predict which rule is more varied">
+              <button class="quiz-option" type="button" data-correct="true">Sampling (weighted random)</button>
+              <button class="quiz-option" type="button">Top-pick (always the strongest)</button>
+              <button class="quiz-option" type="button">They produce the same text</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+            <button class="quiz-skip" type="button">Just show me the code</button>
           </div>
           <textarea class="code-input" spellcheck="false">return generateText(sampleText, settings.n, currentContext, {
   // Try "top" and "sample" here.
@@ -787,6 +828,16 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <div class="cell-head">
             <h3>Inspect backoff</h3>
             <button class="run-button" type="button">Run</button>
+          </div>
+          <div class="code-quiz" data-quiz-type="predict" data-explain="With no smoothing or backoff, an unseen context has a count of zero, so the raw probability is exactly zero. That dead end is what backoff and smoothing are built to rescue.">
+            <p class="quiz-prompt">Predict first: the trigram context <code>softly said</code> never appeared in the corpus. With <strong>no</strong> backoff or smoothing, what probability does the raw model give the next token?</p>
+            <div class="quiz-options" role="group" aria-label="Predict the probability for an unseen context">
+              <button class="quiz-option" type="button" data-correct="true">Zero &mdash; there is no evidence</button>
+              <button class="quiz-option" type="button">A small but non-zero number</button>
+              <button class="quiz-option" type="button">The same as the unigram guess</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+            <button class="quiz-skip" type="button">Just show me the code</button>
           </div>
           <textarea class="code-input" spellcheck="false">return predictNext(sampleText, settings.n, stuckContext, 8, {
   // Backoff tries shorter contexts.
@@ -964,6 +1015,16 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             <h3>Evaluate the models</h3>
             <button class="run-button" type="button">Run</button>
           </div>
+          <div class="code-quiz" data-quiz-type="predict" data-explain="Perplexity measures surprise: it is roughly how many equally likely words the model is choosing between. Lower means less surprised, which usually means a better fit on the held-out text.">
+            <p class="quiz-prompt">Predict first: a model with <strong>lower</strong> perplexity on the held-out text is&hellip;</p>
+            <div class="quiz-options" role="group" aria-label="Predict what lower perplexity means">
+              <button class="quiz-option" type="button" data-correct="true">Less surprised &mdash; a better fit</button>
+              <button class="quiz-option" type="button">More surprised &mdash; a worse fit</button>
+              <button class="quiz-option" type="button">Unrelated to how well it fits</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+            <button class="quiz-skip" type="button">Just show me the code</button>
+          </div>
           <textarea class="code-input" spellcheck="false">return evaluateModels(sampleText, holdoutText, {
   // Perplexity is a measure of surprise.
   // Lower is better. Infinity means the model hit a zero probability.
@@ -1109,6 +1170,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
   <script src="app.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script defer src="code-highlight.js"></script>
+  <script defer src="code-quiz.js"></script>
   <script src="site.js" defer></script>
 </body>
 </html>

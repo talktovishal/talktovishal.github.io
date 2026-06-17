@@ -1887,6 +1887,138 @@ a.chapter-nav-card:hover {
   line-height: 1.6;
 }
 
+.chapter-map-card.is-upcoming {
+  opacity: 0.92;
+}
+
+.chapter-map-card .chapter-map-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 1.14rem;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.soon-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border: 1px solid var(--coral);
+  border-radius: 999px;
+  background: var(--coral-soft);
+  color: var(--coral);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* In-progress banner for chapters still in draft */
+.progress-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  border: 1px solid var(--coral);
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: var(--coral-soft);
+}
+
+.progress-banner-badge {
+  flex: none;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--coral);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.progress-banner-text {
+  margin: 0;
+  color: var(--coral);
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.progress-banner-text a {
+  color: var(--coral);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  font-weight: 800;
+}
+
+.chapter-nav-card.is-disabled a {
+  color: var(--coral);
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+/* Get-notified email signup (Buttondown embed) */
+.notify-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.notify-form {
+  display: grid;
+  gap: 8px;
+  max-width: 560px;
+}
+
+.notify-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.notify-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.notify-input {
+  flex: 1 1 240px;
+  min-width: 0;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.notify-input:focus-visible {
+  outline: 3px solid rgba(198, 95, 30, 0.35);
+  outline-offset: 2px;
+  border-color: var(--accent);
+}
+
+.notify-submit {
+  flex: none;
+}
+
+.notify-fineprint {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.notify-fineprint a {
+  color: var(--teal);
+  text-decoration: underline;
+  font-weight: 700;
+}
+
 .eval-row {
   display: grid;
   grid-template-columns: 92px minmax(120px, 1fr) 74px;
@@ -1989,6 +2121,175 @@ a.chapter-nav-card:hover {
 .code-output.is-error {
   border-color: #d46a4c;
   background: #fff2ec;
+}
+
+/* Think-first quiz that gates a code cell until the learner predicts. */
+.code-quiz {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--teal);
+  border-radius: 8px;
+  background: #fff7ed;
+}
+
+/* display:grid above would otherwise defeat the [hidden] attribute used when the
+   learner skips the quiz, so restore it explicitly. */
+.code-quiz[hidden] {
+  display: none;
+}
+
+.quiz-prompt {
+  margin: 0;
+  color: #46413b;
+  font-size: 0.96rem;
+  font-weight: 750;
+}
+
+.quiz-prompt code {
+  font-size: 0.9em;
+}
+
+.quiz-code-preview {
+  margin: 0;
+  overflow-x: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  color: #17212f;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.quiz-blank {
+  display: inline-block;
+  min-width: 60px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-weight: 850;
+  text-align: center;
+}
+
+.quiz-options {
+  display: grid;
+  gap: 8px;
+}
+
+@media (min-width: 620px) {
+  .quiz-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.quiz-option {
+  min-height: 42px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 750;
+  text-align: left;
+}
+
+.quiz-option:hover {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.code-quiz[data-quiz-type="complete"] .quiz-option {
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-weight: 700;
+}
+
+.quiz-option.is-correct {
+  border-color: var(--green);
+  background: #e8f3ec;
+  color: #184d36;
+}
+
+.quiz-option.is-incorrect {
+  border-color: var(--coral);
+  background: var(--coral-soft);
+  color: #7c2a1b;
+}
+
+.quiz-option.is-correct::after {
+  content: " \2713";
+  font-weight: 900;
+}
+
+.quiz-option.is-incorrect::after {
+  content: " \2717";
+  font-weight: 900;
+}
+
+.code-quiz.is-answered .quiz-option {
+  cursor: default;
+}
+
+.code-quiz.is-answered .quiz-option:hover {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.code-quiz.is-answered .quiz-option.is-correct:hover {
+  border-color: var(--green);
+  background: #e8f3ec;
+}
+
+.code-quiz.is-answered .quiz-option.is-incorrect:hover {
+  border-color: var(--coral);
+  background: var(--coral-soft);
+}
+
+.quiz-feedback {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.quiz-feedback.is-correct {
+  background: #e8f3ec;
+  color: #184d36;
+}
+
+.quiz-feedback.is-incorrect {
+  background: var(--coral-soft);
+  color: #7c2a1b;
+}
+
+.quiz-skip {
+  justify-self: start;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.quiz-skip:hover {
+  color: var(--teal);
+}
+
+/* While a quiz gates the cell, hide the code surface until it is revealed. */
+.code-cell.is-quiz-locked .code-controls,
+.code-cell.is-quiz-locked .code-input,
+.code-cell.is-quiz-locked .code-input-wrap,
+.code-cell.is-quiz-locked .code-output,
+.code-cell.is-quiz-locked .run-button {
+  display: none;
 }
 
 /* Syntax highlighting: a highlighted <pre> sits behind a transparent,
