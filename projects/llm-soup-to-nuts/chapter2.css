@@ -11,6 +11,10 @@
   min-height: 168px;
 }
 
+#sparsityRunButton {
+  margin-top: 10px;
+}
+
 .training-grid,
 .concept-grid,
 .training-math-grid,
@@ -276,7 +280,22 @@
 }
 
 .watch-row {
-  grid-template-columns: minmax(110px, 0.7fr) minmax(160px, 1.5fr) 64px;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(150px, 1.4fr) minmax(104px, auto);
+}
+
+.watch-delta {
+  margin-left: 6px;
+  font-size: 0.78em;
+  font-weight: 800;
+  color: var(--green);
+}
+
+.watch-delta.is-down {
+  color: var(--coral);
+}
+
+.training-grid .span-full {
+  grid-column: 1 / -1;
 }
 
 .gradient-row {

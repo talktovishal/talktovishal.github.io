@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>When Count Tables Need Help - LLM Soup to Nuts</title>
-  <link rel="stylesheet" href="styles.css?v=20260617">
+  <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="chapter2.css">
 </head>
 <body>
@@ -41,7 +41,7 @@
       <div class="workbench">
         <article class="intro-copy">
           <p class="eyebrow">Learning by doing</p>
-          <h1 id="page-title">When counting words is no longer sufficient.</h1>
+          <h1 id="page-title">Why counting words is not sufficient?</h1>
           <p class="lead">
             In Chapter 1 we built a real little language model out of nothing but
             counts. It worked! But it was also a strict librarian: if it had never
@@ -109,19 +109,13 @@
               <li>
                 <strong>A <a href="https://en.wikipedia.org/wiki/Euclidean_vector" target="_blank" rel="noreferrer">list of numbers</a> (a vector).</strong>
                 The whole chapter rests on giving each word a short row of numbers, like
-                <code>[0.42, -0.10, 0.31]</code>. No prior vector-math background is
-                needed; we build the few operations we use right where they show up.
+                <code>[0.42, -0.10, 0.31]</code>. Why this list of numbers? Because it allows us to capture the essence of a word in multiple dimensions. To understand this, think of each number as a different aspect of the word's meaning. The first number might represent the word's sentiment, the second its grammatical role, and the third its semantic similarity to other words. This is not exactly what happens in real-world applications, but it will help us visualize the concept.
               </li>
               <li>
                 <strong>Multiplying and adding.</strong> Our one workhorse is the
                 <a href="https://en.wikipedia.org/wiki/Dot_product" target="_blank" rel="noreferrer">dot product</a>:
-                multiply two lists position by position, then add the results. We will
-                do it by hand before any code runs.
-              </li>
-              <li>
-                <strong>Reading a little code.</strong> Just like last chapter, short
-                runnable snippets you can change and re-run. Reading them is enough;
-                writing any is optional.
+                multiply two lists position by position, then add the results. The geometric
+                interpretation of the dot product is the projection of one vector onto another. This means that the dot product measures the similarity between two vectors. Thus, if two vectors are pointing in the same direction, their dot product will be positive; if they are pointing in opposite directions, the dot product will be negative; and if they are perpendicular, the dot product will be zero.
               </li>
             </ul>
             <p>What you do <strong>not</strong> need yet: no calculus, no matrix
@@ -171,6 +165,7 @@
 brave queen
 small rabbit</textarea>
             <p class="microcopy">Edit this box. Put one phrase on each line, such as <code>the queen</code> or <code>asked the</code>.</p>
+            <button id="sparsityRunButton" class="run-button" type="button">Run</button>
           </div>
           <div class="panel">
             <div class="section-title-row">
@@ -188,33 +183,47 @@ small rabbit</textarea>
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">2. Neural probabilistic language models</p>
-          <h2 id="neural-title">First, give each word a small row of numbers.</h2>
+          <h2 id="neural-title">Elevate each word to be represented as a row of numbers.</h2>
           <p>
             The section above let us feel the problem: a count table only trusts exact
             phrases. If it has seen <code>the cat slept</code> but not
             <code>the dog slept</code>, it has no built-in reason to let
-            <code>cat</code> lend a hand to <code>dog</code>. The fix, introduced by
-            <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">neural language models</a>,
-            is lovely to state: stop treating words as separate boxes, and give each
+            <code>cat</code> lend a hand to <code>dog</code>. The fix was first introduced by
+            <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">neural language models</a>.
+            The main idea is to stop treating words as unique identifiers, and give each
             one a learned <strong>representation</strong> instead.
           </p>
           <p>
-            "Representation" can sound fancy, so let me make it plain. A word vector is
-            just a short list of numbers that stands in for one word - that is the
-            whole idea. At the very start those numbers are basically random noise.
-            Then training gently nudges them, over and over, and here is the quiet
-            magic: words that keep showing up in similar company get nudged toward
+            "Representation" can sound fancy, so let's simplify it. A word vector is
+            just a list of numbers that stands in for a word - that is the
+            whole idea. At the very start those numbers are basically random.
+            Then training gently nudges them, over and over, and here is the magic: words that keep showing up in similar company get nudged toward
             similar numbers. The company a word keeps slowly becomes the numbers a word
             carries.
           </p>
           <p>
-            Our browser demo uses <strong>36 numbers per word</strong>. There is
+            Our browser demo uses <strong>36 numbers per word</strong>. This is called as dimensions. There is
             nothing sacred about 36 - it is a knob we pick before training, the kind of
             choice we call a <strong>hyperparameter</strong>. Real systems often use
-            hundreds. We choose 36 so the training still finishes in a few seconds in
+            hundreds of dimensions. We choose 36 so the training still finishes in a few seconds in
             your browser, yet it is rich enough to show real neighborhood patterns. Do
-            you already feel the tradeoff? More numbers can capture more nuance, but
+            you already feel the tradeoff :-)? More numbers can capture more nuance, but
             cost more to train and store.
+          </p>
+          <p>
+            So the plan is set: every word becomes a row of numbers. At the start
+            those numbers are random. That raises the obvious question - nudged
+            <em>how</em>, exactly? Random numbers do not improve on their own. We need a
+            <strong>training algorithm</strong>: a repeatable little game whose rules
+            decide, for each word, which numbers should rise and which should fall.
+            Several such algorithms exist - the
+            <a href="https://arxiv.org/abs/1301.3781" target="_blank" rel="noreferrer">Word2Vec</a>
+            family,
+            <a href="https://nlp.stanford.edu/projects/glove/" target="_blank" rel="noreferrer">GloVe</a>,
+            and others - differing mostly in the game they play. We will learn the most
+            intuitive of them, <strong>skip-gram</strong> from the Word2Vec family,
+            because once you can picture its game the rest feel like variations. So let's put the two pieces side by side: the row of numbers we are
+            shaping, and the game that shapes it.
           </p>
         </div>
 
@@ -249,7 +258,7 @@ small rabbit</textarea>
           </div>
 
           <div class="panel concept-panel">
-            <h3>What skip-gram trains on</h3>
+            <h3>How skip-gram works?</h3>
             <p>
               Skip-gram plays a simple guessing game. It picks a center word and asks:
               which words really showed up nearby? Those genuine pairs are the ones to
@@ -286,103 +295,250 @@ small rabbit</textarea>
               </div>
             </div>
             <p class="microcopy">
-              This is a simplified redraw of the Word2Vec skip-gram idea. The original
-              Word2Vec paper also contrasts skip-gram with CBOW, which predicts a
+              This is a simplified version of the Word2Vec skip-gram idea. The original
+              Word2Vec paper also contrasts skip-gram with CBOW (Continuous Bag of Words), which predicts a
               center word from its surrounding words.
             </p>
           </div>
         </div>
 
-        <div class="training-math-grid">
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Skip-gram is a training routine - a guessing game whose rules decide how to nudge each word's numbers. The row of numbers itself is the word vector that the game produces, not the game.">
+          <p class="quiz-prompt">Quick check: in your own words, what <em>is</em> skip-gram?</p>
+          <div class="quiz-options" role="group" aria-label="What is skip-gram">
+            <button class="quiz-option" type="button" data-correct="true">A training game that decides how to nudge each word's numbers</button>
+            <button class="quiz-option" type="button" data-feedback="That row of numbers is the word vector - the thing skip-gram produces, not skip-gram itself.">The row of numbers stored for each word</button>
+            <button class="quiz-option" type="button" data-feedback="Counting exact phrases is the count-table approach from the previous section, the very thing we are moving beyond.">A way to count how often exact phrases appear</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
           <div class="panel training-math-card">
-            <h3>What one training step does</h3>
+            <h3>What one training step does?</h3>
             <p>
-              Every word starts life as a small list of random numbers. Training is
-              just the patient work of making those numbers less random, one tiny
-              correction at a time. Here is a single step: the model grabs a center
-              word such as <code>rabbit</code> and one word from its nearby window,
-              such as <code>watch</code>, and checks how well their current numbers
-              agree.
+              Quick framing first: skip-gram sets the <em>rules</em> of the game - which
+              pairs count as real and which are made up. Now a <strong>training
+              step</strong> is a single move <em>inside</em> that game: the tiny update
+              the model makes to the numbers for one pair. Every word starts life as a
+              list of random numbers, and training is just the patient work of
+              making those numbers less random, one move at a time. Here is a single
+              step: the model grabs a center word such as <code>rabbit</code> and one
+              word from its nearby window, such as <code>watch</code>, and checks how
+              well their current numbers agree.
             </p>
             <ol class="training-step-list">
               <li>Look up the current vector for <code>rabbit</code>.</li>
               <li>Look up the current vector for <code>watch</code>.</li>
-              <li>Take a dot product. This asks, "Do these two rows point in a similar direction?"</li>
-              <li>Turn that score into a probability between 0 and 1 with sigmoid, an S-shaped squashing function.</li>
-              <li>Compare the probability with the answer: real pair or made-up pair.</li>
-              <li>Nudge the numbers so the next score is a little less wrong.</li>
+              <li>Take a dot product, remember what we discussed before about dot products helping measure similarity. This asks, "Do these two rows point in a similar direction?"</li>
+              <li>Turn that score into a probability between 0 and 1 with sigmoid, an S-shaped squashing function. Why do we use sigmoid here? The sigmoid function maps any real number to a value between 0 and 1, which is perfect for representing probabilities.</li>
+              <li>Compare that probability with the truth. For a <em>real</em> pair we wanted it high (close to 1); for a <em>made-up</em> pair we wanted it low (close to 0). The gap between what we got and what we wanted is the error - the only feedback the model gets.</li>
+              <li>Nudge both rows to shrink that gap. For a real pair this rotates <code>rabbit</code> a little toward <code>watch</code> (and <code>watch</code> back toward <code>rabbit</code>), so their dot product - their agreement - is a touch higher next time. A made-up pair runs the exact same machinery in reverse, rotating the two rows apart. The exact arithmetic of this nudge - getting the probability, then changing the vectors - is spelled out in the box right after this list.</li>
             </ol>
             <p>
-              One nudge is tiny. Thousands of nudges create the pattern. One full
-              sweep through all of those word pairs is called an epoch, and the
+              One nudge is tiny. Thousands of nudges happen in a single training session. One full
+              sweep through all of those word pairs is called an <strong>epoch</strong>, and the
               training-depth control simply sets how many sweeps to run. That is why
               the loss trace matters: it shows the repeated nudges are making the
-              training task easier for the model.
-            </p>
-            <div class="formula-stack" aria-label="Skip-gram training formulas">
-              <code>score = center vector · context vector</code>
-              <code>probability real = sigmoid(score)</code>
-              <code>loss = surprise about the right answer</code>
-            </div>
-          </div>
-          <div class="panel training-math-card">
-            <h3>Why fake pairs are useful</h3>
-            <p>
-              If <code>rabbit → nearby</code> really appeared, training nudges the
-              vectors so that score goes up. If <code>rabbit → table</code> was a
-              made-up negative example, training nudges the score down. After many
-              passes, words with similar neighborhoods receive similar nudges, so
-              their final lists of numbers become more alike.
-            </p>
-            <p class="microcopy">
-              This is why nearby words mean <em>similar usage in this corpus</em>.
-              They are not guaranteed to be synonyms.
+              training task easier for the model, and it is the same loss you will
+              watch fall in the live <em>Training trace</em> below.
             </p>
           </div>
+
+        <div class="panel nudge-math-panel">
+          <div class="section-title-row">
+            <h3>The nudge, written out in math</h3>
+            <span class="pill">the actual skip-gram update</span>
+          </div>
+          <p>
+            Step 6 said the model "nudges both rows." Here is that nudge with nothing
+            hidden - the real skip-gram-with-negative-sampling update, and it is shorter
+            than it looks. Write the center word's vector as <code>v</code>, the context
+            word's vector as <code>u</code>, and the right answer as <code>y</code>
+            (<code>y = 1</code> for a real pair, <code>y = 0</code> for a made-up one).
+            One step is exactly these five lines - the first three you already met as
+            steps 3 to 5, and the last two are the actual update:
+          </p>
+          <div class="formula-stack" aria-label="Skip-gram negative-sampling update rule">
+            <code>s = v &middot; u</code>
+            <code>p = sigmoid(s)</code>
+            <code>e = p &minus; y</code>
+            <code>v &larr; v &minus; &eta; &middot; e &middot; u</code>
+            <code>u &larr; u &minus; &eta; &middot; e &middot; v</code>
+          </div>
+          <p class="microcopy">
+            <code>s</code> is the score (a dot product), <code>p</code> is the
+            probability the pair is real, <code>e</code> is the error, and
+            <code>&eta;</code> ("eta") is the <strong>learning rate</strong> - a small
+            step size (0.035 in the worked example below). Both updates use the vectors
+            as they were at the start of the step.
+          </p>
+          <p>
+            But <em>why</em> step along the other word's vector at all? Because the score
+            is the dot product <code>v &middot; u</code>, and a dot product grows fastest
+            when two arrows line up. So the most effective way to make <code>v</code>
+            agree more with <code>u</code> is simply to tip <code>v</code> a pinch in
+            <code>u</code>'s direction (and to disagree, tip it the opposite way). The
+            partner's vector <em>is</em> the direction of fastest agreement - that is the
+            whole reason <code>u</code> shows up in <code>v</code>'s update, and
+            <code>v</code> in <code>u</code>'s. (In Chapter 3 you will see this "step
+            along the partner" rule is exactly the gradient of the score.)
+          </p>
+          <p>
+            And why nudge <em>both</em> rows? Because the score treats them as equal
+            partners - <code>v &middot; u</code> is the very same number read either way -
+            so the repair is shared: <code>v</code> leans toward <code>u</code> while
+            <code>u</code> leans toward <code>v</code>, and the two meet in the middle
+            twice as fast. Think of two friends spotting each other across a room and
+            both walking forward, rather than one standing still.
+          </p>
+          <p>
+            Now notice how much rides on that one error number, <code>e = p &minus; y</code>:
+          </p>
+          <ul class="training-step-list">
+            <li>
+              <strong>Real pair (<code>y = 1</code>).</strong> <code>e = p &minus; 1</code>
+              is negative, so <code>&minus; &eta; &middot; e &middot; u</code>
+              <em>adds</em> a slice of <code>u</code> onto <code>v</code>: the center
+              word slides toward its neighbor (and the neighbor toward it). They pull
+              together. The more the model had underrated the pair (the smaller
+              <code>p</code>), the bigger the step.
+            </li>
+            <li>
+              <strong>Made-up pair (<code>y = 0</code>).</strong> <code>e = p</code> is
+              positive, so <code>&minus; &eta; &middot; e &middot; u</code>
+              <em>subtracts</em> a slice of <code>u</code> from <code>v</code>: the two
+              vectors slide apart.
+            </li>
+            <li>
+              <strong>Already correct (<code>p &asymp; y</code>).</strong>
+              <code>e &asymp; 0</code>, so the vectors barely move. That is why training
+              settles down - confident-correct pairs stop tugging, and only the
+              still-wrong pairs keep nudging.
+            </li>
+          </ul>
+          <p class="microcopy">
+            One honest simplification: real Word2Vec keeps <em>two</em> vectors per word
+            (one for its center role, one for its context role) and updates one against
+            the other. We use a single vector per word here to match the rest of the
+            chapter; the arithmetic is otherwise exactly the five lines above. To watch
+            these on real numbers, see the worked example just below.
+          </p>
+        </div>
+
+        <div class="panel why-converge-panel">
+          <div class="section-title-row">
+            <h3>So why does this pull look-alike words together?</h3>
+            <span class="pill">the key intuition</span>
+          </div>
+          <p>
+            This is the part that feels like magic the first time, so let's slow down
+            on it. Look back at the step list and notice something easy to miss: a
+            single step only ever nudges a center word toward (or away from) the
+            <em>context</em> words it actually sits beside. <code>rabbit</code> gets
+            pulled toward <code>watch</code>, <code>ran</code>, <code>hole</code> - the
+            company it keeps. The game <strong>never directly compares one center word
+            with another</strong>; it never once looks at the pair
+            <code>rabbit → kitten</code>.
+          </p>
+          <p>
+            So picture a second word that happens to keep the same company - say
+            <code>kitten</code> also turns up near <code>watch</code>,
+            <code>ran</code>, and <code>hole</code>. Training drags <code>kitten</code>
+            toward that <em>same</em> set of anchor words. And here is the quiet
+            payoff: two ropes tied to the same posts end up in the same spot. Because
+            <code>rabbit</code> and <code>kitten</code> are both pulled toward the same
+            handful of context vectors, they drift into the same neighborhood - close
+            to <em>each other</em> - without the model ever having compared them. Their
+            similarity is a side effect of sharing anchors.
+          </p>
+          <p>
+            That is the whole reason the game works. We never hand-label which words
+            are alike; "alike" <em>emerges</em> because words used in the same way are
+            tugged toward the same places. And the made-up negative pairs are the
+            counterweight that keeps the space honest: they shove unrelated words
+            apart, so vectors spread out into a real map instead of every word
+            collapsing into one crowded point.
+          </p>
+          <p class="microcopy">
+            Picture the dot product as a dial of agreement. Real pairs turn each
+            other's dial up; made-up pairs turn it down. Run that on thousands of
+            pairs and the words that share company quietly rise to agree with the same
+            neighbors - which is exactly what "similar vectors" means.
+          </p>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="The made-up (negative) pairs teach the model what does NOT belong together. Without them, every word could drift toward every other word and the map would collapse.">
+          <p class="quiz-prompt">Quick check: skip-gram also trains on a few <em>made-up</em> pairs that never actually appeared. Why bother?</p>
+          <div class="quiz-options" role="group" aria-label="Why train on made-up pairs">
+            <button class="quiz-option" type="button" data-correct="true">To teach the model what does not belong together, keeping unrelated words apart</button>
+            <button class="quiz-option" type="button" data-feedback="They are deliberately fake, so they are not real evidence - their whole job is to be negative examples.">To add more real evidence about which words go together</button>
+            <button class="quiz-option" type="button" data-feedback="Skip-gram never counts phrase frequencies - that is the count-table idea from the previous section.">To count how frequent each phrase is</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
         <figure class="intuition-figure">
-          <img src="assets/figures/chapter2-embedding-nudges.gif" width="720" height="360" alt="Animated points for rabbit, watch, table, and queen in a vector space, with real pairs pulling together and a made-up pair pushing apart." decoding="async">
-          <figcaption>Embedding training is many tiny pushes: real nearby pairs pull vectors together, while negative samples keep unrelated words from collapsing into the same place.</figcaption>
+          <svg class="nudge-figure" viewBox="0 0 720 360" role="img" aria-labelledby="nudge-fig-title nudge-fig-desc" style="display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:12px;background:#fffefa;">
+            <title id="nudge-fig-title">Similar words pull together while an unrelated word is pushed apart</title>
+            <desc id="nudge-fig-desc">In a vector space, cat and dog start far apart and slide toward each other because they are used in similar ways, while table slides away to the corner. A closeness bar for cat and dog grows as they converge.</desc>
+            <defs>
+              <marker id="nudgeArrowG" viewBox="0 0 10 10" markerWidth="8" markerHeight="8" refX="8" refY="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#27664a"></path></marker>
+              <marker id="nudgeArrowR" viewBox="0 0 10 10" markerWidth="8" markerHeight="8" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#b03d28"></path></marker>
+            </defs>
+
+            <text class="svg-label" x="42" y="44">cat &amp; dog closeness</text>
+            <rect x="240" y="34" width="300" height="12" rx="6" fill="#efe9df"></rect>
+            <rect x="240" y="34" width="40" height="12" rx="6" fill="#27664a">
+              <animate attributeName="width" values="40;250;250;40" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" repeatCount="indefinite"></animate>
+            </rect>
+
+            <rect x="40" y="78" width="640" height="232" rx="12" fill="#fffdf9" stroke="var(--line)" stroke-width="1"></rect>
+            <g stroke="var(--line)" stroke-width="1" opacity="0.45">
+              <line x1="180" y1="78" x2="180" y2="310"></line>
+              <line x1="360" y1="78" x2="360" y2="310"></line>
+              <line x1="540" y1="78" x2="540" y2="310"></line>
+              <line x1="40" y1="155" x2="680" y2="155"></line>
+              <line x1="40" y1="232" x2="680" y2="232"></line>
+            </g>
+
+            <line x1="332" y1="192" x2="388" y2="192" stroke="#27664a" stroke-width="3" marker-start="url(#nudgeArrowG)" marker-end="url(#nudgeArrowG)"></line>
+            <text class="svg-label" x="360" y="176" text-anchor="middle" style="fill:#27664a">pull together</text>
+
+            <line x1="430" y1="225" x2="515" y2="280" stroke="#b03d28" stroke-width="3" marker-end="url(#nudgeArrowR)"></line>
+            <text class="svg-label" x="440" y="272" text-anchor="start" style="fill:#b03d28">push apart</text>
+
+            <g>
+              <circle cx="170" cy="210" r="9" fill="#27664a"></circle>
+              <text class="svg-word" x="156" y="215" text-anchor="end">cat</text>
+              <animateTransform attributeName="transform" type="translate" values="0 0; 130 -18; 130 -18; 0 0" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" repeatCount="indefinite"></animateTransform>
+            </g>
+            <g>
+              <circle cx="560" cy="150" r="9" fill="#27664a"></circle>
+              <text class="svg-word" x="574" y="155" text-anchor="start">dog</text>
+              <animateTransform attributeName="transform" type="translate" values="0 0; -140 42; -140 42; 0 0" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" repeatCount="indefinite"></animateTransform>
+            </g>
+            <g>
+              <circle cx="380" cy="205" r="9" fill="#8a8178"></circle>
+              <text class="svg-word" x="394" y="210" text-anchor="start">table</text>
+              <animateTransform attributeName="transform" type="translate" values="0 0; 180 92; 180 92; 0 0" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" repeatCount="indefinite"></animateTransform>
+            </g>
+
+            <circle cx="150" cy="335" r="6" fill="#27664a"></circle>
+            <text class="svg-caption" x="164" y="340" text-anchor="start">similar words &#8594; pulled together</text>
+            <circle cx="400" cy="335" r="6" fill="#8a8178"></circle>
+            <text class="svg-caption" x="414" y="340" text-anchor="start">unrelated word &#8594; pushed apart</text>
+          </svg>
+          <figcaption>Training the word vectors is many tiny pushes: words used alike (cat, dog) get pulled together, while an unrelated word (table) is pushed away so the space does not collapse into one point. Please note, we have the word vectors in a multiple dimensional space (remember 36 numbers per word), but we're showing them in 2 dimensions (x, y) for simplicity.</figcaption>
         </figure>
 
-        <div class="panel worked-step-panel">
-          <div class="section-title-row">
-            <h3>One real nudge, with numbers</h3>
-            <span class="pill">illustrative</span>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="One full sweep through all of the training pairs is called an epoch. The training-depth control below just sets how many of these sweeps to run.">
+          <p class="quiz-prompt">Quick check: one full pass through <em>all</em> of the word pairs, nudging the numbers as it goes, is called&hellip;</p>
+          <div class="quiz-options" role="group" aria-label="What one full pass is called">
+            <button class="quiz-option" type="button" data-correct="true">An epoch</button>
+            <button class="quiz-option" type="button" data-feedback="A dimension is one of the 36 numbers inside a word's vector, not a pass over the data.">A dimension</button>
+            <button class="quiz-option" type="button" data-feedback="A hyperparameter is a setting you pick before training, like the number of dimensions - not the pass itself.">A hyperparameter</button>
           </div>
-          <p>
-            Let's do a single step by hand, so the "random numbers get adjusted"
-            part stops being hand-wavy. To keep it readable, imagine just three
-            numbers per word instead of 36, and suppose <code>rabbit</code> and
-            <code>watch</code> really did appear near each other, so the right
-            answer for this pair is "real."
-          </p>
-          <div class="vector-table" aria-label="Word vectors before the step">
-            <div class="vector-row"><strong>rabbit (before)</strong><code>[0.20, -0.10, 0.05]</code></div>
-            <div class="vector-row"><strong>watch</strong><code>[0.30, 0.00, 0.10]</code></div>
-          </div>
-          <div class="formula-stack" aria-label="One step of skip-gram math">
-            <code>score = 0.20×0.30 + (-0.10)×0.00 + 0.05×0.10 = 0.065</code>
-            <code>probability real = sigmoid(0.065) ≈ 0.516</code>
-            <code>nudge = learningRate × (1 − 0.516) = 0.035 × 0.484 ≈ 0.017</code>
-            <code>rabbit += nudge × watch → [0.205, -0.10, 0.052]</code>
-          </div>
-          <p>
-            That nudge slid <code>rabbit</code> a step toward <code>watch</code>,
-            and the same step pulls <code>watch</code> back toward
-            <code>rabbit</code>. Recompute the score and it has risen from 0.065 to
-            about 0.067, so next time the model is a touch more sure these two
-            belong together. A made-up pair runs the exact same machinery with the
-            answer flipped to "not real," gently pushing the two rows apart instead.
-          </p>
-          <p class="microcopy">
-            One nudge is invisibly small. The whole trick is repetition: thousands
-            of real pairs tug look-alike words together while thousands of made-up
-            pairs shove unrelated words apart, and the random starting numbers
-            slowly settle into a meaningful shape. The live run does this with 36
-            numbers per word, but each step is exactly the arithmetic above.
-          </p>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
         <section class="trainer chapter2-trainer" aria-label="Train word vectors">
@@ -442,46 +598,40 @@ small rabbit</textarea>
         </section>
 
         <div class="training-grid">
-          <div class="panel">
-            <div class="section-title-row">
-              <h3>Training trace</h3>
-              <span id="lossLabel" class="pill">not trained</span>
-            </div>
-            <p class="microcopy">
-              Loss is the model's training error. Lower is better here, but do not
-              over-read a handful of browser-sized passes. The main point is that
-              the word numbers are being adjusted by evidence from the corpus.
-            </p>
-            <div id="lossPanel" class="loss-panel" aria-live="polite"></div>
-          </div>
-          <div class="panel">
-            <h3>What the button trained</h3>
-            <p class="microcopy">
-              These labels describe the actual browser run. They are not new
-              concepts to memorize; they are knobs and counts that explain what
-              just happened.
-            </p>
-            <div id="trainingDetails" class="detail-list" aria-live="polite"></div>
-          </div>
           <div class="panel watch-panel">
             <div class="section-title-row">
-              <h3>Watch a few word pairs</h3>
+              <h3>Did the vectors get closer? Watch these pairs</h3>
               <span id="watchLabel" class="pill">not trained</span>
             </div>
             <p class="microcopy">
-              Cosine similarity starts near random. As training runs, useful pairs
-              should move closer when they appear in similar neighborhoods.
+              Each bar is the cosine similarity of a pair of words used in similar
+              ways. The bars below show where each pair sits <em>before</em> training -
+              near random. Press <strong>Train word vectors</strong> and watch them
+              climb; the green <code>+</code> on each bar is the gain since this
+              starting point. This is the payoff - similar-usage words sliding together.
             </p>
             <div id="trainingWatch" class="watch-list" aria-live="polite"></div>
+          </div>
+          <div class="panel span-full">
+            <div class="section-title-row">
+              <h3>Training loss</h3>
+              <span id="lossLabel" class="pill">not trained</span>
+            </div>
+            <p class="microcopy">
+              Loss is the model's training error. The line should drift downward as the
+              repeated nudges make the training pairs easier to predict. Do not
+              over-read a handful of browser-sized passes.
+            </p>
+            <div id="lossPanel" class="loss-panel" aria-live="polite"></div>
           </div>
         </div>
 
         <article class="code-cell chapter-code-cell" data-chapter-output="training">
           <div class="cell-head">
-            <h3>Inspect what was trained</h3>
+            <h3>See which words ended up nearby</h3>
             <button class="run-button" type="button">Run</button>
           </div>
-          <div class="code-quiz" data-quiz-type="predict" data-explain="Training nudges each word's vector based on its neighbors, so words that appear in similar contexts (like two character names) drift closer together.">
+          <div class="code-quiz" data-quiz-type="predict" data-explain="After training, a word's nearest neighbors by cosine similarity are the words it was used like - so two words from similar contexts come out close together in the list.">
             <p class="quiz-prompt">Predict first: training nudges a word's vector using the words around it. Two words that keep showing up in <em>similar</em> contexts should end up with vectors that are&hellip;</p>
             <div class="quiz-options" role="group" aria-label="Predict what training does to similar words">
               <button class="quiz-option" type="button" data-correct="true">Closer together (more similar)</button>
@@ -491,7 +641,33 @@ small rabbit</textarea>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
             <button class="quiz-skip" type="button">Just show me the code</button>
           </div>
-          <textarea class="code-input" spellcheck="false">return embeddingTrainingSummary();</textarea>
+          <textarea class="code-input" spellcheck="false">// "Nearest neighbors" is no magic - it is cosine similarity run against every
+// other trained word. Cosine compares the DIRECTION of two rows of numbers:
+// 1.0 means they point the same way (used alike), 0 means unrelated.
+function cosineSim(a, b) {
+  let dot = 0, lenA = 0, lenB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot  += a[i] * b[i];   // how much the two rows agree, position by position
+    lenA += a[i] * a[i];   // length of vector a
+    lenB += b[i] * b[i];   // length of vector b
+  }
+  return dot / (Math.sqrt(lenA) * Math.sqrt(lenB));
+}
+
+// focusWord is whatever word is selected in the explorer just below.
+if (!vocabulary.length) return { focus: focusWord, neighbors: [], note: "Press Train word vectors above first." };
+
+const me = wordVector(focusWord);          // { word, count, vector: [...36 numbers] }
+const neighbors = vocabulary               // every trained word
+  .filter((word) => word !== focusWord)    // skip the word itself
+  .map((word) => {
+    const other = wordVector(word);
+    return { word, count: other.count, similarity: cosineSim(me.vector, other.vector) };
+  })
+  .sort((a, b) => b.similarity - a.similarity)   // most similar first
+  .slice(0, 8);                                  // keep the top 8
+
+return { focus: focusWord, neighbors };</textarea>
           <div class="code-output" aria-live="polite"></div>
         </article>
       </div>

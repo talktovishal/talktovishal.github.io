@@ -163,11 +163,11 @@ const dom = {
   chapterStats: document.getElementById("chapterStats"),
   trainingStatus: document.getElementById("trainingStatus"),
   contextCompareInput: document.getElementById("contextCompareInput"),
+  sparsityRunButton: document.getElementById("sparsityRunButton"),
   sparsitySummary: document.getElementById("sparsitySummary"),
   sparsityPanel: document.getElementById("sparsityPanel"),
   lossLabel: document.getElementById("lossLabel"),
   lossPanel: document.getElementById("lossPanel"),
-  trainingDetails: document.getElementById("trainingDetails"),
   watchLabel: document.getElementById("watchLabel"),
   trainingWatch: document.getElementById("trainingWatch"),
   embeddingMap: document.getElementById("embeddingMap"),
@@ -366,7 +366,7 @@ function renderSparsity() {
   const lines = dom.contextCompareInput.value.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   dom.sparsitySummary.textContent = `${lines.length} phrase${lines.length === 1 ? "" : "s"}`;
   if (!state.hasCheckedSparsity) {
-    dom.sparsityPanel.replaceChildren(notice("Click into the phrases above (or edit them) to check which contexts the model has actually seen."));
+    dom.sparsityPanel.replaceChildren(notice("Press Run to check which of these phrases the model has actually seen in the corpus."));
     return;
   }
   dom.sparsityPanel.replaceChildren();
@@ -387,11 +387,11 @@ function renderSparsity() {
     fallback.textContent = `fallback word: ${bigramContext || "(none)"} -> ${formatNumber(bigram?.total || 0)} hit${bigram?.total === 1 ? "" : "s"}`;
     const next = document.createElement("em");
     if (trigram) {
-      next.textContent = `uses exact phrase, next: ${topContinuation(trigram)}`;
+      next.textContent = `The model has seen this exact two-word phrase before, so it can use it directly. Based on that phrase, its most likely next word here is "${topContinuation(trigram)}".`;
     } else if (bigram) {
-      next.textContent = `exact missing, so fallback next: ${topContinuation(bigram)}`;
+      next.textContent = `The exact phrase was never seen, so the model throws away the first word and leans on the fallback word "${bigramContext}" by itself. Judging from that one word alone, its most likely next word is "${topContinuation(bigram)}".`;
     } else {
-      next.textContent = "exact missing, fallback missing too";
+      next.textContent = `The model never saw this exact phrase, and it has no counts for the fallback word either, so it has nothing to predict the next word from here.`;
     }
     row.append(label, exact, fallback, next);
     dom.sparsityPanel.append(row);
@@ -476,32 +476,17 @@ function notice(text) {
 }
 
 function renderTrainingPlaceholder(message) {
-  const depth = trainingDepth();
   dom.lossLabel.textContent = "not trained";
   dom.trainingStatus.textContent = message;
   dom.lossPanel.replaceChildren(notice("Press Train word vectors to see the loss after each pass through the data."));
-  dom.trainingDetails.replaceChildren();
-  [
-    ["next step", "press Train word vectors"],
-    ["words it trains", "up to 260 focus words"],
-    ["numbers in each vector", "36, chosen for this browser demo"],
-    ["training depth", `${depth.epochs} epochs when you press the button`],
-    ["context evidence", "common words still help train the focus words"],
-    ["what changes", "the map and neighbor list below"],
-    ["not automatic", "changing the corpus marks vectors as untrained"]
-  ].forEach(([labelText, valueText]) => {
-    const row = document.createElement("div");
-    row.className = "detail-row";
-    const label = document.createElement("span");
-    label.textContent = labelText;
-    const value = document.createElement("strong");
-    value.textContent = valueText;
-    row.append(label, value);
-    dom.trainingDetails.append(row);
-  });
   if (dom.watchLabel && dom.trainingWatch) {
-    dom.watchLabel.textContent = "not trained";
-    dom.trainingWatch.replaceChildren(notice("During training, this will show a few word pairs moving from random similarity toward learned similarity."));
+    const initialRows = computeInitialWatchRows();
+    if (initialRows.length) {
+      renderWatchRows(initialRows, "before training", null);
+    } else {
+      dom.watchLabel.textContent = "not trained";
+      dom.trainingWatch.replaceChildren(notice("During training, this will show a few word pairs moving from random similarity toward learned similarity."));
+    }
   }
   dom.trainButton.disabled = false;
   dom.trainButton.textContent = "Train word vectors";
@@ -559,13 +544,15 @@ async function trainEmbeddings(job) {
   const output = training.contextVocab.map(() => Array.from({ length: dimensions }, () => (rng() - 0.5) * 0.08));
   const cumulative = buildNegativeDistribution(training.contextVocab);
   const losses = [];
-  const learningRate = 0.035;
+  const initialLoss = Math.LN2;
+  const learningRate = 0.05;
   const negativeSamples = 5;
   const depth = trainingDepth();
   const epochs = depth.epochs;
   const watchPairs = makeWatchPairs(training.idByWord);
   let watchRows = buildWatchRows(input, training.idByWord, watchPairs);
-  renderTrainingProgress({ ...training, dimensions, epochs, trainingDepthLabel: depth.label, negativeSamples, losses, epoch: 0, watchRows });
+  const watchBaseline = watchRows.map((row) => row.similarity);
+  renderTrainingProgress({ ...training, dimensions, epochs, trainingDepthLabel: depth.label, negativeSamples, losses, initialLoss, epoch: 0, watchRows, watchBaseline });
   await yieldToBrowser();
 
   // Visiting the pairs in a fresh random order each epoch stops the updates from
@@ -575,7 +562,7 @@ async function trainEmbeddings(job) {
   for (let epoch = 0; epoch < epochs; epoch += 1) {
     if (job !== state.embeddingJob) return;
     let loss = 0;
-    const epochLearningRate = learningRate * (1 - epoch / (epochs + 2));
+    const epochLearningRate = learningRate * (1 - 0.5 * epoch / epochs);
     for (let i = order.length - 1; i > 0; i -= 1) {
       const j = Math.floor(rng() * (i + 1));
       const swap = order[i];
@@ -593,7 +580,7 @@ async function trainEmbeddings(job) {
     }
     losses.push(loss / Math.max(1, training.pairs.length * (negativeSamples + 1)));
     watchRows = buildWatchRows(input, training.idByWord, watchPairs);
-    renderTrainingProgress({ ...training, dimensions, epochs, trainingDepthLabel: depth.label, negativeSamples, losses, epoch: epoch + 1, watchRows });
+    renderTrainingProgress({ ...training, dimensions, epochs, trainingDepthLabel: depth.label, negativeSamples, losses, initialLoss, epoch: epoch + 1, watchRows, watchBaseline });
     await yieldToBrowser();
   }
 
@@ -614,7 +601,9 @@ async function trainEmbeddings(job) {
     durationMs: ended - started,
     run: state.embeddingRun,
     watchPairs,
-    watchRows
+    watchRows,
+    watchBaseline,
+    initialLoss
   };
   setTrainingControlsDisabled(false);
   populateFocusWords();
@@ -637,6 +626,38 @@ function markEmbeddingSettingsChanged() {
   state.embeddingModel = null;
   renderTrainingPlaceholder("Ready. Press Train word vectors to learn with the current corpus, text amount, and training depth.");
   renderEmbeddingPlaceholder("No word vectors yet for these settings. Press Train word vectors above, then inspect them here.");
+}
+
+function buildFocusVocab() {
+  if (!state.wordTokens || !state.wordTokens.length) return { vocab: [], idByWord: new Map() };
+  const counts = new Map();
+  state.wordTokens.forEach((token) => counts.set(token, (counts.get(token) || 0) + 1));
+  const vocab = Array.from(counts.entries())
+    .filter(([word, count]) => isEmbeddingFocusWord(word, count))
+    .map(([word, count]) => ({ word, count, score: embeddingFocusScore(word, count) }))
+    .sort((a, b) => b.score - a.score || b.count - a.count || a.word.localeCompare(b.word))
+    .slice(0, 260)
+    .map((item, id) => ({ ...item, id }));
+  const idByWord = new Map(vocab.map((item) => [item.word, item.id]));
+  return { vocab, idByWord };
+}
+
+// The untrained, random-init similarity of each watch pair. Shown statically
+// before the learner trains so they can see the "before" and judge the jump.
+// Uses the same seed/vocab as training, so these values equal the baseline the
+// trained deltas are measured against.
+function computeInitialWatchRows() {
+  const key = `${state.activeCorpusId}|${state.wordTokens ? state.wordTokens.length : 0}`;
+  if (state.initialWatch && state.initialWatch.key === key) return state.initialWatch.rows;
+  const { vocab, idByWord } = buildFocusVocab();
+  let rows = [];
+  if (vocab.length) {
+    const rng = makeRng(42);
+    const input = vocab.map(() => Array.from({ length: 36 }, () => (rng() - 0.5) * 0.08));
+    rows = buildWatchRows(input, idByWord, makeWatchPairs(idByWord));
+  }
+  state.initialWatch = { key, rows };
+  return rows;
 }
 
 function makeWatchPairs(idByWord) {
@@ -770,9 +791,8 @@ function renderTrainingProgress(model) {
   dom.trainingStatus.textContent = model.epoch
     ? `Training epoch ${model.epoch} of ${model.epochs}. The loss and watched word pairs update after each pass.`
     : `Prepared ${formatNumber(model.pairs.length)} word-neighborhood pairs for ${model.vocab.length} focus words. Starting ${model.trainingDepthLabel}.`;
-  renderLossRows(model.losses, model.epochs);
-  renderTrainingDetails(model, "training");
-  renderWatchRows(model.watchRows, model.epoch ? `epoch ${model.epoch}` : "initial");
+  renderLossChart(model.losses, model.epochs, model.initialLoss);
+  renderWatchRows(model.watchRows, model.epoch ? `epoch ${model.epoch}` : "initial", model.watchBaseline);
 }
 
 function renderTraining() {
@@ -782,65 +802,78 @@ function renderTraining() {
   dom.trainingStatus.textContent = `Done. Run ${model.run}: trained ${formatNumber(model.pairs.length)} word-neighborhood pairs for ${model.vocab.length} focus words in ${seconds}s. The map and neighbor list now use these vectors.`;
   dom.trainButton.disabled = false;
   dom.trainButton.textContent = "Retrain word vectors";
-  renderLossRows(model.losses, model.epochs);
-  renderTrainingDetails(model, "trained");
-  renderWatchRows(model.watchRows, "trained");
+  renderLossChart(model.losses, model.epochs, model.initialLoss);
+  renderWatchRows(model.watchRows, "trained", model.watchBaseline);
 }
 
-function renderLossRows(losses, epochs) {
+function renderLossChart(losses, epochs, initialLoss) {
   dom.lossPanel.replaceChildren();
-  if (!losses.length) {
+  const hasStart = typeof initialLoss === "number";
+  if (!losses.length && !hasStart) {
     dom.lossPanel.append(notice(`Waiting for epoch 1 of ${epochs}.`));
     return;
   }
-  const maxLoss = Math.max(...losses, 1);
-  losses.forEach((loss, index) => {
-    const row = document.createElement("div");
-    row.className = "loss-row";
-    const label = document.createElement("span");
-    label.textContent = `epoch ${index + 1}`;
-    const track = document.createElement("span");
-    track.className = "loss-track";
-    const fill = document.createElement("span");
-    fill.style.width = `${clamp((loss / maxLoss) * 100, 4, 100)}%`;
-    track.append(fill);
-    const value = document.createElement("strong");
-    value.textContent = loss.toFixed(3);
-    row.append(label, track, value);
-    dom.lossPanel.append(row);
+  const NS = "http://www.w3.org/2000/svg";
+  const W = 640, H = 170, padL = 44, padR = 16, padT = 14, padB = 26;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  // series[0] is the untrained "start" point; series[k] is the loss after epoch k.
+  const series = hasStart ? [initialLoss].concat(losses) : losses.slice();
+  const maxLoss = Math.max(...series) || 1;
+  const span = Math.max(epochs, 1);
+  const xForIdx = (i) => padL + (hasStart ? (i / span) * plotW : (losses.length <= 1 ? plotW / 2 : (i / (losses.length - 1)) * plotW));
+  const yFor = (loss) => padT + (1 - loss / maxLoss) * plotH;
+  const make = (name, attrs) => {
+    const node = document.createElementNS(NS, name);
+    Object.entries(attrs).forEach(([key, val]) => node.setAttribute(key, String(val)));
+    return node;
+  };
+  const svg = make("svg", {
+    viewBox: `0 0 ${W} ${H}`,
+    preserveAspectRatio: "xMidYMid meet",
+    role: "img",
+    "aria-label": `Training loss starting from about ${initialLoss ? initialLoss.toFixed(2) : ""} at random and falling across ${epochs} epochs.`
   });
+  svg.style.cssText = "display:block;width:100%;height:auto;max-height:240px";
+  svg.append(make("path", { d: `M${padL} ${padT} V${padT + plotH} H${padL + plotW}`, fill: "none", stroke: "#ded9d0", "stroke-width": "1" }));
+  const points = series.map((loss, i) => [xForIdx(i), yFor(loss)]);
+  const areaD = `M${points[0][0]} ${padT + plotH} ` + points.map(([x, y]) => `L${x} ${y}`).join(" ") + ` L${points[points.length - 1][0]} ${padT + plotH} Z`;
+  svg.append(make("path", { d: areaD, fill: "#fff0e4" }));
+  if (points.length > 1) {
+    svg.append(make("polyline", {
+      points: points.map(([x, y]) => `${x},${y}`).join(" "),
+      fill: "none",
+      stroke: "#c65f1e",
+      "stroke-width": "2.5",
+      "stroke-linejoin": "round",
+      "stroke-linecap": "round"
+    }));
+  }
+  const last = points[points.length - 1];
+  svg.append(make("circle", { cx: last[0], cy: last[1], r: "3.6", fill: "#c65f1e" }));
+  const yTop = make("text", { x: padL - 8, y: padT + 4, "text-anchor": "end", class: "svg-caption" });
+  yTop.textContent = maxLoss.toFixed(2);
+  svg.append(yTop);
+  const yZero = make("text", { x: padL - 8, y: padT + plotH + 4, "text-anchor": "end", class: "svg-caption" });
+  yZero.textContent = "0";
+  svg.append(yZero);
+  const xStart = make("text", { x: padL, y: H - 8, "text-anchor": "start", class: "svg-caption" });
+  xStart.textContent = hasStart ? "start (random)" : "epoch 1";
+  svg.append(xStart);
+  const xEnd = make("text", { x: padL + plotW, y: H - 8, "text-anchor": "end", class: "svg-caption" });
+  xEnd.textContent = `epoch ${epochs}`;
+  svg.append(xEnd);
+  dom.lossPanel.append(svg);
+  const cap = document.createElement("p");
+  cap.className = "microcopy";
+  cap.style.margin = "4px 0 0";
+  cap.textContent = losses.length
+    ? `Started near ${initialLoss.toFixed(2)} (random vectors guess 50/50) and fell to ${losses.at(-1).toFixed(3)} after ${losses.length} of ${epochs} epochs. The big early drop is the model quickly learning the obvious pairs; it then flattens as only the hard cases remain.`
+    : `Starting loss is about ${initialLoss.toFixed(2)} - random vectors are right half the time. Watch it fall as the epochs run.`;
+  dom.lossPanel.append(cap);
 }
 
-function renderTrainingDetails(model, stateLabel) {
-  dom.trainingDetails.replaceChildren();
-  [
-    ["method", "skip-gram with negative sampling"],
-    ["trained vocabulary", `${model.vocab.length} focus words`],
-    ["context vocabulary", `${model.contextVocab.length} common context words`],
-    ["numbers in each vector", `${model.dimensions}, chosen before training`],
-    ["nearby window", `${model.windowSize} words left and right`],
-    ["frequent-word thinning", model.keptTokens && model.streamTokens
-      ? `kept ${formatNumber(model.keptTokens)} of ${formatNumber(model.streamTokens)} tokens`
-      : "on, so common glue words crowd the windows less"],
-    ["pair order", "reshuffled every epoch"],
-    ["training passes", `${model.epochs} epochs (${model.trainingDepthLabel})`],
-    ["negative examples", `${model.negativeSamples} made-up pairs per real pair`],
-    ["training pairs", formatNumber(model.pairs.length)],
-    ["state", stateLabel],
-    ["map note", "PCA only draws the map; neighbors use full vectors"]
-  ].forEach(([labelText, valueText]) => {
-    const row = document.createElement("div");
-    row.className = "detail-row";
-    const label = document.createElement("span");
-    label.textContent = labelText;
-    const value = document.createElement("strong");
-    value.textContent = valueText;
-    row.append(label, value);
-    dom.trainingDetails.append(row);
-  });
-}
-
-function renderWatchRows(rows, label) {
+function renderWatchRows(rows, label, baseline) {
   if (!dom.watchLabel || !dom.trainingWatch) return;
   dom.watchLabel.textContent = label;
   dom.trainingWatch.replaceChildren();
@@ -848,7 +881,7 @@ function renderWatchRows(rows, label) {
     dom.trainingWatch.append(notice("No watch pairs were available in this corpus and text amount."));
     return;
   }
-  rows.forEach((item) => {
+  rows.forEach((item, index) => {
     const row = document.createElement("div");
     row.className = "watch-row";
     const labelText = document.createElement("span");
@@ -859,7 +892,14 @@ function renderWatchRows(rows, label) {
     fill.style.width = `${clamp((item.similarity + 1) * 50, 3, 100)}%`;
     track.append(fill);
     const value = document.createElement("strong");
-    value.textContent = item.similarity.toFixed(3);
+    value.textContent = item.similarity.toFixed(2);
+    if (baseline && typeof baseline[index] === "number") {
+      const delta = item.similarity - baseline[index];
+      const chip = document.createElement("span");
+      chip.className = delta < -0.005 ? "watch-delta is-down" : "watch-delta";
+      chip.textContent = `${delta >= 0 ? "+" : "\u2212"}${Math.abs(delta).toFixed(2)}`;
+      value.append(chip);
+    }
     row.append(labelText, track, value);
     dom.trainingWatch.append(row);
   });
@@ -1656,6 +1696,7 @@ function embeddingTrainingSummary() {
 function makeApi() {
   return {
     focusWord: dom.focusWordSelect.value,
+    vocabulary: state.embeddingModel ? state.embeddingModel.vocab.map((item) => item.word) : [],
     nearestWords,
     wordVector,
     embeddingTrainingSummary
@@ -1669,7 +1710,7 @@ async function runCodeCell(cell) {
   output.textContent = "Running...";
   try {
     const api = makeApi();
-    const runner = new Function("api", `"use strict"; const { focusWord, nearestWords, wordVector, embeddingTrainingSummary } = api; return (async () => { ${input.value} })();`);
+    const runner = new Function("api", `"use strict"; const { focusWord, vocabulary, nearestWords, wordVector, embeddingTrainingSummary } = api; return (async () => { ${input.value} })();`);
     const result = await runner(api);
     output.className = "code-output is-success";
     renderCodeResult(output, result);
@@ -1774,6 +1815,7 @@ function wireEvents() {
   dom.trainButton.addEventListener("click", () => startEmbeddingTraining());
   dom.contextCompareInput.addEventListener("input", () => { state.hasCheckedSparsity = true; renderSparsity(); });
   dom.contextCompareInput.addEventListener("focus", () => { state.hasCheckedSparsity = true; renderSparsity(); });
+  if (dom.sparsityRunButton) dom.sparsityRunButton.addEventListener("click", () => { state.hasCheckedSparsity = true; renderSparsity(); });
   dom.focusWordSelect.addEventListener("change", () => renderEmbeddingExplorer());
   dom.analogyInput.addEventListener("input", () => renderAnalogy());
   if (dom.compareWordSelect) dom.compareWordSelect.addEventListener("change", () => { state.hasComparedVectors = true; renderComparison(); });
