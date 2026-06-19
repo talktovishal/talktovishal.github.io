@@ -516,11 +516,11 @@
   background: var(--green);
 }
 
-.chapter3-code-cell {
+.chapter4-code-cell {
   margin-top: 14px;
 }
 
-.chapter3-code-cell .output-visual {
+.chapter4-code-cell .output-visual {
   overflow-x: auto;
 }
 

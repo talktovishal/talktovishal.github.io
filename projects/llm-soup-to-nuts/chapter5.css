@@ -1,7 +1,7 @@
 /* Chapter 5: Transformers and attention. Component styles layered on styles.css. */
 
 /* Overview: all-pairs attention graph. */
-.attn-overview-svg {
+.diagram-figure .attn-overview-svg {
   max-width: 460px;
 }
 
@@ -174,7 +174,7 @@
   margin: 0;
 }
 
-.block-svg {
+.diagram-figure .block-svg {
   max-width: 320px;
 }
 
@@ -242,5 +242,384 @@
   }
   .attn-score {
     display: none;
+  }
+}
+
+/* ---- New diagram helpers (Chapter 5 rewrite) ---- */
+.diagram-figure .loop-svg { max-width: 460px; }
+.diagram-figure .forward-svg { max-width: 300px; }
+.diagram-figure .streams-svg { max-width: 460px; }
+.diagram-figure .gqa-svg { max-width: 460px; }
+
+.svg-box-accent2 {
+  fill: var(--coral);
+  stroke: var(--coral);
+  stroke-width: 1;
+}
+
+.svg-stack-box {
+  fill: #fbf6ee;
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.svg-caption-light {
+  fill: rgba(255, 254, 250, 0.88);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.svg-arrow-loop {
+  stroke: var(--teal);
+  stroke-width: 1.6;
+  stroke-dasharray: 4 3;
+  fill: none;
+}
+
+.svg-word.is-last { fill: var(--teal); }
+
+.stream-line {
+  stroke: #e4d8c6;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.stream-line.is-last { stroke: var(--teal); }
+
+.attn-reach {
+  stroke: var(--teal);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 3;
+  fill: none;
+  opacity: 0.55;
+}
+
+.stream-dot { fill: var(--teal); }
+
+.gqa-q { fill: var(--teal); stroke: var(--teal); }
+.gqa-kv { fill: var(--gold); stroke: var(--gold); }
+
+.source-note {
+  border-left: 4px solid var(--teal);
+}
+
+.exercise-card {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffefa;
+}
+
+.exercise-card summary {
+  cursor: pointer;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.exercise-card p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.exercise-card code {
+  color: var(--ink);
+}
+
+.model-anatomy {
+  margin-top: 18px;
+}
+
+.diagram-figure .qkv-flow-svg,
+.diagram-figure .position-svg {
+  max-width: 760px;
+}
+
+.qkv-mini-key {
+  fill: var(--gold-soft);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.qkv-mini-key.is-strong,
+.qkv-mini-value.is-strong {
+  fill: var(--teal);
+  stroke: var(--teal);
+}
+
+.qkv-mini-value {
+  fill: var(--teal-soft);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.position-divider {
+  stroke: var(--line);
+  stroke-width: 1.3;
+  stroke-dasharray: 4 4;
+}
+
+/* ---- Generation loop ---- */
+.genloop-output {
+  display: grid;
+  gap: 8px;
+  min-height: 96px;
+  margin-bottom: 12px;
+}
+
+.genloop-prefix {
+  margin: 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.genloop-stream {
+  margin: 0;
+  line-height: 1.9;
+}
+
+.genloop-token {
+  display: inline;
+  padding: 2px 4px;
+  border-radius: 5px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: var(--teal-soft);
+  color: var(--ink);
+}
+
+.genloop-token.is-new {
+  background: var(--teal);
+  color: #fffefa;
+}
+
+.genloop-meta { margin: 0; }
+
+/* ---- Decoding tally ---- */
+.decode-tally {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  min-height: 60px;
+}
+
+.tally-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.tally-token {
+  font-weight: 800;
+}
+
+.tally-count {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+/* ---- KV cache compare ---- */
+.kv-compare {
+  display: grid;
+  gap: 10px;
+  min-height: 80px;
+}
+
+.kv-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 130px) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.kv-row.is-active {
+  opacity: 1;
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.kv-label { font-weight: 800; }
+
+.kv-track {
+  height: 14px;
+  border-radius: 999px;
+  background: #e8e1d7;
+  overflow: hidden;
+}
+
+.kv-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.kv-fill.is-nocache { background: var(--coral); }
+.kv-fill.is-cache { background: var(--teal); }
+
+.kv-units {
+  font-weight: 900;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.kv-summary { margin: 4px 0 0; }
+
+.kv-trace {
+  overflow-x: auto;
+}
+
+.kv-trace-grid {
+  display: grid;
+  grid-template-columns: 74px minmax(130px, 1fr) minmax(150px, 1fr) minmax(140px, 1fr);
+  min-width: 560px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fffefa;
+}
+
+.kv-trace-cell {
+  padding: 8px 10px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.kv-trace-cell:nth-child(4n) {
+  border-right: 0;
+}
+
+.kv-trace-cell.is-head {
+  background: var(--gold-soft);
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.kv-trace-cell.is-cache {
+  color: var(--teal);
+  font-weight: 800;
+}
+
+.kv-trace-note {
+  margin-top: 8px;
+}
+
+/* ---- Query/key/value role list ---- */
+.qkv-roles {
+  margin: 0 0 4px;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+
+.qkv-roles li { line-height: 1.5; }
+
+.qkv-math-panel {
+  margin-top: 16px;
+}
+
+.qkv-math-table {
+  overflow-x: auto;
+}
+
+.qkv-math-grid {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.8fr) minmax(170px, 1.4fr) minmax(92px, 0.8fr) minmax(92px, 0.8fr) minmax(92px, 0.8fr);
+  min-width: 720px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fffefa;
+}
+
+.qkv-math-cell {
+  padding: 8px 10px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.qkv-math-cell:nth-child(5n) {
+  border-right: 0;
+}
+
+.qkv-math-cell.is-head {
+  background: var(--gold-soft);
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.qkv-math-cell.is-query {
+  background: var(--teal-soft);
+}
+
+.qkv-math-cell.is-strong {
+  color: var(--teal);
+  font-weight: 900;
+}
+
+.qkv-math-cell code {
+  white-space: nowrap;
+}
+
+/* ---- Multi-head grid ---- */
+.mh-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.mh-head {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffefa;
+  padding: 12px 14px;
+}
+
+.mh-head-title {
+  font-weight: 850;
+  margin-bottom: 2px;
+}
+
+.mh-head-note {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.mh-bars { gap: 5px; }
+
+.mh-bars .attn-bar-row {
+  grid-template-columns: minmax(56px, 84px) 1fr 40px;
+  padding: 4px 8px;
+}
+
+.mh-bars .attn-token { font-size: 0.84rem; }
+
+/* ---- Improvements grid ---- */
+@media (min-width: 720px) {
+  .improve-flow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mh-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

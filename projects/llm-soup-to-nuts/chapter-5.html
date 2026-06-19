@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Transformers and Attention - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260617">
-  <link rel="stylesheet" href="chapter5.css">
+  <link rel="stylesheet" href="chapter5.css?v=20260619">
 </head>
 <body>
   <header class="topbar">
@@ -28,12 +28,19 @@
     <p>Chapter 5</p>
     <nav>
       <a href="#overview"><span>00</span>Overview</a>
-      <a href="#attention"><span>01</span>Attention as weighted lookup</a>
-      <a href="#heatmap"><span>02</span>The attention map</a>
-      <a href="#internals"><span>03</span>Inside a Transformer block</a>
-      <a href="#realmodel"><span>04</span>A real Transformer</a>
-      <a href="#variants"><span>05</span>Families and variants</a>
-      <a href="#references"><span>06</span>References</a>
+      <a href="#onetoken"><span>01</span>One token at a time</a>
+      <a href="#forward"><span>02</span>The forward pass</a>
+      <a href="#decoding"><span>03</span>Choosing the next token</a>
+      <a href="#streams"><span>04</span>Parallel streams</a>
+      <a href="#kvcache"><span>05</span>The KV cache</a>
+      <a href="#block"><span>06</span>Inside the block</a>
+      <a href="#qkv"><span>07</span>Query, key, value</a>
+      <a href="#heatmap"><span>08</span>The attention map</a>
+      <a href="#position"><span>09</span>Position information</a>
+      <a href="#multihead"><span>10</span>Multi-head attention</a>
+      <a href="#realmodel"><span>11</span>A real Transformer</a>
+      <a href="#improvements"><span>12</span>Recent improvements</a>
+      <a href="#references"><span>13</span>Going deeper</a>
     </nav>
   </aside>
 
@@ -46,20 +53,32 @@
             <p class="progress-banner-text">This chapter is still being written and reviewed &mdash; it is not finished yet, so parts may be rough or change. <a href="index.html#stay-notified">Get notified</a> when it is officially published.</p>
           </div>
           <p class="eyebrow">Learning by doing</p>
-          <h1 id="page-title">Transformers: let every token look at every other token.</h1>
+          <h1 id="page-title">Transformers: how ChatGPT looks back at words :-).</h1>
           <p class="lead">
-            Chapter 2 ended with a problem. Recurrent models read one token at a time
-            and carry a single note forward, so a clue from far back has to survive a
-            long, lossy journey. The Transformer threw out that journey. Instead of
-            passing a note down a chain, it lets each token reach out and look directly
-            at every other token, all at once.
+            The Transformer from first principles: let's build the attention machinery
+            that lets an LLM use context.
           </p>
           <p>
-            That single idea, called <strong>attention</strong>, is the engine inside
-            every modern LLM. The good news: you already have the math. Attention is
-            built from the dot products and softmax you met in Chapter 3. This chapter
-            assembles those pieces into the mechanism, then lets you run a real
-            Transformer in your own browser.
+            I type a question into ChatGPT, and a few seconds later it writes back like
+            it has kept track of the whole conversation. How does that happen? How does
+            the word <code>it</code> know what it refers to? How does the model remember
+            something I wrote many words ago? Let's build the core idea ourselves.
+          </p>
+          <p>
+            Here is the picture I want you to keep in your head. Older models often felt
+            like a line of people whispering a message forward: each word passes a small
+            note to the next word, and we hope the important clue survives until the end.
+            The Transformer changes the game. It lets each token look back directly at
+            the other tokens and ask, "which of you matters for me right now?" That move
+            is called <strong>attention</strong>. It sounds fancy, but by the end of this
+            chapter it will feel like a very careful weighted lookup.
+          </p>
+          <p class="example-note source-note">
+            This chapter is built around the "Looking Inside Large Language Models"
+            chapter of <em>Hands-On Large Language Models</em>. I am using it as the route
+            map, but not copying it. The goal here is the same style as Chapter 1: rebuild
+            the idea slowly, with our own little examples, until the words <em>query</em>,
+            <em>key</em>, <em>value</em>, and <em>KV cache</em> actually mean something.
           </p>
           <figure class="diagram-figure">
             <svg class="pipeline-svg attn-overview-svg" viewBox="0 0 460 210" role="img" aria-labelledby="attn-ov-title attn-ov-desc">
@@ -84,84 +103,715 @@
             <figcaption>Self-attention connects every token to every other token in one step, so distance no longer fades the signal.</figcaption>
           </figure>
           <p class="example-note">
-            <em>Guiding question:</em> when the model is about to predict the word
-            after <code>the cat sat on the</code>, how does it decide that
-            <code>cat</code> matters more than <code>the</code>? Attention is the
-            answer, and it is just weighted lookup.
+            <em>Guiding question to keep in your pocket:</em> when the model reads
+            <code>Sarah fed the cat because it</code> and has to figure out what
+            <code>it</code> means, how does it decide that <code>it</code> points at the
+            <code>cat</code> and not at <code>Sarah</code>? Attention is the answer.
+            Woohoo, this is the mechanism we are going to take apart :-)
           </p>
           <div class="idea-flow" aria-label="Chapter flow">
             <div>
-              <strong>Weighted lookup</strong>
-              <span>Score every token with a query and key, then blend their values.</span>
+              <strong>One token at a time</strong>
+              <span>Watch the model write one token, attach it, and ask again.</span>
             </div>
             <div>
-              <strong>Read the map</strong>
-              <span>See the full attention matrix and what causal masking changes.</span>
+              <strong>The forward pass</strong>
+              <span>Text becomes token IDs, then vectors, then next-token scores.</span>
             </div>
             <div>
-              <strong>Stack the block</strong>
-              <span>Add positions, residuals, normalization, and a feed-forward layer.</span>
+              <strong>Attention, by hand</strong>
+              <span>Turn "which word matters?" into dot products and weights.</span>
+            </div>
+            <div>
+              <strong>Masks, cache, positions</strong>
+              <span>See why the model cannot peek ahead, and why caching matters.</span>
             </div>
             <div>
               <strong>Run the real thing</strong>
-              <span>Load a real GPT model and read its next-token probabilities.</span>
+              <span>Load a genuine GPT model and read the same kind of bars live.</span>
             </div>
+          </div>
+          <div class="example-note prereq-note">
+            <p><em>Before we dive in, a few needed prerequisites are in order.</em> This is the chapter where the earlier ideas start shaking hands with each other, so a little comfort with the following will make the ride much smoother. Use the links as quick refreshers if anything feels rusty.</p>
+            <ul>
+              <li>
+                <strong><a href="chapter-1.html">Chapter 1</a>.</strong> A language model predicts
+                the <em>next token</em> and gives every candidate a probability. Those
+                prediction bars are exactly what a Transformer produces at the end.
+              </li>
+              <li>
+                <strong><a href="chapter-3.html">Chapter 3</a>.</strong> A <a href="chapter-3.html#why">tokenizer</a>
+                chops text into tokens and turns each into a <strong>token ID</strong>, and
+                every ID looks up a row of numbers in an <em>embedding table</em>.
+              </li>
+              <li>
+                <strong><a href="chapter-4.html">Chapter 4</a>.</strong> The two bits of math
+                attention runs on: the <a href="chapter-4.html#vectors">dot product</a> (how
+                much two vectors agree) and <a href="chapter-4.html#softmax">softmax</a> (turning
+                scores into weights that add to 1).
+              </li>
+            </ul>
+            <p>What you do <strong>not</strong> need yet: how the model <em>got</em> its weights. We treat the model as already trained here, and save the story of pretraining for <strong>Chapter 6</strong>.</p>
           </div>
         </article>
       </div>
     </section>
 
-    <section id="attention" class="band" aria-labelledby="attention-title">
+    <section id="onetoken" class="band" aria-labelledby="onetoken-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">1. Attention as weighted lookup</p>
-          <h2 id="attention-title">Query, key, value: score the tokens, then blend them.</h2>
+          <p class="eyebrow">1. One token at a time</p>
+          <h2 id="onetoken-title">Print one token, attach it, and ask again.</h2>
           <p>
-            <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">Attention</a> gives every token three roles, each a short vector. The
-            <strong>query</strong> is what this token is looking for. The
-            <strong>key</strong> is what each token offers. The
-            <strong>value</strong> is the information each token passes along. To
-            update one token, we compare its query against every key with a
-            <strong>dot product</strong> (the same similarity score from Chapter 3),
-            divide by <code>&#8730;d</code> to keep the numbers tame, and run the
-            scores through <strong>softmax</strong> to get weights that add to 1.
+            Let me clear up the first big misconception. When an LLM writes a paragraph,
+            it does <em>not</em> print the whole paragraph in one shot. It predicts one
+            token, attaches that token to the end of the prompt, and then asks the same
+            question again: "given everything so far, what token should come next?"
+            Predict, append, repeat. That is the whole loop.
           </p>
           <p>
-            The new representation of the token is then the weighted sum of all the
-            value vectors. High-scoring tokens contribute more. That is the whole
-            mechanism: <code>attention(q) = softmax(q &middot; K / &#8730;d) &middot; V</code>.
-            Below, the six tokens of <code>the cat sat on the mat</code> each carry a
-            hand-picked query, key, and value so you can watch the weighted lookup
-            happen. In a real model these vectors are learned.
+            Each trip through the neural network has a name: a
+            <strong>forward pass</strong>. That just means the input flows through the
+            model, the model does its calculations, and one next-token prediction comes
+            out. So when we say "the model wrote an email," what really happened is many
+            forward passes, each one adding one token to the growing text.
           </p>
           <p>
-            Where do those vectors come from? The model starts with the token vectors
-            from the embedding table, then learns three projection matrices:
-            <code>W_Q</code>, <code>W_K</code>, and <code>W_V</code>. Multiplying the
-            current token representations by those matrices gives
-            <code>Q = XW_Q</code>, <code>K = XW_K</code>, and <code>V = XW_V</code>.
-            The interactive below skips the learned matrices and gives you the
-            resulting vectors directly, so the attention math itself is visible.
+            There is a word for a model that feeds its own output back in as input to
+            make the next prediction: it is called <strong>autoregressive</strong>. (That
+            is the same word that explains why a chatbot streams its answer to you piece
+            by piece instead of all at once &mdash; it is genuinely making the next piece
+            only after it has committed to the last.) Now let's do the tiny version.
+            Press the button below and watch the prompt grow by one token per pass.
           </p>
-          <div class="worked-example" aria-label="One attention row by hand">
-            <h3>One attention row by hand</h3>
+          <figure class="diagram-figure">
+            <svg class="pipeline-svg loop-svg" viewBox="0 0 460 220" role="img" aria-labelledby="loop-title loop-desc">
+              <title id="loop-title">The autoregressive generation loop</title>
+              <desc id="loop-desc">The prompt flows into the model, the model emits one token, that token is appended to the prompt, and the loop repeats.</desc>
+              <rect x="40" y="28" width="180" height="44" rx="9" class="svg-box-soft"></rect>
+              <text x="130" y="47" class="svg-word" text-anchor="middle">prompt so far</text>
+              <text x="130" y="63" class="svg-caption" text-anchor="middle">Sarah for the gardening &hellip;</text>
+              <line x1="220" y1="50" x2="262" y2="50" class="svg-arrow" marker-end="url(#loop-arrow)"></line>
+              <rect x="262" y="28" width="158" height="44" rx="9" class="svg-box-accent"></rect>
+              <text x="341" y="54" class="svg-model-text" text-anchor="middle">Transformer (1 forward pass)</text>
+              <line x1="341" y1="72" x2="341" y2="112" class="svg-arrow" marker-end="url(#loop-arrow)"></line>
+              <rect x="300" y="112" width="82" height="38" rx="9" class="svg-box-plain"></rect>
+              <text x="341" y="136" class="svg-word" text-anchor="middle">"Dear"</text>
+              <path d="M300 131 C 150 150, 90 130, 110 80" fill="none" class="svg-arrow svg-arrow-loop" marker-end="url(#loop-arrow)"></path>
+              <text x="186" y="150" class="svg-caption" text-anchor="middle">append the new token, then run again</text>
+              <defs>
+                <marker id="loop-arrow" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>The model never sees the whole future at once. It emits one token, appends it, and runs a fresh forward pass for the next one.</figcaption>
+          </figure>
+        </div>
+
+        <div class="panel genloop-panel">
+          <div class="section-title-row">
+            <h3>Generate one token per pass</h3>
+            <span id="genStatus" class="pill">waiting</span>
+          </div>
+          <p class="microcopy">The model is "writing an email." Each press is one forward pass: one guess, one new token, then the prompt becomes a little longer.</p>
+          <div id="genOutput" class="genloop-output" aria-live="polite"></div>
+          <div class="stepper-row">
+            <button id="genNextBtn" class="primary-button" type="button">Generate next token</button>
+            <button id="genResetBtn" class="ghost-button" type="button">Reset</button>
+          </div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="A Transformer LLM generates one token per forward pass: it predicts a token, appends it to the input, and runs again. The full answer is built up over many passes, not produced in a single shot.">
+          <p class="quiz-prompt">Quick check: when an LLM writes you a three-sentence reply, how many tokens does a single forward pass produce?</p>
+          <div class="quiz-options" role="group" aria-label="Tokens per forward pass">
+            <button class="quiz-option" type="button" data-correct="true">Exactly one &mdash; the reply is built one token per pass</button>
+            <button class="quiz-option" type="button" data-feedback="The model does not emit a whole sentence per pass; it commits to a single token, appends it, and runs again.">One full sentence per pass</button>
+            <button class="quiz-option" type="button" data-feedback="It is not produced in one shot. That is the whole point of the autoregressive loop.">The entire reply in one pass</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: trace the loop yourself</summary>
+          <p>
+            Try this with pencil and paper. Suppose the prompt is <code>The robot painted a</code>, and the model greedily
+            emits these four tokens: <code> picture</code>, <code> of</code>,
+            <code> Mars</code>, <code>.</code>. How many forward passes happened, and what
+            text is fed into the final pass?
+          </p>
+          <p>
+            Answer: four forward passes happened. The final pass reads
+            <code>The robot painted a picture of Mars</code> and emits <code>.</code>.
+            Notice that the prompt grows after every choice; the model never decides all
+            four tokens at once.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section id="forward" class="band band-muted" aria-labelledby="forward-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">2. The forward pass</p>
+          <h2 id="forward-title">Text goes in; next-token scores come out.</h2>
+          <p>
+            So what actually happens inside one forward pass? I like to split the model
+            into three big pieces. First comes the <strong>tokenizer</strong> (your friend from
+            <a href="chapter-3.html#why">Chapter 3</a>). It breaks the text into tokens and
+            hands each one an integer ID. Each ID then looks up a row of numbers &mdash;
+            its <strong>embedding</strong> &mdash; in a big table the model learned during
+            training.
+          </p>
+          <p>
+            Those embedding vectors flow through the second part: a tall
+            <strong>stack of Transformer blocks</strong>, often dozens of them, each one
+            refining the representation a little more. Think of this stack as the model's
+            working area. This is where it mixes context, applies learned patterns, and
+            slowly turns plain token vectors into useful next-token evidence.
+          </p>
+          <p>
+            At the very top sits the third part, the <strong>language modeling head</strong>
+            (or "LM head"). It is a single layer that turns the stack's output into one
+            number for every token in the vocabulary &mdash; tens of thousands of them
+            &mdash; and <a href="chapter-4.html#softmax">softmax</a> turns those numbers
+            into a probability for each possible next token. That probability bar chart is
+            the model's answer. It is the very same kind of picture you built back in
+            <a href="chapter-1.html">Chapter 1</a>.
+          </p>
+          <figure class="diagram-figure">
+            <svg class="pipeline-svg forward-svg" viewBox="0 0 300 360" role="img" aria-labelledby="fwd-title fwd-desc">
+              <title id="fwd-title">The three components of a forward pass</title>
+              <desc id="fwd-desc">Text enters a tokenizer that produces token IDs and embeddings, which flow up through a stack of Transformer blocks, then into a language modeling head that outputs a probability for every token in the vocabulary.</desc>
+              <rect x="60" y="14" width="180" height="32" rx="8" class="svg-box-soft"></rect>
+              <text x="150" y="35" class="svg-word" text-anchor="middle">text &rarr; tokens &rarr; IDs</text>
+              <line x1="150" y1="46" x2="150" y2="64" class="svg-arrow" marker-end="url(#fwd-arrow)"></line>
+              <rect x="60" y="64" width="180" height="32" rx="8" class="svg-box-plain"></rect>
+              <text x="150" y="85" class="svg-word" text-anchor="middle">embedding lookup</text>
+              <line x1="150" y1="96" x2="150" y2="114" class="svg-arrow" marker-end="url(#fwd-arrow)"></line>
+              <rect x="48" y="114" width="204" height="120" rx="10" class="svg-stack-box"></rect>
+              <text x="150" y="133" class="svg-model-text" text-anchor="middle">stack of Transformer blocks</text>
+              <rect x="70" y="144" width="160" height="24" rx="6" class="svg-box-accent"></rect>
+              <text x="150" y="160" class="svg-word" text-anchor="middle">block 1</text>
+              <rect x="70" y="172" width="160" height="24" rx="6" class="svg-box-accent"></rect>
+              <text x="150" y="188" class="svg-word" text-anchor="middle">block 2</text>
+              <text x="150" y="214" class="svg-caption" text-anchor="middle">&hellip; up to block N</text>
+              <line x1="150" y1="234" x2="150" y2="252" class="svg-arrow" marker-end="url(#fwd-arrow)"></line>
+              <rect x="60" y="252" width="180" height="32" rx="8" class="svg-box-plain"></rect>
+              <text x="150" y="273" class="svg-word" text-anchor="middle">LM head</text>
+              <line x1="150" y1="284" x2="150" y2="302" class="svg-arrow" marker-end="url(#fwd-arrow)"></line>
+              <rect x="60" y="302" width="180" height="40" rx="8" class="svg-box-soft"></rect>
+              <text x="150" y="320" class="svg-word" text-anchor="middle">probability per token</text>
+              <text x="150" y="335" class="svg-caption" text-anchor="middle">the next-token guess</text>
+              <defs>
+                <marker id="fwd-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>One forward pass, top to bottom: tokenizer and embeddings in, a stack of blocks in the middle, and an LM head that scores every word in the vocabulary.</figcaption>
+          </figure>
+          <div class="worked-example model-anatomy" aria-label="How to read a model printout">
+            <h3>How to read a real model printout</h3>
             <p>
-              Use the default query token, <code>sat</code>. Its query is
-              <code>[0.0, 0.9, 0.1, 0.4]</code>. The key for <code>cat</code> is
-              <code>[0.0, 1.0, 0.0, 0.1]</code>. Their dot product is high because
-              both point strongly at the subject channel.
+              The source chapter prints a small modern causal model and asks you to notice
+              the same three-part shape. The names look intimidating, but do not let them
+              scare you. We are just looking for the familiar landmarks: embeddings at the
+              bottom, repeated decoder blocks in the middle, and an LM head at the top.
+            </p>
+            <div class="detail-list">
+              <div class="detail-row">
+                <span><code>embed_tokens</code></span>
+                <strong>32,064 token IDs, each mapped to a 3,072-number vector.</strong>
+              </div>
+              <div class="detail-row">
+                <span><code>layers</code></span>
+                <strong>32 repeated Transformer decoder blocks.</strong>
+              </div>
+              <div class="detail-row">
+                <span><code>qkv_proj</code></span>
+                <strong>One projection that makes query, key, and value vectors for attention.</strong>
+              </div>
+              <div class="detail-row">
+                <span><code>lm_head</code></span>
+                <strong>Turns a 3,072-number final vector into 32,064 next-token scores.</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="The LM head sits at the top of the stack and outputs one score for every token in the vocabulary; softmax turns those into next-token probabilities. The tokenizer is the first component, not the last.">
+          <p class="quiz-prompt">Quick check: what does the language modeling head at the top of the stack produce?</p>
+          <div class="quiz-options" role="group" aria-label="What the LM head produces">
+            <button class="quiz-option" type="button" data-correct="true">A probability for every token in the vocabulary</button>
+            <button class="quiz-option" type="button" data-feedback="Splitting text into tokens is the tokenizer's job, and it happens at the very start of the pass, not the end.">The token IDs for the input text</button>
+            <button class="quiz-option" type="button" data-feedback="Embedding lookup happens right after tokenization, near the bottom of the stack, not at the head.">The embedding vectors for each token</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: find the three parts</summary>
+          <p>
+            In a model summary, circle these names: <code>embed_tokens</code>,
+            <code>layers</code>, and <code>lm_head</code>. Which one belongs to the
+            tokenizer/embedding stage, which one is the stack of blocks, and which one
+            produces the next-token scores?
+          </p>
+          <p>
+            Answer: <code>embed_tokens</code> is the embedding lookup right after
+            tokenization; <code>layers</code> is the stack of Transformer blocks; and
+            <code>lm_head</code> is the final scoring layer.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section id="decoding" class="band" aria-labelledby="decoding-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">3. Choosing the next token</p>
+          <h2 id="decoding-title">The model gives chances; we still have to choose.</h2>
+          <p>
+            The LM head hands us a probability for every token, but we still have to pick
+            <em>one</em> token to actually print. This is the same question from Chapter 1:
+            after we have all the bars, do we always choose the tallest bar, or do we let
+            the smaller bars have a chance too? The rule we use is called the
+            <strong>decoding strategy</strong>.
+          </p>
+          <p>
+            The simplest rule is <strong>greedy</strong> decoding: always take the
+            single highest-probability token. It sounds ideal, but it tends to produce
+            flat, repetitive text. A livelier approach is to <strong>sample</strong> &mdash;
+            roll a weighted die so that a token with 40% probability gets picked about 40%
+            of the time, while less likely tokens still get an occasional turn. A knob
+            called <strong>temperature</strong> controls how adventurous the sampling is:
+            low temperature hugs the top choice, high temperature spreads the love around.
+            (Greedy is just temperature turned all the way down; we save the full
+            temperature story for <a href="chapter-6.html">Chapter 6</a>.)
+          </p>
+          <p>
+            Below is a fixed next-token distribution, the kind the LM head might produce
+            after <code>Write an email apologizing to</code>. Choose a strategy, nudge the
+            temperature, and press <em>Pick a token</em> a bunch of times. Watch greedy
+            pick the same word every single time while sampling keeps things interesting.
+            Same model, same bars, different choice rule.
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Decoding controls">
+          <label class="select-row" for="decodeMode">
+            <span>Strategy</span>
+            <select id="decodeMode" class="control-input">
+              <option value="greedy">Greedy (always the top token)</option>
+              <option value="sample" selected>Sample (weighted by probability)</option>
+            </select>
+          </label>
+          <label class="range-row" for="decodeTemp">
+            <span>Temperature</span>
+            <input id="decodeTemp" type="range" min="0.3" max="1.8" step="0.1" value="1.0">
+            <output id="decodeTempLabel" for="decodeTemp">1.0</output>
+          </label>
+        </div>
+
+        <div class="two-column">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Next-token distribution</h3>
+              <span id="decodeDistPill" class="pill">temperature 1.0</span>
+            </div>
+            <p class="microcopy">Each bar is a candidate next token and its probability after temperature is applied.</p>
+            <div id="decodeBars" class="attn-bars" aria-live="polite"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>What got picked</h3>
+              <span class="pill">your rolls</span>
+            </div>
+            <div class="stepper-row">
+              <button id="decodePickBtn" class="primary-button" type="button">Pick a token</button>
+              <button id="decodeResetBtn" class="ghost-button" type="button">Clear tally</button>
+            </div>
+            <div id="decodeTally" class="decode-tally" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Greedy decoding always selects the single highest-probability token, so for a fixed distribution it returns the same word every time. Sampling adds randomness; temperature controls how much.">
+          <p class="quiz-prompt">Quick check: you run the same prompt through the same model ten times with <strong>greedy</strong> decoding. What do you get?</p>
+          <div class="quiz-options" role="group" aria-label="Greedy decoding behavior">
+            <button class="quiz-option" type="button" data-correct="true">The exact same output all ten times</button>
+            <button class="quiz-option" type="button" data-feedback="That is sampling, not greedy. Greedy ignores the dice and always takes the top-scoring token.">Ten different outputs, weighted by probability</button>
+            <button class="quiz-option" type="button" data-feedback="Greedy is fully deterministic on a fixed distribution; randomness only enters when you sample.">Random gibberish, since decoding is always random</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: compare two decoders</summary>
+          <p>
+            Use the controls above. First choose greedy and press <em>Pick a token</em>
+            five times. Then clear the tally, choose sampling, and press it five times.
+            Write down what changed.
+          </p>
+          <p>
+            What to notice: greedy should keep choosing the same top token because it has
+            no randomness. Sampling can still favor the top token, but lower-probability
+            tokens get a chance proportional to their bars. Raising temperature flattens
+            the bars; lowering temperature sharpens them.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section id="streams" class="band band-muted" aria-labelledby="streams-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">4. Parallel streams and context</p>
+          <h2 id="streams-title">Every token gets its own little track.</h2>
+          <p>
+            Here is one reason Transformers became such a big deal. The old line-of-people
+            picture processes words one after another. A Transformer gives <em>each</em>
+            token its own little <strong>stream</strong> of computation, and many streams
+            can run at the same time. Modern GPUs love that. It is like opening many
+            checkout lanes instead of making every customer wait in one line.
+          </p>
+          <p>
+            The number of streams a model can run at once is its
+            <strong>context length</strong>. A model with a 4,000-token context has room
+            for 4,000 streams; ask for more and it simply has nowhere to put them. This is
+            why "context window" is a number you hear quoted for every model. It is the
+            size of the reading space the model has available at once.
+          </p>
+          <p>
+            One subtlety worth pausing on: to predict the next token, the model only uses
+            the output of the <em>last</em> stream. So why bother computing all the others?
+            Because attention in that last stream reaches back and reads the earlier
+            streams. Their work is not wasted. It is the evidence the final token leans on.
+          </p>
+          <figure class="diagram-figure">
+            <svg class="pipeline-svg streams-svg" viewBox="0 0 440 200" role="img" aria-labelledby="streams-svg-title streams-svg-desc">
+              <title id="streams-svg-title">Parallel token streams</title>
+              <desc id="streams-svg-desc">Five tokens each flow up their own vertical stream of computation; only the last stream's output feeds the next-token prediction, but attention lets it read the earlier streams.</desc>
+              <g class="streams-col">
+                <text x="60" y="24" class="svg-word" text-anchor="middle">Sarah</text>
+                <text x="140" y="24" class="svg-word" text-anchor="middle">fed</text>
+                <text x="220" y="24" class="svg-word" text-anchor="middle">the</text>
+                <text x="300" y="24" class="svg-word" text-anchor="middle">cat</text>
+                <text x="385" y="24" class="svg-word is-last" text-anchor="middle">because</text>
+              </g>
+              <line x1="60" y1="36" x2="60" y2="150" class="stream-line"></line>
+              <line x1="140" y1="36" x2="140" y2="150" class="stream-line"></line>
+              <line x1="220" y1="36" x2="220" y2="150" class="stream-line"></line>
+              <line x1="300" y1="36" x2="300" y2="150" class="stream-line"></line>
+              <line x1="385" y1="36" x2="385" y2="150" class="stream-line is-last"></line>
+              <path d="M60 96 H 385" class="attn-reach"></path>
+              <path d="M140 84 H 385" class="attn-reach"></path>
+              <path d="M220 108 H 385" class="attn-reach"></path>
+              <path d="M300 72 H 385" class="attn-reach"></path>
+              <circle cx="385" cy="150" r="7" class="stream-dot is-last"></circle>
+              <line x1="385" y1="157" x2="385" y2="178" class="svg-arrow" marker-end="url(#streams-arrow)"></line>
+              <text x="385" y="194" class="svg-caption" text-anchor="middle">next-token guess</text>
+              <text x="170" y="172" class="svg-caption" text-anchor="middle">attention lets the last stream read the earlier ones</text>
+              <defs>
+                <marker id="streams-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>Tokens are processed in parallel streams. Only the last stream predicts the next token, but attention lets it pull in everything the earlier streams computed.</figcaption>
+          </figure>
+          <details class="exercise-card">
+            <summary>Exercise: count the streams</summary>
+            <p>
+              A prompt has 6 tokens and the model's context length is 10 tokens. How many
+              token streams run during the forward pass, and which stream feeds the LM
+              head for the next-token prediction?
+            </p>
+            <p>
+              Answer: 6 streams run, one per input token. The last stream is the one whose
+              final vector feeds the LM head, but attention lets that last stream pull
+              useful information from the earlier five.
+            </p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section id="kvcache" class="band" aria-labelledby="kvcache-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">5. The KV cache</p>
+          <h2 id="kvcache-title">Don't do the same homework again and again.</h2>
+          <p>
+            Remember the loop from the first hands-on demo above: to generate the next
+            token, we append the last one and run another forward pass. But wait a second.
+            The first hundred tokens did not change! Recomputing all their attention
+            ingredients from scratch on every step is like doing yesterday's homework
+            again before starting today's.
+          </p>
+          <p>
+            The fix is the <strong>KV cache</strong>. Inside attention, every past token
+            produces a <strong>key</strong> and a <strong>value</strong> vector (you will
+            build these by hand two sections from now). Those never change once a token is
+            fixed, so we simply save them. On the next step the model computes
+            the key and value for only the one new token and reuses everything cached for
+            the past. The heavy work per step drops from "redo the whole prefix" to "do one
+            new token."
+          </p>
+          <p>
+            The payoff is not subtle. In the book this chapter follows, generating 100
+            tokens took about <strong>4.5 seconds</strong> with the cache on and roughly
+            <strong>21.8 seconds</strong> with it off. Slide the length below and watch the
+            total amount of work explode without the cache and stay gentle with it on.
+            This is one of those engineering tricks that sounds boring until you feel the
+            speed difference.
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="KV cache controls">
+          <label class="range-row" for="kvTokens">
+            <span>Tokens to generate</span>
+            <input id="kvTokens" type="range" min="4" max="64" step="1" value="24">
+            <output id="kvTokensLabel" for="kvTokens">24</output>
+          </label>
+          <label class="check-row">
+            <input id="kvCacheToggle" type="checkbox" checked>
+            <span>KV cache on (reuse past keys and values)</span>
+          </label>
+        </div>
+
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Total token-computations to finish</h3>
+            <span id="kvStatusPill" class="pill">cache on</span>
+          </div>
+          <p class="microcopy">One unit is "process one token's stream once." Without the cache, step <em>k</em> re-processes all <em>k</em> tokens; with it, step <em>k</em> processes just the one new token.</p>
+          <div id="kvCompare" class="kv-compare" aria-live="polite"></div>
+        </div>
+
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Step trace</h3>
+            <span class="pill">why the curve bends</span>
+          </div>
+          <p class="microcopy">This shows the first few generation steps. The uncached model keeps paying for the whole prefix; the cached model pays for only the new token.</p>
+          <div id="kvTrace" class="kv-trace" aria-live="polite"></div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="The KV cache stores the key and value vectors of past tokens so they are computed once and reused. Without it, every generation step re-processes the entire growing prefix, so total work grows quadratically with length.">
+          <p class="quiz-prompt">Quick check: what does the KV cache actually save you from doing?</p>
+          <div class="quiz-options" role="group" aria-label="What the KV cache saves">
+            <button class="quiz-option" type="button" data-correct="true">Recomputing the past tokens' keys and values on every new step</button>
+            <button class="quiz-option" type="button" data-feedback="It does not change the vocabulary or the LM head; it caches per-token attention vectors so the past is not recomputed.">Storing the whole vocabulary in memory</button>
+            <button class="quiz-option" type="button" data-feedback="The cache speeds up generation, but the model still produces one token per forward pass either way.">Running more than one forward pass per token</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: compute a tiny cache win</summary>
+          <p>
+            Imagine generating 8 new tokens. Without a cache, the total work is
+            <code>1 + 2 + 3 + 4 + 5 + 6 + 7 + 8</code>. With a cache, the total work is
+            <code>1 + 1 + 1 + 1 + 1 + 1 + 1 + 1</code>. What are the two totals?
+          </p>
+          <p>
+            Answer: without cache, 36 units. With cache, 8 units. The important idea is
+            the shape: uncached work grows like a triangle; cached work grows like a line.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section id="block" class="band band-muted" aria-labelledby="block-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">6. Inside the block</p>
+          <h2 id="block-title">Each block has two jobs: remember patterns and gather context.</h2>
+          <p>
+            Time to open one of those stacked blocks. This is where the model spends most
+            of its thinking time. A Transformer block has two important pieces: a
+            <strong>self-attention</strong> layer and a <strong>feed-forward neural network</strong>.
+            They sound similar, but I want you to think of them as doing two different jobs.
+          </p>
+          <p>
+            The <strong>feed-forward network</strong> is the model's memory and its
+            reasoning-by-pattern. Feed a model <code>The Shawshank</code> and it will
+            happily continue with <code>Redemption</code>; that stored association lives in
+            the feed-forward layers, learned from seeing the phrase countless times. But it
+            is not a lookup table &mdash; the same machinery lets the model
+            <em>interpolate</em>, handling inputs it never saw exactly. Recall plus
+            generalization. Useful, but not enough.
+          </p>
+          <p>
+            The <strong>attention layer</strong> is the context-gatherer. Memory alone is
+            not enough, because meaning depends on the rest of the sentence. Take
+            <code>The dog chased the squirrel because it was scared</code>. To continue
+            after <code>it</code>, the model has to know whether <code>it</code> is the dog
+            or the squirrel. Attention is the mechanism that reaches back, weighs the
+            earlier words, and folds the right one into <code>it</code>'s representation.
+            That is the job we will build by hand next. This is the good part.
+          </p>
+          <figure class="diagram-figure block-figure">
+            <svg class="pipeline-svg block-svg" viewBox="0 0 300 320" role="img" aria-labelledby="block-svg-title block-svg-desc">
+              <title id="block-svg-title">One Transformer block</title>
+              <desc id="block-svg-desc">Inside a block, the input passes through self-attention with a residual add-and-normalize, then a feed-forward network with another residual add-and-normalize, producing the block output.</desc>
+              <rect x="60" y="12" width="180" height="30" rx="8" class="svg-box-soft"></rect>
+              <text x="150" y="32" class="svg-word" text-anchor="middle">input from below</text>
+              <line x1="150" y1="42" x2="150" y2="60" class="svg-arrow" marker-end="url(#block-arrow)"></line>
+              <rect x="40" y="60" width="220" height="38" rx="8" class="svg-box-accent"></rect>
+              <text x="150" y="78" class="svg-model-text" text-anchor="middle">self-attention</text>
+              <text x="150" y="91" class="svg-caption-light" text-anchor="middle">gather context from other tokens</text>
+              <line x1="150" y1="98" x2="150" y2="116" class="svg-arrow" marker-end="url(#block-arrow)"></line>
+              <rect x="60" y="116" width="180" height="28" rx="8" class="svg-box-plain"></rect>
+              <text x="150" y="134" class="svg-word" text-anchor="middle">add &amp; normalize</text>
+              <line x1="150" y1="144" x2="150" y2="162" class="svg-arrow" marker-end="url(#block-arrow)"></line>
+              <rect x="40" y="162" width="220" height="38" rx="8" class="svg-box-accent2"></rect>
+              <text x="150" y="180" class="svg-model-text" text-anchor="middle">feed-forward network</text>
+              <text x="150" y="193" class="svg-caption-light" text-anchor="middle">recall facts, process each token</text>
+              <line x1="150" y1="200" x2="150" y2="218" class="svg-arrow" marker-end="url(#block-arrow)"></line>
+              <rect x="60" y="218" width="180" height="28" rx="8" class="svg-box-plain"></rect>
+              <text x="150" y="236" class="svg-word" text-anchor="middle">add &amp; normalize</text>
+              <line x1="150" y1="246" x2="150" y2="264" class="svg-arrow" marker-end="url(#block-arrow)"></line>
+              <rect x="60" y="264" width="180" height="30" rx="8" class="svg-box-soft"></rect>
+              <text x="150" y="284" class="svg-word" text-anchor="middle">block output</text>
+              <text x="150" y="310" class="svg-caption" text-anchor="middle">stack this block many times to build a GPT</text>
+              <defs>
+                <marker id="block-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>A single block: attention gathers context, a feed-forward network recalls and refines, and each is wrapped in a residual "add &amp; normalize" that keeps the signal flowing through a deep stack.</figcaption>
+          </figure>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Attention is the context-gatherer: it reaches across positions to pull in relevant information from other tokens (like resolving what 'it' refers to). The feed-forward network handles stored knowledge and per-token processing.">
+          <p class="quiz-prompt">Quick check: in <code>&hellip; the squirrel because it</code>, which part of the block is responsible for working out that <code>it</code> means the squirrel?</p>
+          <div class="quiz-options" role="group" aria-label="Which layer resolves it">
+            <button class="quiz-option" type="button" data-correct="true">The attention layer &mdash; it pulls in context from other tokens</button>
+            <button class="quiz-option" type="button" data-feedback="The feed-forward network processes each token on its own and stores facts; it cannot, by itself, mix in information from other positions.">The feed-forward network, working on each token alone</button>
+            <button class="quiz-option" type="button" data-feedback="Add &amp; normalize keeps the numbers stable and the signal flowing; it does not decide what a pronoun refers to.">The add-and-normalize step</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: sort the jobs</summary>
+          <p>
+            Label each job as mostly <strong>attention</strong> or mostly
+            <strong>feed-forward</strong>: resolving what <code>it</code> refers to;
+            remembering that <code>The Shawshank</code> often continues with
+            <code>Redemption</code>; blending information from a noun earlier in the
+            sentence; applying a learned pattern to one token's current vector.
+          </p>
+          <p>
+            Answer: resolving <code>it</code> and blending from an earlier noun are
+            attention jobs because they mix positions. Remembering the movie title and
+            applying a learned per-token pattern are feed-forward jobs.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section id="qkv" class="band" aria-labelledby="qkv-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">7. Query, key, value</p>
+          <h2 id="qkv-title">Ask a question, find the matching keys, and blend the answers.</h2>
+          <p>
+            Now the heart of the whole thing. Suppose the current token is
+            <code>it</code>. It is basically asking, "what thing in the sentence am I
+            standing in for?" Attention turns that question into three little vectors for
+            every token. In a real model these vectors are learned; in our tiny model I
+            set them by hand so we can see the machinery clearly.
+          </p>
+          <ul class="qkv-roles">
+            <li><strong>Query</strong> &mdash; the question the current token is asking.</li>
+            <li><strong>Key</strong> &mdash; the label each token holds up: "here is what I can help with."</li>
+            <li><strong>Value</strong> &mdash; the information that token will hand over if it is useful.</li>
+          </ul>
+          <p>
+            With those in hand, attention runs in exactly two steps.
+            <strong>Step one, relevance scoring:</strong> take the current token's query
+            and compare it against every token's key with a
+            <a href="chapter-4.html#vectors">dot product</a>. A big dot product means
+            "these two match." We divide by <code>&#8730;d</code> to keep the numbers tame,
+            then run the scores through <a href="chapter-4.html#softmax">softmax</a> so they
+            become weights that add up to 1.
+            <strong>Step two, combining information:</strong> multiply each token's value
+            by its weight and add them all up. Tokens that scored high contribute most. The
+            sum is the token's new, context-aware representation. In one line:
+            <code>attention(q) = softmax(q &middot; K / &#8730;d) &middot; V</code>.
+          </p>
+          <p>
+            Below is our running sentence, <code>Sarah fed the cat because it</code>, with
+            hand-picked query/key/value vectors so the mechanism is visible (in a real model
+            these are learned). The default query is <code>it</code>. Watch where it looks.
+            My bet is that you will see the idea click as soon as the <code>cat</code> bar
+            jumps ahead.
+          </p>
+          <div class="worked-example" aria-label="One attention score by hand">
+            <h3>Why "it" finds "cat", by hand</h3>
+            <p>
+              The query for <code>it</code> leans hard on the "animate / living-thing"
+              channel, because a pronoun like <em>it</em> is hunting for a thing it could
+              stand in for. The key for <code>cat</code> leans on that same channel. So
+              their dot product is large. The key for <code>fed</code> is more verb-like,
+              so it does not match the question very well.
             </p>
             <div class="formula-stack">
-              <code>q_sat dot k_cat = 0.0*0.0 + 0.9*1.0 + 0.1*0.0 + 0.4*0.1 = 0.94</code>
-              <code>scaled score = 0.94 / sqrt(4) = 0.47</code>
-              <code>softmax over all six scaled scores gives weights about [14%, 22%, 15%, 15%, 14%, 19%]</code>
-              <code>output_sat = weighted sum of value vectors = [0.38, 0.32, 0.18, 0.31]</code>
+              <code>q_it &middot; k_cat   = high   &rarr; "it" and "cat" match strongly</code>
+              <code>q_it &middot; k_the   = medium &rarr; a determiner, mildly relevant</code>
+              <code>q_it &middot; k_fed   = ~0     &rarr; a verb, nothing to offer "it"</code>
+              <code>softmax of all six scores &rarr; cat wins most of the weight</code>
+              <code>output_it = weighted sum of values &asymp; mostly cat's value</code>
             </div>
             <p class="microcopy">
-              The bars below are this same calculation for every key token. The
-              heatmap in the next section simply repeats it for every query token.
+              The bars below run this exact calculation for every token. Because
+              <code>cat</code> wins the weight, <code>it</code>'s new vector is mostly made
+              of <code>cat</code> &mdash; the model has resolved the pronoun.
             </p>
           </div>
+          <figure class="diagram-figure qkv-flow-figure">
+            <svg class="pipeline-svg qkv-flow-svg" viewBox="0 0 760 260" role="img" aria-labelledby="qkv-flow-title qkv-flow-desc">
+              <title id="qkv-flow-title">Query key value attention flow</title>
+              <desc id="qkv-flow-desc">The current token's query is compared with every key to make scores; softmax turns scores into weights; those weights blend the value vectors into one output vector.</desc>
+              <rect x="26" y="28" width="132" height="58" rx="9" class="svg-box-soft"></rect>
+              <text x="92" y="52" class="svg-word" text-anchor="middle">query for "it"</text>
+              <text x="92" y="70" class="svg-caption" text-anchor="middle">what am I looking for?</text>
+              <line x1="158" y1="57" x2="213" y2="57" class="svg-arrow" marker-end="url(#qkv-flow-arrow)"></line>
+              <rect x="213" y="20" width="150" height="74" rx="9" class="svg-box-plain"></rect>
+              <text x="288" y="42" class="svg-word" text-anchor="middle">dot with keys</text>
+              <text x="288" y="60" class="svg-caption" text-anchor="middle">Sarah, fed, the, cat...</text>
+              <text x="288" y="78" class="svg-caption" text-anchor="middle">score = q · k / √d</text>
+              <line x1="363" y1="57" x2="420" y2="57" class="svg-arrow" marker-end="url(#qkv-flow-arrow)"></line>
+              <rect x="420" y="20" width="112" height="74" rx="9" class="svg-box-accent"></rect>
+              <text x="476" y="51" class="svg-model-text" text-anchor="middle">softmax</text>
+              <text x="476" y="69" class="svg-caption-light" text-anchor="middle">weights add to 1</text>
+              <line x1="532" y1="57" x2="590" y2="57" class="svg-arrow" marker-end="url(#qkv-flow-arrow)"></line>
+              <rect x="590" y="20" width="144" height="74" rx="9" class="svg-box-soft"></rect>
+              <text x="662" y="42" class="svg-word" text-anchor="middle">blend values</text>
+              <text x="662" y="60" class="svg-caption" text-anchor="middle">cat contributes most</text>
+              <text x="662" y="78" class="svg-caption" text-anchor="middle">new vector for "it"</text>
+              <g aria-hidden="true">
+                <rect x="236" y="128" width="46" height="16" rx="4" class="qkv-mini-key"></rect>
+                <rect x="286" y="128" width="46" height="16" rx="4" class="qkv-mini-key"></rect>
+                <rect x="336" y="128" width="46" height="16" rx="4" class="qkv-mini-key is-strong"></rect>
+                <text x="309" y="164" class="svg-caption" text-anchor="middle">keys answer: "how relevant am I?"</text>
+                <rect x="606" y="128" width="22" height="44" rx="4" class="qkv-mini-value"></rect>
+                <rect x="636" y="112" width="22" height="60" rx="4" class="qkv-mini-value is-strong"></rect>
+                <rect x="666" y="138" width="22" height="34" rx="4" class="qkv-mini-value"></rect>
+                <text x="647" y="194" class="svg-caption" text-anchor="middle">values carry the information that gets mixed</text>
+              </g>
+              <defs>
+                <marker id="qkv-flow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>Attention is a weighted lookup: the query chooses weights by comparing to keys, then those weights blend the values.</figcaption>
+          </figure>
         </div>
 
         <div class="control-grid section-controls" aria-label="Attention controls">
@@ -179,7 +829,7 @@
           <div class="panel">
             <div class="section-title-row">
               <h3>Attention weights</h3>
-              <span class="pill">softmax of scores</span>
+              <span class="pill">step 1: score &rarr; softmax</span>
             </div>
             <p class="microcopy">Each bar is how much the query token attends to that token. The bars add up to 100%.</p>
             <div id="qkvScores" class="attn-bars" aria-live="polite"></div>
@@ -188,51 +838,89 @@
           <div class="panel">
             <div class="section-title-row">
               <h3>The blended result</h3>
-              <span class="pill">weighted sum of values</span>
+              <span class="pill">step 2: weighted sum of values</span>
             </div>
             <div id="qkvOutput" class="vector-readout" aria-live="polite"></div>
           </div>
         </div>
+
+        <div class="panel qkv-math-panel">
+          <div class="section-title-row">
+            <h3>The actual numbers</h3>
+            <span class="pill">dot product trace</span>
+          </div>
+          <p class="microcopy">This table exposes the same calculation as the bars. The raw dot product is scaled by <code>&#8730;4 = 2</code>, then softmax turns the scaled scores into attention weights.</p>
+          <div id="qkvMath" class="qkv-math-table" aria-live="polite"></div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Relevance scoring compares the current token's query with every token's key using a dot product, then softmax turns those scores into weights. The values are what get blended afterward, in step two.">
+          <p class="quiz-prompt">Quick check: in step one (relevance scoring), what gets compared against what?</p>
+          <div class="quiz-options" role="group" aria-label="What relevance scoring compares">
+            <button class="quiz-option" type="button" data-correct="true">The current token's <strong>query</strong> against every token's <strong>key</strong></button>
+            <button class="quiz-option" type="button" data-feedback="Values are not used for scoring; they are blended in step two, after the weights are known.">Every token's value against every other value</button>
+            <button class="quiz-option" type="button" data-feedback="Queries are compared with keys, not with other queries. The query asks; the keys answer.">Each token's query against every other query</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: calculate the winning score</summary>
+          <p>
+            Use the default query <code>it</code>. Its query vector is
+            <code>[0.10, 0.00, 0.30, 1.80]</code>. The key vector for
+            <code>cat</code> is <code>[0.00, 0.00, 0.00, 1.80]</code>. Compute
+            <code>q_it &middot; k_cat</code>, then divide by <code>&#8730;4 = 2</code>.
+          </p>
+          <p>
+            Answer: the dot product is <code>0.10*0 + 0*0 + 0.30*0 + 1.80*1.80 = 3.24</code>.
+            Dividing by 2 gives a scaled score of <code>1.62</code>. That is much larger
+            than the other scaled scores, so after softmax <code>cat</code> gets about
+            46% of the attention weight.
+          </p>
+        </details>
       </div>
     </section>
 
     <section id="heatmap" class="band band-muted" aria-labelledby="heatmap-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">2. The attention map</p>
-          <h2 id="heatmap-title">Do it for every token at once, and you get a heatmap.</h2>
+          <p class="eyebrow">8. The attention map</p>
+          <h2 id="heatmap-title">Let every token take a turn asking the question.</h2>
           <p>
-            Run that same weighted lookup with every token taking a turn as the query,
-            and you get a full <strong>attention matrix</strong>: one row per query
-            token, one column per key token, each cell showing how much that row
-            attends to that column. This is exactly what people mean when they show an
-            "attention pattern." Brighter cells are stronger attention.
+            Run that same scoring with every token taking a turn as the query, and you get
+            a full <strong>attention matrix</strong>: one row per query token, one column
+            per key token, each cell showing how much that row attends to that column. This
+            grid is exactly what people mean when they show an "attention pattern." Brighter
+            cells are stronger attention. It is the same calculation you just did for
+            <code>it</code>, repeated for every token.
           </p>
           <p>
-            Toggle the <strong>causal mask</strong> from the controls above. Models
-            that generate text left to right are not allowed to peek at the future, so
-            each token may only attend to itself and earlier tokens. That blanks out
-            the upper triangle of the map, and the remaining weights are renormalized.
-            This single rule is what makes a Transformer a next-token predictor rather
-            than a fill-in-the-blank reader.
+            Now toggle the <strong>causal mask</strong>. A model that writes left to right
+            is not allowed to peek at the future &mdash; when it is processing a token, the
+            tokens that come after it do not exist yet. So each token may only attend to
+            itself and the tokens before it. That blanks out the upper triangle of the map
+            and the remaining weights are renormalized. This one rule is what makes a model
+            a next-token predictor (like GPT) rather than a fill-in-the-blank reader (like
+            <a href="https://arxiv.org/abs/1810.04805" target="_blank" rel="noreferrer">BERT</a>, whose
+            B is for "bidirectional" precisely because it looks both ways).
           </p>
           <p>
-            Mathematically, the mask is simple and a little dramatic: future positions
-            get a score of <code>-Infinity</code> before softmax. Exponentiating
-            <code>-Infinity</code> gives zero, so those future tokens receive exactly
-            no attention weight. Then softmax redistributes the probability mass over
-            the allowed past tokens.
+            The trick under the hood is tidy: future positions get a score of
+            <code>-&#8734;</code> before softmax. Since <code>e<sup>-&#8734;</sup></code> is
+            zero, those cells receive exactly no weight, and softmax shares the probability
+            out over the allowed past. In plain English: cover the future before the model
+            can cheat.
           </p>
           <figure class="intuition-figure">
-            <img src="assets/figures/chapter5-causal-mask.gif" width="720" height="360" alt="Animated attention matrix for the cat sat on the mat, revealing the lower triangle as allowed past attention while future cells are crossed out." decoding="async">
-            <figcaption>A GPT-style causal mask keeps only the lower triangle: each row can read itself and the past, never the future.</figcaption>
+            <img src="assets/figures/chapter5-causal-mask.gif" width="720" height="360" alt="Animated attention matrix that reveals only the lower triangle as allowed past attention while future cells are crossed out." decoding="async">
+            <figcaption>Schematic of a causal mask: each row may read itself and the past (lower triangle), never the future (upper triangle).</figcaption>
           </figure>
         </div>
 
         <div class="panel heatmap-panel">
           <div class="section-title-row">
             <h3>Self-attention matrix</h3>
-            <span id="heatmapStatus" class="pill">full attention</span>
+            <span id="heatmapStatus" class="pill">toggle the mask</span>
           </div>
           <label class="check-row">
             <input id="causalToggleHeatmap" type="checkbox">
@@ -241,124 +929,226 @@
           <p class="microcopy">Rows are the query token; columns are the key token. Each number is the attention weight as a percent.</p>
           <div id="attentionHeatmap" class="attention-heatmap" aria-live="polite"></div>
         </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="A causal mask blocks attention to future positions (the upper triangle), so a left-to-right generator never peeks ahead. Future scores are set to negative infinity before softmax, giving them zero weight.">
+          <p class="quiz-prompt">Quick check: what does the causal mask prevent a token from doing?</p>
+          <div class="quiz-options" role="group" aria-label="What the causal mask blocks">
+            <button class="quiz-option" type="button" data-correct="true">Attending to tokens that come <em>after</em> it</button>
+            <button class="quiz-option" type="button" data-feedback="A token can always attend to itself and the tokens before it; that is the allowed lower triangle.">Attending to itself and earlier tokens</button>
+            <button class="quiz-option" type="button" data-feedback="The mask is about which positions are visible, not about how many tokens are emitted; the model still emits one per pass.">Emitting more than one token per pass</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: draw one masked row</summary>
+          <p>
+            For the six-token sentence <code>Sarah fed the cat because it</code>, imagine
+            the query row is <code>cat</code>, the fourth token. Which key columns are
+            allowed when the causal mask is on?
+          </p>
+          <p>
+            Answer: <code>cat</code> may attend to <code>Sarah</code>, <code>fed</code>,
+            <code>the</code>, and itself. It may not attend to <code>because</code> or
+            <code>it</code>, because those are future tokens from <code>cat</code>'s point
+            of view.
+          </p>
+        </details>
       </div>
     </section>
 
-    <section id="internals" class="band" aria-labelledby="internals-title">
+    <section id="position" class="band" aria-labelledby="position-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">3. Inside a Transformer block</p>
-          <h2 id="internals-title">Attention is the heart, but a block has a few more parts.</h2>
+          <p class="eyebrow">9. Position information</p>
+          <h2 id="position-title">The model also needs to know word order.</h2>
           <p>
-            Attention by itself ignores word order: shuffle the tokens and the dot
-            products are unchanged. So before the first block, every token embedding
-            gets a <strong>positional encoding</strong> added to it, a signal that says
-            where the token sits in the sequence. Now <code>the cat</code> and
-            <code>cat the</code> look different to the model.
+            We have one more quiet problem to solve. Attention compares vectors, but by
+            itself it does not know that <code>dog bites man</code> and
+            <code>man bites dog</code> mean different things. Same tokens, totally
+            different story! A language model needs some way to know where each token sits,
+            or every sentence starts to look like a bag of words.
           </p>
           <p>
-            A real model also runs several attention patterns in parallel, called
-            <strong>multi-head attention</strong>. One head might track the subject of a
-            verb while another tracks nearby punctuation. Their results are joined and
-            passed on. Around each sub-layer sit two workhorses from good neural-network
-            design: a <strong>residual connection</strong> that adds the input back to
-            the output so signal and gradients flow freely, and
-            <strong>layer normalization</strong> that keeps the numbers in a stable
-            range. Finally a small <strong>feed-forward network</strong> processes each
-            position on its own. Stack this block dozens of times and you have a GPT.
+            Early Transformers added a <strong>positional embedding</strong> near the
+            bottom of the model: token vector plus "I am position 1," "I am position 2,"
+            and so on. Modern decoder LLMs often use <strong>rotary positional embeddings</strong>,
+            or <strong>RoPE</strong>, instead. I like to think of RoPE as putting a tiny
+            position-dependent twist into the query and key vectors before they are
+            compared. The dot product then asks two questions at once: do these tokens
+            match, and are they in the right relative place?
           </p>
-        </div>
-
-        <div class="worked-example" aria-label="One Transformer block as equations">
-          <h3>One block as equations</h3>
           <p>
-            Here is a compact post-normalization version that matches the diagram.
-            The shapes matter: if the sequence has <code>T</code> tokens and each
-            vector has <code>d_model</code> numbers, then <code>X</code> is a
-            <code>T by d_model</code> table. Attention mixes information across
-            tokens; the feed-forward network transforms each row independently.
+            That timing matters. RoPE lives inside attention, right before relevance
+            scoring, so the model can ask questions like "does this key match my query,
+            and is it the right distance away?" It also plays more nicely with long
+            contexts and packed training examples, where absolute position numbers alone
+            can be a clumsy signal.
           </p>
-          <div class="formula-stack">
-            <code>X0 = token_embeddings + positional_embeddings</code>
-            <code>head_i = Attention(X0 W_Qi, X0 W_Ki, X0 W_Vi)</code>
-            <code>multi_head = concat(head_1, ..., head_h) W_O</code>
-            <code>X1 = LayerNorm(X0 + multi_head)</code>
-            <code>X2 = LayerNorm(X1 + FFN(X1))</code>
-          </div>
-          <p class="microcopy">
-            The residual additions are the skip paths. They let the block change a
-            representation without forcing it to forget what it already knew.
-          </p>
-        </div>
-
-        <div class="two-column">
-          <figure class="diagram-figure block-figure">
-            <svg class="pipeline-svg block-svg" viewBox="0 0 300 360" role="img" aria-labelledby="block-title block-desc">
-              <title id="block-title">One Transformer block</title>
-              <desc id="block-desc">Tokens plus positional encodings flow into multi-head attention, then add and normalize, then a feed-forward network, then add and normalize again, producing the block output.</desc>
-              <rect x="60" y="12" width="180" height="34" rx="8" class="svg-box-soft"></rect>
-              <text x="150" y="34" class="svg-word" text-anchor="middle">tokens + positions</text>
-              <line x1="150" y1="46" x2="150" y2="66" class="svg-arrow" marker-end="url(#b-arrow)"></line>
-              <rect x="40" y="66" width="220" height="38" rx="8" class="svg-box-accent"></rect>
-              <text x="150" y="89" class="svg-model-text" text-anchor="middle">multi-head attention</text>
-              <line x1="150" y1="104" x2="150" y2="124" class="svg-arrow" marker-end="url(#b-arrow)"></line>
-              <rect x="60" y="124" width="180" height="32" rx="8" class="svg-box-plain"></rect>
-              <text x="150" y="145" class="svg-word" text-anchor="middle">add &amp; normalize</text>
-              <line x1="150" y1="156" x2="150" y2="176" class="svg-arrow" marker-end="url(#b-arrow)"></line>
-              <rect x="40" y="176" width="220" height="38" rx="8" class="svg-box-accent"></rect>
-              <text x="150" y="199" class="svg-model-text" text-anchor="middle">feed-forward network</text>
-              <line x1="150" y1="214" x2="150" y2="234" class="svg-arrow" marker-end="url(#b-arrow)"></line>
-              <rect x="60" y="234" width="180" height="32" rx="8" class="svg-box-plain"></rect>
-              <text x="150" y="255" class="svg-word" text-anchor="middle">add &amp; normalize</text>
-              <line x1="150" y1="266" x2="150" y2="286" class="svg-arrow" marker-end="url(#b-arrow)"></line>
-              <rect x="60" y="286" width="180" height="34" rx="8" class="svg-box-soft"></rect>
-              <text x="150" y="308" class="svg-word" text-anchor="middle">block output</text>
-              <text x="150" y="344" class="svg-caption" text-anchor="middle">Stack this block many times to build a GPT.</text>
+          <figure class="diagram-figure position-figure">
+            <svg class="pipeline-svg position-svg" viewBox="0 0 760 300" role="img" aria-labelledby="pos-title pos-desc">
+              <title id="pos-title">Position information in attention</title>
+              <desc id="pos-desc">Token embeddings are combined with position information; in RoPE, positions rotate query and key vectors just before their dot product is computed.</desc>
+              <text x="104" y="32" class="svg-word" text-anchor="middle">same words</text>
+              <text x="324" y="32" class="svg-word" text-anchor="middle">different order</text>
+              <g class="position-row">
+                <rect x="34" y="58" width="68" height="34" rx="8" class="svg-box-soft"></rect>
+                <rect x="108" y="58" width="68" height="34" rx="8" class="svg-box-soft"></rect>
+                <rect x="182" y="58" width="68" height="34" rx="8" class="svg-box-soft"></rect>
+                <text x="68" y="80" class="svg-word" text-anchor="middle">dog</text>
+                <text x="142" y="80" class="svg-word" text-anchor="middle">bites</text>
+                <text x="216" y="80" class="svg-word" text-anchor="middle">man</text>
+                <text x="68" y="112" class="svg-caption" text-anchor="middle">pos 1</text>
+                <text x="142" y="112" class="svg-caption" text-anchor="middle">pos 2</text>
+                <text x="216" y="112" class="svg-caption" text-anchor="middle">pos 3</text>
+              </g>
+              <g class="position-row">
+                <rect x="254" y="58" width="68" height="34" rx="8" class="svg-box-soft"></rect>
+                <rect x="328" y="58" width="68" height="34" rx="8" class="svg-box-soft"></rect>
+                <rect x="402" y="58" width="68" height="34" rx="8" class="svg-box-soft"></rect>
+                <text x="288" y="80" class="svg-word" text-anchor="middle">man</text>
+                <text x="362" y="80" class="svg-word" text-anchor="middle">bites</text>
+                <text x="436" y="80" class="svg-word" text-anchor="middle">dog</text>
+                <text x="288" y="112" class="svg-caption" text-anchor="middle">pos 1</text>
+                <text x="362" y="112" class="svg-caption" text-anchor="middle">pos 2</text>
+                <text x="436" y="112" class="svg-caption" text-anchor="middle">pos 3</text>
+              </g>
+              <line x1="515" y1="36" x2="515" y2="252" class="position-divider"></line>
+              <text x="628" y="32" class="svg-word" text-anchor="middle">RoPE inside attention</text>
+              <rect x="552" y="58" width="152" height="40" rx="9" class="svg-box-plain"></rect>
+              <text x="628" y="82" class="svg-word" text-anchor="middle">token representation</text>
+              <line x1="628" y1="98" x2="628" y2="124" class="svg-arrow" marker-end="url(#pos-arrow)"></line>
+              <rect x="548" y="124" width="74" height="42" rx="9" class="svg-box-accent"></rect>
+              <rect x="634" y="124" width="74" height="42" rx="9" class="svg-box-accent"></rect>
+              <text x="585" y="142" class="svg-model-text" text-anchor="middle">query</text>
+              <text x="671" y="142" class="svg-model-text" text-anchor="middle">key</text>
+              <text x="628" y="160" class="svg-caption-light" text-anchor="middle">rotated by position</text>
+              <line x1="585" y1="166" x2="620" y2="196" class="svg-arrow" marker-end="url(#pos-arrow)"></line>
+              <line x1="671" y1="166" x2="636" y2="196" class="svg-arrow" marker-end="url(#pos-arrow)"></line>
+              <rect x="566" y="196" width="124" height="42" rx="9" class="svg-box-soft"></rect>
+              <text x="628" y="214" class="svg-word" text-anchor="middle">dot product</text>
+              <text x="628" y="230" class="svg-caption" text-anchor="middle">content + relative position</text>
+              <text x="252" y="244" class="svg-caption" text-anchor="middle">Position tells the model who came first, who came later, and how far apart tokens are.</text>
               <defs>
-                <marker id="b-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <marker id="pos-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                   <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
                 </marker>
               </defs>
             </svg>
-            <figcaption>A single block: attention, then a feed-forward network, each wrapped in a residual connection and normalization.</figcaption>
+            <figcaption>RoPE injects order into the attention score itself by rotating query and key vectors before they are compared.</figcaption>
           </figure>
-          <div class="panel">
-            <div class="section-title-row">
-              <h3>Why each part earns its place</h3>
-              <span class="pill">quick reference</span>
-            </div>
-            <div class="detail-list">
-              <div class="detail-row"><span>positional encoding</span><strong>gives attention a sense of order</strong></div>
-              <div class="detail-row"><span>multi-head attention</span><strong>several attention patterns at once</strong></div>
-              <div class="detail-row"><span>residual connection</span><strong>adds input back so signal survives depth</strong></div>
-              <div class="detail-row"><span>layer normalization</span><strong>keeps activations in a stable range</strong></div>
-              <div class="detail-row"><span>feed-forward network</span><strong>processes each position on its own</strong></div>
-              <div class="detail-row"><span>causal mask</span><strong>hides the future for left-to-right generation</strong></div>
-            </div>
-          </div>
         </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Self-attention needs position information because the same tokens in a different order can mean something completely different. RoPE encodes that position by rotating queries and keys before relevance scoring.">
+          <p class="quiz-prompt">Quick check: why is position information necessary if attention already sees all the tokens?</p>
+          <div class="quiz-options" role="group" aria-label="Why position matters">
+            <button class="quiz-option" type="button" data-correct="true">Because word order changes meaning, and plain attention is order-blind</button>
+            <button class="quiz-option" type="button" data-feedback="The tokenizer creates token IDs, but it does not by itself tell attention where each token sat in the sequence.">Because tokenizers cannot split text into words</button>
+            <button class="quiz-option" type="button" data-feedback="The LM head scores next tokens; position information is needed much earlier, inside the stream and attention calculations.">Because the LM head has no vocabulary</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: spot the order problem</summary>
+          <p>
+            Compare <code>the cat chased the dog</code> with
+            <code>the dog chased the cat</code>. If a model kept only token identities and
+            threw away positions, what crucial fact would it lose?
+          </p>
+          <p>
+            Answer: it would lose who did the chasing and who got chased. Attention needs
+            position information so the same tokens in a different order produce different
+            representations.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section id="multihead" class="band" aria-labelledby="multihead-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">10. Multi-head attention</p>
+          <h2 id="multihead-title">Use several attention heads, because one question is not enough.</h2>
+          <p>
+            One attention pattern is not enough. A sentence has many kinds of relationship
+            at once &mdash; a pronoun and its referent, a verb and its subject, a word and
+            the punctuation nearby. So a Transformer runs attention <em>several times in
+            parallel</em>, and each copy is called an <strong>attention head</strong>. Each
+            head gets its own learned query/key/value projections, so each one learns to
+            care about a different kind of pattern.
+          </p>
+          <p>
+            Mechanically it is "split, attend, combine." The token's vector is split across
+            the heads, each head does the two-step attention you just built, and their
+            results are stitched back together. It is like asking several friends to read
+            the same sentence, each with a different highlighter. One marks pronouns, one
+            marks previous words, one marks subjects, and together they give you a richer
+            picture.
+          </p>
+          <p>
+            Pick a query token below and compare three heads we hand-designed. One chases
+            meaning (the coreference head that sends <code>it</code> to <code>cat</code>),
+            one is a "look at the token just before me" head, and one always anchors on the
+            sentence's subject. Same words, three different stories.
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Multi-head controls">
+          <label class="select-row" for="mhQuerySelect">
+            <span>Query token</span>
+            <select id="mhQuerySelect" class="control-input"></select>
+          </label>
+        </div>
+        <div id="mhHeads" class="mh-grid" aria-live="polite"></div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Each attention head has its own query/key/value projections and learns to focus on a different type of relationship. Running several in parallel lets the model track many patterns at once, then combine them.">
+          <p class="quiz-prompt">Quick check: why does a Transformer use several attention heads instead of one?</p>
+          <div class="quiz-options" role="group" aria-label="Why multiple heads">
+            <button class="quiz-option" type="button" data-correct="true">Different heads can track different relationships at the same time</button>
+            <button class="quiz-option" type="button" data-feedback="Heads run in parallel, not in sequence; they do not take turns refining a single pattern step by step.">Each head fixes the mistakes of the previous head, in order</button>
+            <button class="quiz-option" type="button" data-feedback="Heads are about modeling more kinds of relationships, not about skipping the tokenizer; tokenization still happens once up front.">So the model can skip tokenization</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: assign a head a job</summary>
+          <p>
+            Imagine a fourth head in this toy model. What relationship would you want it
+            to track: punctuation, the verb, the nearest noun, or something else? Write
+            one sentence describing what that head should attend to.
+          </p>
+          <p>
+            One good answer: a verb head could make <code>fed</code> attend strongly to
+            the subject <code>Sarah</code> and the object <code>cat</code>, helping later
+            layers understand who did what to whom. There is no single correct head; the
+            point is that different heads can specialize.
+          </p>
+        </details>
       </div>
     </section>
 
     <section id="realmodel" class="band band-muted" aria-labelledby="realmodel-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">4. A real Transformer</p>
-          <h2 id="realmodel-title">Read the next-token probabilities of a real GPT model.</h2>
+          <p class="eyebrow">11. A real Transformer</p>
+          <h2 id="realmodel-title">Now run a real GPT-style model in your browser.</h2>
           <p>
-            Everything so far was a hand-built miniature. Now meet the real thing.
-            The button below loads <strong>distilGPT-2</strong>, a small but genuine
-            82-million-parameter Transformer, and runs it entirely in your browser
-            using the <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noreferrer">transformers.js</a>
-            library. Nothing is sent to a server; the model weights download once and
-            then your typing is processed on your own machine.
+            Everything so far was a hand-built miniature. Time for the real thing. The
+            button below loads <strong>distilGPT-2</strong>, a small but genuine
+            82-million-parameter Transformer, and runs it entirely in your browser with the
+            <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noreferrer">transformers.js</a>
+            library. Nothing is sent anywhere: the weights download once, then your typing
+            is processed on your own machine.
           </p>
           <p>
-            When it is ready, type a prompt and ask for the next-token probabilities.
-            You are looking at the exact same picture as Chapter 1's prediction bars,
-            the model's guess for what comes next, except these numbers come from a
-            real Transformer with learned attention instead of a small count table.
-            That is the whole arc of this course in one view.
+            When it is ready, type a prompt and ask for the next-token probabilities. You
+            are looking at the real LM head's output &mdash; the same probability bars from
+            <a href="chapter-1.html">Chapter 1</a>, except now produced by a true Transformer
+            with learned attention instead of a tiny count table. Press <em>Generate</em>
+            and watch the same loop from the opening demo run for real, one greedy token at
+            a time. Same idea, much bigger machine.
           </p>
         </div>
 
@@ -366,7 +1156,7 @@
           <div class="stepper-row">
             <button id="loadModelButton" class="primary-button" type="button">Load the real model</button>
           </div>
-          <p id="modelStatus" class="model-status">The model downloads on the first click (a one-time download of roughly fifty megabytes), then runs offline from your browser cache. The attention demos above need no download.</p>
+          <p id="modelStatus" class="model-status">The model downloads on the first click (a one-time download of roughly fifty megabytes), then runs offline from your browser cache. Every demo above this point needs no download at all.</p>
         </div>
 
         <div id="modelPanel" class="model-panel" hidden>
@@ -397,46 +1187,137 @@
             </div>
           </div>
         </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: connect the real bars to the toy bars</summary>
+          <p>
+            After loading the model, try <code>The capital of France is</code> and then
+            <code>The cat sat on the</code>. For each prompt, name the top token and
+            explain why a learned Transformer might favor it.
+          </p>
+          <p>
+            What to notice: you are looking at the real LM head's probability distribution.
+            The bars may be much sharper for a factual or common phrase and more spread
+            out for an open-ended phrase. Either way, decoding still has to choose one
+            token from that distribution.
+          </p>
+        </details>
       </div>
     </section>
 
-    <section id="variants" class="band" aria-labelledby="variants-title">
+    <section id="improvements" class="band" aria-labelledby="improvements-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">5. Families and variants</p>
-          <h2 id="variants-title">One block, many family trees.</h2>
+          <p class="eyebrow">12. Recent improvements</p>
+          <h2 id="improvements-title">The original idea still stands, but engineers keep making it faster.</h2>
           <p>
-            The same block powers models that feel quite different, mostly because of
-            how attention is masked and which way the model reads. <strong>Decoder-only</strong>
-            models like the GPT family use a causal mask and predict the next token;
-            they are the basis of most chat assistants. <strong>Encoder-only</strong>
-            models like BERT drop the mask, read the whole sentence at once, and are
-            great for understanding tasks. <strong>Encoder-decoder</strong> models like
-            T5 pair a reader with a writer for translation and summarization.
+            The Transformer you just built is, remarkably, still the core of a 2024-era
+            model like Llama 3. But a few well-earned tweaks make modern models faster and
+            cheaper. Most of the tweaks answer one of two practical questions: can we make
+            attention less expensive, and can we make the block easier to train? Here is a
+            field guide, aka the names you will keep seeing in LLM architecture diagrams.
           </p>
-          <p>
-            Beyond the family split, most scaling tricks are about making attention
-            cheaper or the network bigger without paying full price.
-            <strong>Multi-query</strong> and <strong>grouped-query attention</strong>
-            share keys and values across heads to save memory.
-            <strong>Sliding-window</strong> and <strong>sparse attention</strong> limit
-            how far each token looks. A <strong>mixture of experts</strong> swaps the
-            single feed-forward network for many, using only a few per token. The core
-            you just built does not change; these are ways to afford more of it.
-          </p>
+          <div class="idea-flow improve-flow" aria-label="Modern Transformer improvements">
+            <div>
+              <strong>Local / sparse attention</strong>
+              <span>Full attention is the costliest step, since every token looks at every other. Sparse and sliding-window attention let a token see only a nearby slice. GPT-3 interleaved full and sparse blocks to keep quality while cutting cost.</span>
+            </div>
+            <div>
+              <strong>Multi-query &amp; grouped-query attention</strong>
+              <span>Instead of every head owning a full set of keys and values, heads <em>share</em> them &mdash; all of them (multi-query) or in groups (grouped-query). Far less memory to move at inference. Llama 2 and 3 use grouped-query.</span>
+            </div>
+            <div>
+              <strong>Flash Attention</strong>
+              <span>Same math, smarter bookkeeping: it is careful about what gets moved between a GPU's fast and slow memory, giving big speedups for both training and inference without changing the result.</span>
+            </div>
+            <div>
+              <strong>Pre-norm, RMSNorm, SwiGLU</strong>
+              <span>Modern blocks normalize <em>before</em> each sub-layer instead of after, use the simpler, faster <strong>RMSNorm</strong>, and swap the old ReLU for a <strong>SwiGLU</strong> activation in the feed-forward network.</span>
+            </div>
+            <div>
+              <strong>Document packing</strong>
+              <span>Training contexts are long but many documents are short, so several are <em>packed</em> into one context (with separators) to avoid wasting the window on padding &mdash; a small efficiency trick with a real impact at scale.</span>
+            </div>
+          </div>
+          <figure class="diagram-figure">
+            <svg class="pipeline-svg gqa-svg" viewBox="0 0 460 210" role="img" aria-labelledby="gqa-title gqa-desc">
+              <title id="gqa-title">Multi-head vs grouped-query vs multi-query attention</title>
+              <desc id="gqa-desc">Multi-head attention gives every query head its own key and value; grouped-query shares one key and value per group of heads; multi-query shares a single key and value across all heads.</desc>
+              <text x="76" y="20" class="svg-word" text-anchor="middle">Multi-head</text>
+              <text x="230" y="20" class="svg-word" text-anchor="middle">Grouped-query</text>
+              <text x="384" y="20" class="svg-word" text-anchor="middle">Multi-query</text>
+              <g class="gqa-col">
+                <rect x="40" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="60" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="80" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="100" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="40" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
+                <rect x="60" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
+                <rect x="80" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
+                <rect x="100" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
+                <text x="78" y="104" class="svg-caption" text-anchor="middle">4 queries, 4 KV</text>
+              </g>
+              <g class="gqa-col">
+                <rect x="194" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="214" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="234" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="254" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="204" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
+                <rect x="244" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
+                <text x="232" y="104" class="svg-caption" text-anchor="middle">4 queries, 2 KV</text>
+              </g>
+              <g class="gqa-col">
+                <rect x="348" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="368" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="388" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="408" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
+                <rect x="376" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
+                <text x="384" y="104" class="svg-caption" text-anchor="middle">4 queries, 1 KV</text>
+              </g>
+              <text x="230" y="140" class="svg-caption" text-anchor="middle">Teal = query heads &middot; gold = shared keys/values. Fewer KV sets means less memory to move.</text>
+            </svg>
+            <figcaption>Sharing keys and values across heads (grouped-query, then multi-query) shrinks the memory traffic at inference, which is why large models adopt it.</figcaption>
+          </figure>
         </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Grouped-query and multi-query attention reduce how many separate key/value sets the model keeps, so there is less memory to move during generation. The attention math itself is unchanged.">
+          <p class="quiz-prompt">Quick check: what is the main thing grouped-query attention saves compared with classic multi-head attention?</p>
+          <div class="quiz-options" role="group" aria-label="What grouped-query attention saves">
+            <button class="quiz-option" type="button" data-correct="true">Memory &mdash; heads share key/value sets instead of each owning one</button>
+            <button class="quiz-option" type="button" data-feedback="It does not change what attention computes; queries still score against keys and blend values. It only shares the key/value sets.">It replaces the dot-product score with a cheaper one</button>
+            <button class="quiz-option" type="button" data-feedback="The number of query heads can stay the same; what shrinks is the number of key/value sets they share.">It removes the query heads entirely</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <details class="exercise-card">
+          <summary>Exercise: pick the right upgrade</summary>
+          <p>
+            Match each bottleneck to a likely improvement: "GPU memory traffic dominates
+            attention," "the model needs cheaper inference-time key/value storage,"
+            "many training examples are shorter than the context window," and "very long
+            documents make full attention expensive."
+          </p>
+          <p>
+            Answer: FlashAttention targets GPU memory traffic; grouped-query or
+            multi-query attention shrinks key/value storage; document packing reduces
+            wasted context during training; local or sparse attention trims the full
+            attention pattern for long sequences.
+          </p>
+        </details>
       </div>
     </section>
 
     <section id="references" class="band band-muted" aria-labelledby="references-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">6. Going deeper</p>
+          <p class="eyebrow">13. Going deeper</p>
           <h2 id="references-title">Further reading.</h2>
           <p>
-            Start with the original Transformer paper, then use the illustrated guides
-            to build intuition, and the libraries to keep experimenting with real
-            models in the browser or in Python.
+            If you want to keep going, these are the references I would reach for. Start
+            with the "Looking Inside Large Language Models" chapter if you want the route
+            we followed here, then use the illustrated guides when you want another visual
+            pass, and the papers when you want the exact technical details.
           </p>
         </div>
 
@@ -446,24 +1327,16 @@
             <span>The paper that introduced the Transformer and self-attention.</span>
           </li>
           <li>
+            <a href="https://www.oreilly.com/library/view/hands-on-large-language/9781098150952/" target="_blank" rel="noreferrer">Alammar &amp; Grootendorst, Hands-On Large Language Models</a>
+            <span>The book whose "looking inside" chapter this lesson is built around.</span>
+          </li>
+          <li>
+            <a href="https://learning.oreilly.com/library/view/hands-on-large-language/9781098150952/ch03.html" target="_blank" rel="noreferrer">Looking Inside Large Language Models</a>
+            <span>The source chapter's detailed route through autoregressive generation, Transformer blocks, attention, caching, and recent architecture updates.</span>
+          </li>
+          <li>
             <a href="https://jalammar.github.io/illustrated-transformer/" target="_blank" rel="noreferrer">Alammar, The Illustrated Transformer</a>
             <span>The most popular visual walkthrough of attention and the encoder-decoder block.</span>
-          </li>
-          <li>
-            <a href="https://nlp.seas.harvard.edu/annotated-transformer/" target="_blank" rel="noreferrer">The Annotated Transformer</a>
-            <span>A line-by-line PyTorch implementation alongside the paper.</span>
-          </li>
-          <li>
-            <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noreferrer">transformers.js</a>
-            <span>The library used in this chapter to run real models in the browser.</span>
-          </li>
-          <li>
-            <a href="https://arxiv.org/abs/1810.04805" target="_blank" rel="noreferrer">Devlin et al., BERT</a>
-            <span>The encoder-only model that popularized masked-language pretraining.</span>
-          </li>
-          <li>
-            <a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noreferrer">Brown et al., Language Models are Few-Shot Learners (GPT-3)</a>
-            <span>The decoder-only scaling result behind modern chat models.</span>
           </li>
           <li>
             <a href="https://jalammar.github.io/illustrated-gpt2/" target="_blank" rel="noreferrer">Alammar, The Illustrated GPT-2</a>
@@ -474,12 +1347,40 @@
             <span>An animated, zoomable 3D walkthrough of every step inside a GPT-style model.</span>
           </li>
           <li>
-            <a href="https://e2eml.school/transformers.html" target="_blank" rel="noreferrer">Rohrer, Transformers from Scratch</a>
-            <span>A from-first-principles written explanation of attention and the Transformer block.</span>
+            <a href="https://arxiv.org/abs/2104.09864" target="_blank" rel="noreferrer">Su et al., RoFormer (RoPE)</a>
+            <span>Rotary positional embeddings, the position scheme used by most modern LLMs.</span>
           </li>
           <li>
-            <a href="https://huggingface.co/docs/transformers/model_summary" target="_blank" rel="noreferrer">Hugging Face, A Tour of Model Architectures</a>
-            <span>A reference tour of encoder, decoder, and encoder-decoder model families.</span>
+            <a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noreferrer">Ainslie et al., GQA: Grouped-Query Attention</a>
+            <span>The shared key/value scheme behind Llama 2 and 3.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noreferrer">Dao et al., FlashAttention</a>
+            <span>IO-aware attention that speeds up training and inference without changing the math.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1904.10509" target="_blank" rel="noreferrer">Child et al., Sparse Transformers</a>
+            <span>A long-context attention pattern that attends to selected positions instead of the full past.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1911.02150" target="_blank" rel="noreferrer">Shazeer, Multi-Query Attention</a>
+            <span>The key/value sharing idea that grouped-query attention builds on.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1910.07467" target="_blank" rel="noreferrer">Zhang &amp; Sennrich, RMSNorm</a>
+            <span>A simpler normalization layer used in many modern Transformer blocks.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2002.05202" target="_blank" rel="noreferrer">Shazeer, GLU Variants Improve Transformer</a>
+            <span>The source of SwiGLU-style feed-forward activations used in newer LLM blocks.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/1810.04805" target="_blank" rel="noreferrer">Devlin et al., BERT</a>
+            <span>The encoder-only model that reads both directions at once.</span>
+          </li>
+          <li>
+            <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noreferrer">transformers.js</a>
+            <span>The library used in this chapter to run a real model in the browser.</span>
           </li>
         </ol>
       </div>
@@ -498,7 +1399,8 @@
     </section>
   </main>
 
-  <script src="chapter5.js"></script>
+  <script src="chapter5.js?v=20260619"></script>
+  <script defer src="code-quiz.js"></script>
   <script src="site.js" defer></script>
 </body>
 </html>

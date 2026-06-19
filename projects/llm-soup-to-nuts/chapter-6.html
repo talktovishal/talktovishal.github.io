@@ -52,7 +52,7 @@
             first phase where a fresh network reads an enormous amount of text and does
             one simple thing billions of times: predict the next token, check how
             surprised it was, and nudge its weights. The same four-beat loop from
-            Chapter 3, just very, very large.
+            Chapter 4, just very, very large.
           </p>
           <p>
             Three decisions shape the result: the <strong>objective</strong> the model
@@ -110,7 +110,7 @@
           </p>
           <p>
             Under the hood, next-token pretraining is still the cross-entropy story
-            from Chapter 3. At position <code>t</code>, the model reads the earlier
+            from Chapter 4. At position <code>t</code>, the model reads the earlier
             tokens <code>x_&lt;t</code>, assigns a probability to the real next token
             <code>x_t</code>, and pays surprise <code>-ln p(x_t | x_&lt;t)</code>.
             Average that over billions of positions and you have the training loss.
