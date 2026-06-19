@@ -49,6 +49,20 @@
   margin-bottom: 14px;
 }
 
+/* Stack the embedding explorer and the RNN gradient demo into one column so the
+   tall output panel (neighbor list / gradient bars) does not leave a big empty
+   gap beside the short map/slider panel. */
+.real-embedding-layout,
+#sequences .training-grid {
+  grid-template-columns: 1fr;
+}
+
+/* Let the free-text "type your own" field fill the row instead of leaving an
+   empty grid cell next to it on a two-column control grid. */
+.analogy-custom {
+  grid-column: 1 / -1;
+}
+
 .chapter2-trainer .control-grid {
   grid-template-columns: minmax(220px, 0.95fr) minmax(260px, 1.15fr) minmax(220px, 0.9fr);
 }

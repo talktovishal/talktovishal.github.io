@@ -174,6 +174,7 @@ const dom = {
   embeddingMapLabel: document.getElementById("embeddingMapLabel"),
   focusWordSelect: document.getElementById("focusWordSelect"),
   analogyInput: document.getElementById("analogyInput"),
+  analogyPresetSelect: document.getElementById("analogyPresetSelect"),
   nearestPanel: document.getElementById("nearestPanel"),
   analogyPanel: document.getElementById("analogyPanel"),
   recurrentWeightSlider: document.getElementById("recurrentWeightSlider"),
@@ -200,6 +201,7 @@ const dom = {
   comparisonPanel: document.getElementById("comparisonPanel"),
   compareWordSelect: document.getElementById("compareWordSelect"),
   compareAnalogyInput: document.getElementById("compareAnalogyInput"),
+  comparePresetSelect: document.getElementById("comparePresetSelect"),
   compareTrained: document.getElementById("compareTrained"),
   compareGlove: document.getElementById("compareGlove"),
   compareAnalogyResult: document.getElementById("compareAnalogyResult")
@@ -776,7 +778,7 @@ function populateFocusWords() {
     dom.focusWordSelect.append(option);
   });
   dom.focusWordSelect.disabled = false;
-  const defaultFocus = ["alice", "rabbit", "queen", "elizabeth", "holmes"].find((word) => (
+  const defaultFocus = ["king", "queen", "alice", "elizabeth", "darcy", "holmes", "rabbit"].find((word) => (
     state.embeddingModel.idByWord.has(word)
   ));
   dom.focusWordSelect.value = state.embeddingModel.idByWord.has(previous)
@@ -976,6 +978,7 @@ function renderEmbeddingExplorer() {
   window.requestAnimationFrame(resolveEmbeddingLabelCollisions);
   renderNearest(focus);
   renderAnalogy();
+  state.hasComparedVectors = true;
   renderComparison();
 }
 
@@ -1818,8 +1821,10 @@ function wireEvents() {
   if (dom.sparsityRunButton) dom.sparsityRunButton.addEventListener("click", () => { state.hasCheckedSparsity = true; renderSparsity(); });
   dom.focusWordSelect.addEventListener("change", () => renderEmbeddingExplorer());
   dom.analogyInput.addEventListener("input", () => renderAnalogy());
+  if (dom.analogyPresetSelect) dom.analogyPresetSelect.addEventListener("change", () => { dom.analogyInput.value = dom.analogyPresetSelect.value; renderAnalogy(); });
   if (dom.compareWordSelect) dom.compareWordSelect.addEventListener("change", () => { state.hasComparedVectors = true; renderComparison(); });
   if (dom.compareAnalogyInput) dom.compareAnalogyInput.addEventListener("input", () => { state.hasComparedVectors = true; renderComparison(); });
+  if (dom.comparePresetSelect) dom.comparePresetSelect.addEventListener("change", () => { dom.compareAnalogyInput.value = dom.comparePresetSelect.value; state.hasComparedVectors = true; renderComparison(); });
   dom.recurrentWeightSlider.addEventListener("input", () => { state.hasExploredGradient = true; renderGradient(); });
   dom.sequenceStepsSlider.addEventListener("input", () => { state.hasExploredGradient = true; renderGradient(); });
   document.querySelectorAll(".chapter-code-cell .run-button").forEach((button) => {

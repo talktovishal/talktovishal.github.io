@@ -689,10 +689,15 @@ return { focus: focusWord, neighbors };</textarea>
           </p>
           <p>
             The browser trains vectors for up to <strong>260 focus words</strong> from
-            your text, and it deliberately keeps the interesting ones: characters,
-            names, places, and other content words. It quietly drops most of the
-            high-frequency glue - <code>the</code>, <code>of</code>, <code>and</code> -
-            because a map crowded with those would teach us nothing about meaning.
+            your text. Why 260? It is simply a cap we chose - another knob, like the 36
+            numbers per word from the last section. A real system trains its entire
+            vocabulary (tens or hundreds of thousands of words), but here a smaller cap
+            keeps training fast in your browser and keeps the 2D map readable instead of
+            one solid blob of dots. So the page spends that budget on the
+            <em>interesting</em> words - characters, names, places, and other content
+            words - and quietly drops most of the high-frequency glue (<code>the</code>,
+            <code>of</code>, <code>and</code>), because a map crowded with those would
+            teach us nothing about meaning.
           </p>
           <p>
             Two famous methods popularized this idea.
@@ -729,10 +734,9 @@ return { focus: focusWord, neighbors };</textarea>
           <div class="panel guide-card">
             <h3>Try analogies, but stay skeptical</h3>
             <p>
-              Classic examples like <code>king - man + woman</code> came from much
+              When you study word vectors, you can perform arithmetic on them. For example, you can add and subtract vectors to explore relationships between words. Classic examples like <code>queen = king - man + woman</code> came from much
               larger training runs. Our browser model is intentionally small. Vector
-              math can still be interesting, but failed or strange answers are part
-              of the lesson.
+              math can still be interesting, however please don't expect our small model trying to replicate the results of much larger models.
             </p>
           </div>
         </div>
@@ -754,7 +758,92 @@ return { focus: focusWord, neighbors };</textarea>
           neighbors, train on more text or pick a corpus where your target words are
           common.
           </p>
+        <div class="example-note">
 
+          <p><em>How is the map drawn? A quick word on PCA.</em> Our vectors live in 36
+          dimensions, but a screen has only two.
+          <a href="https://en.wikipedia.org/wiki/Principal_component_analysis" target="_blank" rel="noreferrer">Principal component analysis (PCA)</a>
+          is the standard trick for turning a high-dimensional cloud of points into a
+          two-dimensional picture. The best intuition is not to think of PCA as
+          “throwing away dimensions” first. Think of it as choosing the best camera
+          angle.</p>
+
+
+          <p>Imagine a group of people standing in a park. If you take a photo from a
+          bad angle, many people may overlap, and the photo hides important differences
+          between them. If you move around and take the photo from a better angle, the
+          people are more spread out in the picture, and you can see the structure of
+          the group more clearly. PCA does something similar for vectors. It looks for
+          the viewing direction that makes the cloud of points look as spread out as
+          possible. That first best viewing direction is the
+          <strong>first principal component</strong>.</p>
+
+
+          <p>After PCA finds that first direction, it looks for a second one. But the
+          second direction has to be at right angles to the first, so that it adds new
+          information rather than repeating the same view. This becomes the
+          <strong>second principal component</strong>. These two directions become the
+          map's <code>x</code> and <code>y</code> axes. Each dot on the screen is the
+          original 36-number vector's shadow on this two-dimensional plane.</p>
+
+
+          <p>To make this more concrete, imagine a much simpler example with only two
+          measurements: a person's height and arm span. If we plot many people using
+          those two numbers, the points will not form a random blob. Taller people often
+          have longer arm spans, so the cloud stretches along a diagonal direction. That
+          diagonal direction is more meaningful than either “height only” or “arm span
+          only.” It captures the main way people vary in that small dataset: overall
+          body size. PCA is looking for exactly that kind of natural direction in the
+          data.</p>
+
+
+          <p>This is where the <em>covariance matrix</em> comes in. A covariance matrix
+          is just a table that asks: which measurements tend to move together? In the
+          height-and-arm-span example, the covariance between height and arm span would
+          be positive, because they often increase together. If one measurement tends to
+          go up when another goes down, their covariance is negative. If two
+          measurements do not have a consistent relationship, their covariance is near
+          zero.</p>
+
+
+          <p>The calculation is also not mysterious. First we center every dimension by
+          subtracting its average, so each value says “how far above or below average is
+          this word on this dimension?” Then, for every pair of dimensions, we multiply
+          those two centered values for each word and average the result:
+          <code>average((dimension i - average i) × (dimension j - average j))</code>.
+          That number is the covariance between those two dimensions. Since our word
+          vectors have 36 dimensions, the covariance matrix is a <code>36 × 36</code>
+          table. It summarizes the overall shape of the whole cloud: which directions
+          stretch together, which oppose each other, and which are mostly unrelated.</p>
+
+
+          <p>Now for <em>eigenvectors</em>. A useful way to think about them is as the
+          natural directions of a stretched-out shape. If a cloud of points looks like a
+          long oval, one natural direction runs along the length of the oval, and
+          another runs across its width. Those directions are not chosen by us
+          arbitrarily; they come from the shape of the data itself. For PCA, the
+          eigenvectors of the covariance matrix are those natural directions. The
+          eigenvalue attached to each eigenvector tells us how much spread there is in
+          that direction.</p>
+
+
+          <p>So the first principal component is the eigenvector with the largest
+          eigenvalue: the direction where the cloud is most spread out. The second
+          principal component is the next strongest direction, at right angles to the
+          first. In the height-and-arm-span example, the first component might point
+          along “overall body size.” In our word-vector example, the direction is harder
+          to name, but the idea is the same: PCA finds the strongest patterns of
+          variation in the trained vectors and uses the top two as the map axes.</p>
+
+
+          <p>This picture is useful, but it is still only a projection. Because we keep
+          only 2 of the original 36 directions, PCA must throw information away. Two
+          dots can look close on the map even though they are far apart in the full
+          36-dimensional space. That is exactly why we trust the neighbor list, which is
+          computed using all 36 numbers, more than the picture.</p>
+          
+
+        </div>
         <div class="embedding-layout real-embedding-layout">
           <div class="panel">
             <div class="section-title-row">
@@ -770,12 +859,21 @@ return { focus: focusWord, neighbors };</textarea>
                 <span>Word to inspect</span>
                 <select id="focusWordSelect" class="control-input"></select>
               </label>
-              <label class="select-row" for="analogyInput">
-                <span>Vector math</span>
-                <input id="analogyInput" class="control-input" type="text" placeholder="optional: alice - said + queen">
+              <label class="select-row" for="analogyPresetSelect">
+                <span>Vector-math example</span>
+                <select id="analogyPresetSelect" class="control-input">
+                  <option value="he - him + her">he &minus; him + her</option>
+                  <option value="queen - king + duchess">queen &minus; king + duchess</option>
+                  <option value="alice - she + he">alice &minus; she + he</option>
+                  <option value="hatter - hare + mouse">hatter &minus; hare + mouse</option>
+                </select>
+              </label>
+              <label class="select-row analogy-custom" for="analogyInput">
+                <span>Or type your own</span>
+                <input id="analogyInput" class="control-input" type="text" value="he - him + her" placeholder="three trained words, e.g. he - him + her">
               </label>
             </div>
-            <p class="microcopy">Pick a trained word. Nearby words are ranked with cosine similarity on the full vectors.</p>
+            <p class="microcopy">Pick a word to inspect its nearest neighbors (cosine similarity on the full 36 numbers). <strong>Vector math</strong> takes three trained words as <code>A &minus; B + C</code> and returns the closest word - so <code>he &minus; him + her</code> asks "her is to him as ___ is to he?". On a tiny model the answers are rough; that is part of the lesson.</p>
             <div id="nearestPanel" class="neighbor-list" aria-live="polite"></div>
             <div id="analogyPanel" class="vector-readout" aria-live="polite"></div>
           </div>
@@ -795,13 +893,36 @@ return { focus: focusWord, neighbors };</textarea>
             to your model: cosine similarity for neighbors, and vector arithmetic for
             analogies.
           </p>
+          <p>
+            Why GloVe? It is one of the two classic recipes for word vectors (alongside
+            the Word2Vec we just trained), it is freely published, and it was trained at
+            a scale we cannot touch in a browser. The name is short for <em>Global
+            Vectors</em>: instead of sliding a window and rewarding real neighbor pairs
+            one at a time like skip-gram, GloVe first counts how often every pair of
+            words co-occurs across the <em>whole</em> corpus, then fits each vector so
+            that the dot product of two words matches how often they appear together.
+            Different bookkeeping, same destination - words used alike end up close.
+            Watching the two side by side, the lesson is not which recipe wins; it is
+            what <strong>scale</strong> buys. GloVe's neighbors are far steadier and its
+            analogies (like <code>king &minus; man + woman &asymp; queen</code>) actually
+            land, because 6 billion words pin down each vector much more tightly than one
+            short book ever could.
+          </p>
           <div class="control-grid compact-controls">
             <label class="select-row" for="compareWordSelect">
               <span>Word to compare</span>
               <select id="compareWordSelect" class="control-input"></select>
             </label>
-            <label class="select-row" for="compareAnalogyInput">
-              <span>Analogy</span>
+            <label class="select-row" for="comparePresetSelect">
+              <span>Analogy example</span>
+              <select id="comparePresetSelect" class="control-input">
+                <option value="king - man + woman">king &minus; man + woman</option>
+                <option value="brother - man + woman">brother &minus; man + woman</option>
+                <option value="king - queen + woman">king &minus; queen + woman</option>
+              </select>
+            </label>
+            <label class="select-row analogy-custom" for="compareAnalogyInput">
+              <span>Or type your own</span>
               <input id="compareAnalogyInput" class="control-input" type="text" value="king - man + woman">
             </label>
           </div>
@@ -825,27 +946,6 @@ return { focus: focusWord, neighbors };</textarea>
             illustrative, not exhaustive.
           </p>
         </div>
-
-        <article class="code-cell chapter-code-cell" data-chapter-output="neighbors">
-          <div class="cell-head">
-            <h3>Inspect the raw word vector</h3>
-            <button class="run-button" type="button">Run</button>
-          </div>
-          <div class="code-quiz" data-quiz-type="predict" data-explain="An embedding is just a row of numbers (a vector). The neighbor list and every cosine similarity are computed from these raw numbers.">
-            <p class="quiz-prompt">Predict first: this cell returns a word's trained <strong>embedding</strong>. What does an embedding actually look like?</p>
-            <div class="quiz-options" role="group" aria-label="Predict what an embedding is">
-              <button class="quiz-option" type="button" data-correct="true">A row of numbers (a vector)</button>
-              <button class="quiz-option" type="button">A single number &mdash; the word's count</button>
-              <button class="quiz-option" type="button">A list of the word's synonyms</button>
-            </div>
-            <p class="quiz-feedback" aria-live="polite" hidden></p>
-            <button class="quiz-skip" type="button">Just show me the code</button>
-          </div>
-          <textarea class="code-input" spellcheck="false">// The neighbor list above is computed from raw numbers like these.
-// This returns the actual trained vector (one row) for the selected word.
-return wordVector(focusWord);</textarea>
-          <div class="code-output" aria-live="polite"></div>
-        </article>
       </div>
     </section>
 
@@ -873,8 +973,40 @@ return wordVector(focusWord);</textarea>
             about 0.12; multiply by 1.1 twenty times and you balloon to roughly 6.7. So
             the signal tends to either vanish to nothing or explode - the famous
             <a href="https://en.wikipedia.org/wiki/Vanishing_gradient_problem" target="_blank" rel="noreferrer">vanishing and exploding gradient</a>
-            problem. Move the sliders below and watch it happen for yourself; then we
-            will see how LSTMs and GRUs added gates to tame the flow.
+            problem.
+          </p>
+          <p>
+            Why must it multiply at all? To learn, the network traces each mistake
+            backward through every step the signal passed - the chain rule from
+            calculus - and because the <em>same</em> recurrent weight is reused at every
+            step, that backward trace becomes the weight multiplied by itself over and
+            over. So a single quantity, the size of that recurrent weight, largely
+            decides the network's fate, and three regimes fall out of it:
+          </p>
+          <ul class="training-step-list">
+            <li><strong>Below 1 - vanishing.</strong> The product shrinks toward zero, so
+            a signal from far back arrives too faint to change anything. The network
+            cannot learn that a word 30 steps ago mattered - this is the failure that
+            loses <code>France</code> by the time we reach <code>french</code>.</li>
+            <li><strong>Right around 1 - stable.</strong> The signal neither dies nor
+            blows up, so long-range learning is actually possible. It is a narrow,
+            hard-to-hold sweet spot.</li>
+            <li><strong>Above 1 - exploding.</strong> The product grows without bound.
+            Updates become enormous and erratic; training lurches, overshoots, and often
+            collapses into <code>NaN</code>. That runaway growth is why the numbers in
+            the slider's exploding range jump around so violently.</li>
+          </ul>
+          <p>
+            The sliders below make it concrete: set the recurrent weight and the number
+            of time steps, and watch one number get multiplied step by step. A value
+            just under 1 fades to almost nothing over 20 steps, while a value just over 1
+            rockets upward - that knife-edge between forgetting and blowing up is the
+            whole problem. Real RNNs juggle whole matrices rather than a single number,
+            but the intuition is identical.
+            <a href="https://www.bioinf.jku.at/publications/older/2604.pdf" target="_blank" rel="noreferrer">LSTMs</a>
+            and GRUs were invented to escape this trap: they add small learnable
+            <strong>gates</strong> that can hold a value steady across many steps, so the
+            signal can travel far without fading or exploding.
           </p>
         </div>
 
@@ -902,6 +1034,41 @@ return wordVector(focusWord);</textarea>
             <div id="gradientPanel" class="gradient-panel" aria-live="polite"></div>
           </div>
         </div>
+
+        <div class="section-heading">
+          <p>
+            So how do LSTMs and GRUs escape that trap? The root problem was that a plain
+            RNN <em>overwrites</em> its hidden state every step, forcing the signal
+            through the same multiply again and again. An <strong>LSTM</strong> (Long
+            Short-Term Memory) adds a second, protected track called the <strong>cell
+            state</strong> - picture a conveyor belt running straight through time.
+            Rather than being rewritten each step, the belt is mostly just <em>added
+            to</em>, and a few tiny learned <strong>gates</strong> (small sigmoid layers
+            that output a number from 0 to 1) decide what happens to it: a <strong>forget
+            gate</strong> sets how much of the old memory to keep, an <strong>input
+            gate</strong> how much new information to write, and an <strong>output
+            gate</strong> how much to reveal. The crucial one is the forget gate: when it
+            sits near 1, the belt carries a value forward almost untouched for dozens of
+            steps, so tracing the gradient backward is like multiplying by about 1 each
+            step instead of by a shrinking or exploding weight. The signal survives the
+            long trip, and a clue like <code>France</code> can finally reach a blank
+            thirty words later.
+          </p>
+          <p>
+            A <a href="https://arxiv.org/abs/1406.1078" target="_blank" rel="noreferrer">GRU</a>
+            (Gated Recurrent Unit) is the same idea on a diet: it merges the cell and
+            hidden state and uses just two gates - an <strong>update gate</strong> that
+            blends "keep the old state" with "use the new one," and a <strong>reset
+            gate</strong> that decides how much past context to ignore when proposing the
+            next value. With fewer parameters it trains faster and often matches the
+            LSTM. Either way the fix is structural, not a lucky setting: by letting the
+            network <em>choose</em> to carry its memory along an almost-unchanged path -
+            instead of being forced to multiply it at every step - gates turn the
+            vanishing/exploding knife-edge into something a model can actually train
+            through.
+          </p>
+        </div>
+
         <p class="microcopy section-note">
           One detail we have quietly glossed over: every model in this chapter still
           split text on spaces, exactly the way Chapter 1 did. Real models do not.
