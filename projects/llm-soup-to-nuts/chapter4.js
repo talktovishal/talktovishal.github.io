@@ -127,23 +127,23 @@ const probabilityPresets = {
   },
   dog: {
     title: "the dog",
-    labels: ["ran", "sat", "barked"],
-    counts: [9, 4, 2],
-    guesses: [45, 35, 20]
+    labels: ["ran", "sat", "saw"],
+    counts: [7, 5, 2],
+    guesses: [40, 35, 25]
   },
   bird: {
     title: "the bird",
-    labels: ["sang", "flew", "sat"],
-    counts: [5, 5, 3],
-    guesses: [60, 25, 15]
+    labels: ["sat", "ran", "saw"],
+    counts: [5, 4, 2],
+    guesses: [55, 30, 15]
   }
 };
 
 const embeddingRows = {
-  cat: [0.62, -0.22, 0.48, 0.12],
-  dog: [0.58, -0.18, 0.52, 0.19],
-  mat: [-0.31, 0.73, -0.28, 0.44],
-  rug: [-0.24, 0.69, -0.18, 0.56]
+  cat: [0.70, 0.30],
+  dog: [0.60, 0.40],
+  mat: [-0.30, 0.70],
+  rug: [-0.20, 0.60]
 };
 
 const lineData = [
@@ -1538,7 +1538,7 @@ function renderNextWordLab() {
   dom.nwTempLabel.textContent = formatNumber(Number(dom.nwTempSlider.value) / 100, 2);
   if (!nwState.hasTrained) {
     dom.nwStatus.textContent = "untrained";
-    dom.nwMetrics.replaceChildren(createElement("div", "empty-state", "Press Train (or Train one step) to train the model and reveal its metrics."));
+    dom.nwMetrics.replaceChildren(createElement("div", "empty-state", "Press Train next-word model (or Train 10 epochs) to train the model and reveal its metrics."));
     dom.nwLossHistory.replaceChildren(createElement("div", "empty-state", "Loss history appears once training starts."));
     renderNwPrediction();
     return;
@@ -1584,20 +1584,62 @@ function runCodeCell(cell) {
   }
 }
 
+function humanizeKey(key) {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .toLowerCase();
+}
+
+function formatResultValue(key, value) {
+  if (typeof value !== "number") return String(value);
+  if (/accuracy|gap/i.test(key)) return formatPercent(value);
+  if (Number.isInteger(value)) return String(value);
+  return formatNumber(value, Math.abs(value) < 1 ? 3 : 2);
+}
+
 function renderCodeResult(output, result) {
+  const data = result && typeof result === "object" ? result : { value: result };
+  const status = createElement("div", "output-status");
+  status.append(
+    createElement("strong", "", "Ran successfully"),
+    createElement("span", "", "browser training loop")
+  );
   const visual = createElement("div", "output-visual");
-  const entries = Object.entries(result || {});
-  const metrics = createElement("div", "output-metrics");
-  entries.slice(0, 6).forEach(([label, value]) => {
-    const item = createElement("div", "output-metric");
-    item.append(createElement("strong", "", String(value)), createElement("span", "", label));
-    metrics.append(item);
-  });
-  visual.append(metrics);
-  const pre = createElement("pre", "output-raw-preview");
+
+  const numericEntries = Object.entries(data).filter(
+    ([key, value]) => key !== "sample" && typeof value === "number"
+  );
+  if (numericEntries.length) {
+    const metrics = createElement("div", "output-metrics");
+    numericEntries.slice(0, 6).forEach(([key, value]) => {
+      const item = createElement("div", "output-metric");
+      item.append(
+        createElement("strong", "", formatResultValue(key, value)),
+        createElement("span", "", humanizeKey(key))
+      );
+      metrics.append(item);
+    });
+    visual.append(metrics);
+  }
+
+  if (typeof data.sample === "string") {
+    const sentence = createElement("div", "generate-panel");
+    sentence.append(
+      createElement("p", "generated-line", data.sample),
+      createElement("span", "generated-note", "sampled from the model you just trained")
+    );
+    visual.append(sentence);
+  }
+
+  const raw = createElement("details", "output-raw");
+  raw.append(createElement("summary", "", "Raw result object"));
+  const pre = createElement("pre");
   pre.textContent = JSON.stringify(result, null, 2);
-  visual.append(pre);
-  output.replaceChildren(visual);
+  raw.append(pre);
+  visual.append(raw);
+
+  output.replaceChildren(status, visual);
 }
 
 function wireEvents() {

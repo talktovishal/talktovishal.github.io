@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
-  <link rel="stylesheet" href="styles.css?v=20260617">
+  <link rel="stylesheet" href="styles.css?v=20260621c">
   <link rel="stylesheet" href="chapter4.css">
 </head>
 <body>
@@ -21,6 +21,8 @@
       <a href="index.html">Overview</a>
       <a href="chapter-1.html">Ch 1</a>
       <a href="chapter-2.html">Ch 2</a>
+      <a href="chapter-3.html">Ch 3</a>
+      <a class="is-active" href="chapter-4.html">Ch 4</a>
     </nav>
   </header>
 
@@ -43,10 +45,6 @@
     <section id="overview" class="workbench-band" aria-labelledby="page-title">
       <div class="workbench">
         <article class="intro-copy">
-          <div class="progress-banner" role="status">
-            <span class="progress-banner-badge">In Progress</span>
-            <p class="progress-banner-text">This chapter is still being written and reviewed &mdash; it is not finished yet, so parts may be rough or change. <a href="index.html#stay-notified">Get notified</a> when it is officially published.</p>
-          </div>
           <p class="eyebrow">Learning by doing</p>
           <h1 id="page-title">The math that teaches a model to guess the next word :-).</h1>
           <p class="lead">
@@ -166,10 +164,13 @@
             job is to put a number on surprise.
           </p>
           <p>
-            Here is the tiny corpus we will train on at the end of this chapter. Across
-            its sentences, <code>the cat</code> is followed by <code>sat</code> 8 times,
-            <code>ran</code> 3 times, and <code>slept</code> once - 12 examples in all.
-            So the chance of <code>sat</code> coming next, written
+            To make surprise concrete, let's start with a small pile of next-word counts
+            for a single context. Say that after <code>the cat</code> we saw
+            <code>sat</code> 8 times, <code>ran</code> 3 times, and <code>slept</code>
+            once - 12 examples in all. (These are round, hand-picked numbers so the math
+            stays clean; the real corpus we actually train on at the end of the chapter is
+            smaller and messier, but the idea is identical.) So the chance of
+            <code>sat</code> coming next, written
             <code>P(sat | the cat) = 8 / 12 &approx; 0.67</code>, is just 8 out of those
             12. That vertical bar means "given": we are not asking how common
             <code>sat</code> is everywhere, only how common it is right after
@@ -321,7 +322,11 @@
           <p>
             Surprise told us <em>how wrong</em> a guess was. But before the model can
             guess at all, it needs a way to tell words apart - and, more usefully, to
-            notice when two words are <em>alike</em>. Chapter 2's answer was to hand each
+            notice when two words are <em>alike</em>. You already do this without
+            thinking: <code>cat</code> and <code>dog</code> feel like cousins, while
+            <code>cat</code> and <code>table</code> feel like strangers. We want to give
+            the model that same gut feeling, using nothing but numbers. Chapter 2's
+            answer was to hand each
             word a short list of learned numbers, its vector. Stack all those rows into
             one table and you have an <strong>embedding matrix</strong>: one row per
             word, and "looking up a word" is simply grabbing its row. The row is not a
@@ -363,11 +368,11 @@
               </label>
               <label class="number-row vector-number-row" for="vectorBx">
                 <span>B x</span>
-                <input id="vectorBx" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="0.35">
+                <input id="vectorBx" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="0.60">
               </label>
               <label class="number-row vector-number-row" for="vectorBy">
                 <span>B y</span>
-                <input id="vectorBy" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="0.80">
+                <input id="vectorBy" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="0.40">
               </label>
             </div>
             <svg id="vectorSvg" class="vector-svg" viewBox="0 0 520 360" role="img" aria-label="Two vectors on a coordinate grid"></svg>
@@ -562,7 +567,12 @@
           <p>
             Now the satisfying part: assigning blame. With probabilities in hand,
             cross-entropy reads off how much the model put on the word that actually
-            came next - little there means a lot of surprise, a high loss. To fix it,
+            came next - little there means a lot of surprise, a high loss. (A quick
+            units note: we counted surprise in <em>bits</em> earlier, using log base 2;
+            the live loss here uses the natural log instead, so it is measured in
+            <em>nats</em> - the same quantity on a different base, which is why
+            perplexity later reads as <code>e^loss</code> rather than
+            <code>2^loss</code>.) To fix it,
             <a href="https://en.wikipedia.org/wiki/Backpropagation" target="_blank" rel="noreferrer">backpropagation</a>
             hands each word its share of the blame: "you, the word it wrongly favored -
             too high, push down; you, the true word - too low, push up." And here is the
@@ -647,6 +657,9 @@
             multiplies its inputs by weights, adds a <strong>bias</strong>, and runs
             the result through an
             <a href="https://en.wikipedia.org/wiki/Activation_function" target="_blank" rel="noreferrer">activation function</a>.
+            Picture it as a tiny opinion-maker: it listens to a few numbers, weighs
+            each one by how much it trusts that input, adds its own standing lean (the
+            bias), and then decides how strongly to speak up.
             Why bother with the activation? Because without that little bend - a
             <a href="https://en.wikipedia.org/wiki/Rectifier_(neural_networks)" target="_blank" rel="noreferrer">ReLU</a>,
             a tanh, a sigmoid - a stack of layers can only ever draw a straight line, no
@@ -676,8 +689,8 @@
               <label class="select-row activation-row" for="forwardCtxA">
                 <span>Context 1</span>
                 <select id="forwardCtxA" class="control-input">
-                  <option value="the">the</option>
-                  <option value="cat" selected>cat</option>
+                  <option value="the" selected>the</option>
+                  <option value="cat">cat</option>
                   <option value="dog">dog</option>
                   <option value="sat">sat</option>
                   <option value="ran">ran</option>
@@ -687,9 +700,9 @@
                 <span>Context 2</span>
                 <select id="forwardCtxB" class="control-input">
                   <option value="the">the</option>
-                  <option value="cat">cat</option>
+                  <option value="cat" selected>cat</option>
                   <option value="dog">dog</option>
-                  <option value="sat" selected>sat</option>
+                  <option value="sat">sat</option>
                   <option value="ran">ran</option>
                 </select>
               </label>
@@ -744,7 +757,10 @@
             accuracy</strong> shows how well the network fits dots it learned from.
             <strong>Test accuracy</strong> is the generalization check: did it learn
             the pattern, or just memorize? A big gap between them is the classic sign
-            of <a href="https://en.wikipedia.org/wiki/Overfitting" target="_blank" rel="noreferrer">overfitting</a>.
+            of <a href="https://en.wikipedia.org/wiki/Overfitting" target="_blank" rel="noreferrer">overfitting</a>
+            - the difference between a student who truly understood the lesson and one
+            who just memorized last year's answer key, then freezes the moment the
+            question changes.
           </p>
         </div>
 
@@ -1059,12 +1075,17 @@
 
     <section class="chapter-nav-band" aria-label="Chapter navigation">
       <div class="section-shell">
-        <nav class="chapter-nav chapter-nav-single">
-          <a class="chapter-nav-card" href="index.html">
-            <span>Course overview</span>
-            <strong>Back to the overview</strong>
-            <em>See the chapter map and the chapters that are ready to read now.</em>
+        <nav class="chapter-nav">
+          <a class="chapter-nav-card" href="chapter-3.html">
+            <span>Previous chapter</span>
+            <strong>Chapter 3: Tokenization</strong>
+            <em>How text becomes the tokens a model reads.</em>
           </a>
+          <span class="chapter-nav-card is-disabled">
+            <span>Next chapter</span>
+            <strong>More chapters coming soon</strong>
+            <em>Chapters 5 to 6 are in progress. <a href="index.html#stay-notified">Get notified</a> when they go live.</em>
+          </span>
         </nav>
       </div>
     </section>

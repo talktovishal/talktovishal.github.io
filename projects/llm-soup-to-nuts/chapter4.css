@@ -1,4 +1,5 @@
 .math-lab-grid,
+.math-decomposition-grid,
 .vector-grid,
 .gradient-grid,
 .softmax-grid,
@@ -11,6 +12,7 @@
 }
 
 .math-lab-grid > *,
+.math-decomposition-grid > *,
 .vector-grid > *,
 .gradient-grid > *,
 .softmax-grid > *,
@@ -202,9 +204,210 @@
   line-height: 1.25;
 }
 
+.math-decomposition-grid {
+  margin-top: 14px;
+}
+
+.decomposition-svg {
+  width: 100%;
+  min-height: 260px;
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.decomposition-track {
+  fill: #e9e4dc;
+}
+
+.decomposition-entropy {
+  fill: var(--teal);
+}
+
+.decomposition-kl {
+  fill: var(--coral);
+}
+
+.decomposition-cross-base {
+  fill: #e9e4dc;
+}
+
+.svg-title-label,
+.svg-axis-label,
+.svg-value-label,
+.svg-kl-label,
+.svg-empty-label {
+  font-family: "Inter", system-ui, sans-serif;
+  font-weight: 850;
+}
+
+.svg-title-label {
+  fill: var(--ink);
+  font-size: 14px;
+}
+
+.svg-axis-label,
+.svg-empty-label {
+  fill: var(--muted);
+  font-size: 12px;
+}
+
+.svg-value-label {
+  fill: #34302b;
+  font-size: 12px;
+}
+
+.svg-kl-label {
+  fill: var(--coral);
+  font-size: 12px;
+}
+
+.surprise-ledger {
+  display: grid;
+  gap: 7px;
+}
+
+.ledger-row {
+  display: grid;
+  grid-template-columns: minmax(64px, 0.78fr) repeat(4, minmax(68px, 1fr));
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.ledger-head {
+  min-height: 30px;
+  background: #f3eee5;
+}
+
+.ledger-row strong {
+  font-weight: 900;
+}
+
+.ledger-row span {
+  color: #48433d;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.distribution-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.distribution-grid > * {
+  min-width: 0;
+}
+
+.static-bars {
+  display: grid;
+  gap: 8px;
+}
+
+.static-bars div {
+  display: grid;
+  grid-template-columns: minmax(64px, 0.45fr) minmax(108px, 1fr) minmax(60px, auto);
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.static-bars strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.static-bars span {
+  display: block;
+  height: 13px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e9e4dc;
+}
+
+.static-bars i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--teal);
+}
+
+.static-bars div:nth-child(2) i {
+  background: var(--green);
+}
+
+.static-bars div:nth-child(3) i {
+  background: var(--gold);
+}
+
+.static-bars em {
+  color: var(--muted);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.8rem;
+  font-style: normal;
+  font-weight: 850;
+  text-align: right;
+}
+
+.distribution-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.distribution-stat-grid div {
+  display: grid;
+  gap: 4px;
+  min-height: 74px;
+  align-content: center;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.distribution-stat-grid strong {
+  color: var(--ink);
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.distribution-stat-grid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.compact-concept-lines {
+  margin: 0;
+}
+
+.formula-compact {
+  max-width: 860px;
+}
+
 .toolkit-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
   margin-top: 14px;
 }
@@ -229,6 +432,10 @@
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.35;
+}
+
+.math-concept-lines {
+  margin: 12px 0 0;
 }
 
 .vector-svg,
@@ -430,6 +637,34 @@
   margin-top: 14px;
 }
 
+.loop-bridge-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.loop-bridge-grid div {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 132px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.loop-bridge-grid strong {
+  font-weight: 900;
+}
+
+.loop-bridge-grid span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
 .nn-controls {
   grid-template-columns: minmax(190px, 1.15fr) repeat(3, minmax(170px, 0.95fr));
   margin-bottom: 12px;
@@ -563,6 +798,27 @@
   overflow-x: auto;
 }
 
+.workbook-block {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: 10px;
+  background: #f8fcfa;
+}
+
+.workbook-block h3 {
+  margin: 0 0 10px;
+}
+
+.workbook-grid {
+  margin-top: 0;
+}
+
+.workbook-grid details {
+  background: #fffefa;
+}
+
 /* ---- Forward-pass controls ---- */
 .network-grid .control-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -634,8 +890,37 @@
   font-size: 0.82rem;
 }
 
+/* ---- Practice checkpoints ---- */
+.practice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.practice-grid details {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.practice-grid summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.practice-grid p {
+  margin: 10px 0 0;
+  color: #46413b;
+  line-height: 1.5;
+}
+
 @media (max-width: 1120px) {
   .math-lab-grid,
+  .math-decomposition-grid,
+  .distribution-grid,
   .vector-grid,
   .gradient-grid,
   .softmax-grid,
@@ -646,6 +931,7 @@
   }
 
   .toolkit-strip,
+  .loop-bridge-grid,
   .corpus-lines {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -654,7 +940,9 @@
 @media (max-width: 760px) {
   .metric-card-grid,
   .toolkit-strip,
+  .loop-bridge-grid,
   .corpus-lines,
+  .practice-grid,
   .nw-controls,
   .network-grid .control-grid {
     grid-template-columns: 1fr;
@@ -667,10 +955,16 @@
   .history-row,
   .lookup-row,
   .forward-row,
+  .static-bars div,
   .vector-controls,
   .vector-number-row,
-  .math-range {
+  .math-range,
+  .distribution-stat-grid {
     grid-template-columns: 1fr;
+  }
+
+  .ledger-row {
+    grid-template-columns: 1fr 1fr;
   }
 
   .probability-row em,
@@ -678,6 +972,7 @@
   .blame-row em,
   .gradient-row em,
   .history-row em,
+  .static-bars em,
   .math-range output {
     text-align: left;
   }
