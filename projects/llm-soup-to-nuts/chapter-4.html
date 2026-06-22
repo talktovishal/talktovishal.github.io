@@ -6,6 +6,7 @@
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
   <link rel="stylesheet" href="chapter4.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
   <header class="topbar">
@@ -42,27 +43,22 @@
   </aside>
 
   <main id="top">
-    <section id="overview" class="workbench-band" aria-labelledby="page-title">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title" frozen="yes">
       <div class="workbench">
         <article class="intro-copy">
           <p class="eyebrow">Learning by doing</p>
-          <h1 id="page-title">The math that teaches a model to guess the next word :-).</h1>
-          <p class="lead">
-            I keep coming back to the same tiny miracle from Chapter 1: I type a few
-            words, and something guesses what comes next. Counting got us part of the
-            way. Now let's make the numbers <em>learn</em> the guess instead of storing
-            every little count table by hand. We will build a tiny neural network,
-            train it start to finish right here in your browser, and watch a pile of
+          <h1 id="page-title">The math prerequisites for understanding LLMs in-depth</h1>
+          <p>
+            In this chapter, we will build a tiny neural network, train it start to finish right here in your browser, and watch a pile of
             numbers learn to finish sentences.
           </p>
           <p>
-            Yes, there is math here. But every tool earns its keep by solving a problem
+            Yes, there is math here. But every concept earns its keep by solving a problem
             you can actually see. <strong>Probability</strong> puts a number on how
             surprised the model is by the real next word. <strong>Vectors</strong> let
             it compare words. <strong>Loss</strong> squeezes a wrong guess into a
-            single number. <strong>Gradients</strong> whisper which way to nudge the
-            numbers so the next guess is a little better. We meet each one only when
-            the model needs it, never as a bare definition.
+            single number. <strong>Gradients</strong> influence which way to nudge the
+            numbers so the next guess is a little better. We will progressively build the math to gain a full understanding of how LLMs work under the hood.
           </p>
           <p>
             We keep the example deliberately tiny, because a tiny model lets you watch
@@ -142,51 +138,59 @@
                 results, you can follow every formula here.
               </li>
             </ul>
-            <p>What you do <strong>not</strong> need yet: no calculus and no matrix algebra. We build gradients, softmax, and backprop up from scratch, one tiny nudge at a time - the only moves are multiply, add, and compare.</p>
           </div>
         </article>
       </div>
     </section>
 
-    <section id="math-toolkit" class="band" aria-labelledby="math-title">
+    <section id="math-toolkit" class="band" aria-labelledby="math-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">1. Surprise and the next word</p>
           <h2 id="math-title">Start where Chapter 1 left off: how surprised is the model?</h2>
+          <p class="example-note math-contract-note">
+            <em>One heads-up before we start.</em> The other chapters keep the math
+            light on purpose. This one does the opposite: we are going to write down the
+            equations. Do not let that scare you off. Every
+            symbol gets explained in plain words right where it appears, and every formula
+            is just a tidy way of writing a concept you will have already worked out by
+            hand a line above. Where a piece of calculus shows up, I will define it on . Read the words first and the symbols second, and it will all make sense.
+          </p>
           <p>
             Let's begin with a feeling you already have: <em>surprise</em>. Read
             "the cat ___" and your mind quietly bets on a couple of words -
             <code>sat</code>, maybe <code>ran</code>. End the sentence on <code>sat</code>
-            and you feel nothing; end it on <code>helicopter</code> and you flinch. A
-            language model has that exact reflex, and here is the part that surprised
-            <em>me</em> the first time I saw it: all of training is just teaching the
-            model to flinch less at the words that really come next. So our very first
+            and you feel nothing; end it on <code>helicopter</code> and you feel something is not right. A
+            language model has that exact reflex, and all of training is just teaching the
+            model to get less surprised and more confident at the words that really come next. So our very first
             job is to put a number on surprise.
           </p>
-          <p>
-            To make surprise concrete, let's start with a small pile of next-word counts
-            for a single context. Say that after <code>the cat</code> we saw
-            <code>sat</code> 8 times, <code>ran</code> 3 times, and <code>slept</code>
-            once - 12 examples in all. (These are round, hand-picked numbers so the math
+<p>
+            To make this concrete, let's start with a small pile of next-word counts
+            for a specific context. Say that after the phrase <code>the cat</code>, we look at our training data and see
+            the word <code>sat</code> 8 times, <code>ran</code> 3 times, and <code>slept</code>
+            once—12 examples in all. (These are round, hand-picked numbers so the math
             stays clean; the real corpus we actually train on at the end of the chapter is
-            smaller and messier, but the idea is identical.) So the chance of
-            <code>sat</code> coming next, written
-            <code>P(sat | the cat) = 8 / 12 &approx; 0.67</code>, is just 8 out of those
-            12. That vertical bar means "given": we are not asking how common
-            <code>sat</code> is everywhere, only how common it is right after
-            <code>the cat</code>.
+            larger and messier, but the core idea is identical.) We can express the chance of
+            <code>sat</code> coming next as
+            <code>P(sat | the cat) = 8 / 12 &approx; 0.67</code> (or 67%). That vertical bar means "given": we are not asking how common
+            the word <code>sat</code> is everywhere, only how common it is <em>right after</em>
+            <code>the cat</code>. This represents the <strong>true distribution</strong> of our data.
           </p>
           <p>
-            Now the three words this whole section turns on.
-            <a href="https://en.wikipedia.org/wiki/Cross-entropy" target="_blank" rel="noreferrer">Cross-entropy</a>
-            is the model's <em>actual</em> surprise at the real next word, counted in
-            bits. <a href="https://en.wikipedia.org/wiki/Entropy_(information_theory)" target="_blank" rel="noreferrer">Entropy</a>
-            is the <em>smallest</em> surprise anyone could manage on this context - the
-            floor you reach only if your guesses match the evidence perfectly. And
-            <a href="https://en.wikipedia.org/wiki/Perplexity" target="_blank" rel="noreferrer">perplexity</a>
-            rewrites that surprise on a friendlier scale: roughly how many words the
-            model felt torn between. Three names, but they all answer one question - is
-            the model confident, or flailing?
+            When training a language model, we want its predictions to match this reality as closely as possible. To measure how well it's doing, we rely on three heavily connected concepts from Information Theory. All three answer one fundamental question: <em>is the model confident, or flailing?</em> Let's look at them through the lens of "surprise."
+          </p>
+          <p>
+            <a href="https://en.wikipedia.org/wiki/Entropy_(information_theory)" target="_blank" rel="noreferrer">Entropy</a>
+            is the <em>inherent uncertainty</em> of the language itself. Imagine you knew the exact true probabilities (like our 67%, 25%, and 8%). Even with perfect knowledge, you still can't be 100% sure what the next word will be; there is a baseline level of average surprise when the next word is finally revealed. Entropy calculates this absolute floor, measured in bits. It is the <em>smallest</em> average surprise anyone could manage on this context. If a context forces exactly one specific next word every single time, the entropy is zero bits—no surprise at all.
+          </p>
+          <p>
+            <a href="https://en.wikipedia.org/wiki/Cross-entropy" target="_blank" rel="noreferrer">Cross-entropy</a>, on the other hand,
+            is the model's <em>actual</em> average surprise when it uses its own internal, imperfect probabilities to predict the real next words. If our model incorrectly thinks <code>slept</code> is the most likely next word, it will incur a massive "surprise penalty" every time <code>sat</code> repeatedly shows up in the training data. The closer the model's predictions match the true distribution, the lower the cross-entropy gets, eventually bottoming out exactly at the true Entropy floor. In machine learning, minimizing cross-entropy is the standard way we teach models to predict text.
+          </p>
+          <p>
+            Finally, <a href="https://en.wikipedia.org/wiki/Perplexity" target="_blank" rel="noreferrer">perplexity</a>
+            rewrites this cross-entropy metric on a much friendlier, intuitive scale. While "bits of surprise" can feel abstract, perplexity translates those bits back into an effective vocabulary size. Mathematically, it is simply the exponentiation of cross-entropy (e.g., 2<sup>cross-entropy</sup>). If a model has a perplexity of 4 on a given text, it means that, on average, the model felt as confused as if it were choosing blindly between 4 equally likely words. A perfect model that knows exactly what comes next has a perplexity of 1.
           </p>
           <p class="example-note">
             <em>Now feel it for yourself.</em> The left sliders are the evidence - how
@@ -263,13 +267,13 @@
           <h3>Cross-entropy by hand</h3>
           <p>
             With the evidence <code>sat 8, ran 3, slept 1</code> and a model that
-            guesses <code>sat 55%, ran 30%, slept 15%</code>, the surprise at each
+            guesses <strong>sat 55% <u>(0.55)</u>, ran 30% <u>(0.30)</u>, slept 15% <u>(0.15)</u></strong>, the surprise at each
             real word is <code>-log2(model probability)</code>, weighted by how often
             that word actually happened:
           </p>
           <div class="formula-stack">
-            <code>P(sat) = 8/12 = 0.67, P(ran) = 3/12 = 0.25, P(slept) = 1/12 = 0.08</code>
-            <code>cross-entropy = 0.67·(-log2 0.55) + 0.25·(-log2 0.30) + 0.08·(-log2 0.15)</code>
+            <code>P(sat) = 8/12 ≈ 0.67, P(ran) = 3/12 = 0.25, P(slept) = 1/12 ≈ 0.083</code>
+            <code>cross-entropy = 0.67·(-log2 <u>0.55</u>) + 0.25·(-log2  <u>0.30</u>) + 0.083·(-log2 <u>0.15</u>)</code>
             <code>≈ 0.58 + 0.43 + 0.23 = 1.24 bits → perplexity = 2^1.24 ≈ 2.4 words</code>
           </div>
           <p class="microcopy">
@@ -279,6 +283,34 @@
           </p>
         </div>
 
+        <div class="math-formal" aria-label="Surprise in symbols">
+          <h3>The same idea, in symbols</h3>
+          <p>
+            Everything we just discussed has a compact mathematical form. The core building block is the <em>surprise</em> of a single word. If our model assigns a probability \(q\) to a specific word, the surprise of seeing that word is measured as \(-\log_2(q)\) bits. Notice how this aligns with our intuition: if the model is highly confident (\(q\) is close to 1), the surprise drops to nearly zero. But if the model thinks a word is almost impossible (\(q\) is close to 0), the resulting surprise penalty is massive.
+          </p>
+          <p>
+            To evaluate the model's overall performance, we don't just look at one word; we calculate the <em>expected</em> (or average) surprise. We take the surprise of every possible next word and weight it by how often that word <strong>truly</strong> appears in the evidence (\(p\)). Adding all these weighted surprises together gives us the Entropy (if using the true probabilities \(p\) for the surprise) or Cross-Entropy (if using the model's imperfect guesses \(q\) for the surprise):
+          </p>
+          
+          $$H(p) = -\sum_{w} p(w)\,\log_2 p(w) \qquad H(p,q) = -\sum_{w} p(w)\,\log_2 q(w)$$
+          $$\text{Perplexity} = 2^{H(p,q)}$$
+          
+          <ul class="symbol-glossary">
+            <li>\(p(w)\): The <strong>true distribution</strong> &mdash; how often word \(w\) actually follows this context in the data.</li>
+            <li>\(q(w)\): The <strong>model's prediction</strong> &mdash; the probability the model assigns to word \(w\).</li>
+            <li>\(\sum_{w}\): The sum over the entire vocabulary. We add up the probability-weighted surprise for every candidate next word.</li>
+            <li>\(\log_2\): Measures the surprise in <strong>bits</strong>, framing the prediction as binary choices. Perplexity turns those abstract bits back into an intuitive word count.</li>
+          </ul>
+          
+          <p class="microcopy">
+            <strong>Checking the math:</strong> Let's plug in the numbers from our live panel. Our true data is \(p = (\tfrac{8}{12}, \tfrac{3}{12}, \tfrac{1}{12})\) and our model's guesses are \(q = (0.55, 0.30, 0.15)\). 
+            <br><br>
+            The true Entropy floor is \(H(p) = 1.19\) bits. The model's Cross-Entropy is \(H(p,q) = 1.24\) bits, and its Perplexity is \(2^{1.24} \approx 2.36\) words. 
+            <br><br>
+            <em>A note on actual training:</em> Later sections (and ML frameworks like PyTorch) switch to using the natural log \(\ln\). This measures the exact same surprise, but in <em>nats</em> instead of bits. In that environment, cross-entropy is often just called your "Loss," and perplexity is calculated as \(e^{\text{loss}}\).
+          </p>
+        </div>
+        
         <div class="code-quiz" data-quiz-type="predict" data-explain="Entropy is the unavoidable floor set by the evidence itself; cross-entropy is the model's actual surprise, which sits on or above that floor. Training pushes cross-entropy down toward the entropy floor - it can never dip below it.">
           <p class="quiz-prompt">Quick check: this context honestly allows several next words. As the model learns, its <strong>cross-entropy</strong> falls - how low can it possibly go?</p>
           <div class="quiz-options" role="group" aria-label="How low can cross-entropy go">
@@ -289,28 +321,59 @@
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
-        <article class="toolkit-strip" aria-label="Five words for surprise">
-          <div>
-            <strong>Probability</strong>
-            <span>How much chance the model gives one next word, from 0 to 1.</span>
-          </div>
-          <div>
-            <strong>Conditional probability</strong>
-            <span>The chance of a word given the context, like <code>sat</code> given <code>the cat</code>.</span>
-          </div>
-          <div>
-            <strong>Entropy</strong>
-            <span>The unavoidable surprise when the context truly allows several next words.</span>
-          </div>
-          <div>
-            <strong>Cross-entropy</strong>
-            <span>The model's real surprise at the actual next word. Training drives this down.</span>
-          </div>
-          <div>
-            <strong>Perplexity</strong>
-            <span>Cross-entropy as a count: about how many next words the model is torn between.</span>
-          </div>
-        </article>
+
+        <div class="math-formal" aria-label="Intuition and Reasoning">
+          <h3>Why \(-\log_2(q)\)? The Four Rules of Surprise</h3>
+          <p>
+            The formula \(-\log_2(q)\) wasn't chosen randomly. Claude Shannon formulated it in 1948 because it is the <em>only</em> mathematical function that perfectly matches how our common-sense concept of "surprise" works:
+          </p>
+          <ul>
+            <li>
+              <strong>Certainty means zero surprise:</strong> If a model is 100% certain (probability \(q = 1.0\)), it shouldn't be surprised when it's right. Mathematically, \(-\log_2(1) = 0\) bits.
+            </li>
+            <li>
+              <strong>Surprises must add up:</strong> If you flip a coin (50% chance) and draw a specific suit from a deck of cards (25% chance), the probability of <em>both</em> happening is found by multiplying (\(0.5 \times 0.25 = 0.125\)). But surprise shouldn't multiply; it should <em>add</em>. Logarithms are the exact mathematical tool that turns multiplication into addition.
+            </li>
+            <li>
+              <strong>We want positive numbers:</strong> Probabilities are always fractions, and logarithms of fractions are negative (e.g., \(\log_2(0.5) = -1\)). Shannon simply added a negative sign to the front of the equation to flip the result back to a positive number, giving us \(1\) bit of surprise.
+            </li>
+            <li>
+              <strong>We want to measure in "Choices":</strong> Using base-2 (\(\log_2\)) ties the math directly to binary choices, or bits. A 1-in-2 chance (\(q = 0.5\)) yields \(1\) bit. A 1-in-4 chance yields \(2\) bits. As the probability approaches zero, the surprise shoots toward infinity.
+            </li>
+          </ul>
+
+          <h3>The Deeper Truth: Optimal Data Compression</h3>
+          <p>
+            To get to the next level of depth, we have to look past the metaphor of "surprise." Shannon was originally trying to figure out the fundamental physical limits of data compression. The reason \(-\log_2(q)\) is the "right" formula is because it calculates the absolute minimum number of <strong>1s and 0s (bits)</strong> required to encode a piece of information.
+          </p>
+          <p>
+            Imagine playing a game of 20 Questions to guess the next word, where every yes/no question costs exactly 1 bit. To be efficient, you assign your shortest paths (fewest questions) to the most common words:
+          </p>
+          <ul>
+            <li>If a word happens <strong>50%</strong> of the time (1-in-2), it takes exactly <strong>1 question</strong> to identify (\(-\log_2(0.5) = 1\) bit).</li>
+            <li>If a word happens <strong>25%</strong> of the time (1-in-4), it takes <strong>2 questions</strong> (\(-\log_2(0.25) = 2\) bits).</li>
+            <li>If a word happens <strong>12.5%</strong> of the time (1-in-8), it takes <strong>3 questions</strong> (\(-\log_2(0.125) = 3\) bits).</li>
+          </ul>
+          <p>
+            The formula isn't an arbitrary penalty; it is the <em>literal number of bits you must spend to encode that word</em> in a perfectly optimized system.
+          </p>
+
+          <h3>Why Cross-Entropy is the Perfect Loss Function</h3>
+          <p>
+            When we evaluate a Large Language Model, we are judging the "rulebook" it uses to compress and predict language.
+          </p>
+          <p>
+            <strong>Entropy (\(H\))</strong> is the unbreakable law of physics for compression. If we know the <em>exact</em> true probabilities of every word, Entropy tells us the minimum average number of bits per word needed to encode the text.
+          </p>
+          <p>
+            <strong>Cross-Entropy</strong> measures what happens when we compress the true text using our model's <em>flawed</em> rulebook. If our model incorrectly predicts that a common word like <code>sat</code> is incredibly rare (say, \(q = 0.01\)), it will assign a long, 6.6-bit code to it (\(-\log_2(0.01) \approx 6.6\)). Because <code>sat</code> actually shows up all the time, we are forced to constantly use this massive 6.6-bit code, wasting a huge amount of data.
+          </p>
+          <p>
+            When we train an LLM to "minimize cross-entropy loss," we are literally forcing it to rearrange its internal probabilities so its coding rulebook wastes as few bits as possible compared to the true distribution of the text.
+          </p>
+        </div>
+
+
       </div>
     </section>
 
@@ -318,9 +381,9 @@
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">2. Words as vectors</p>
-          <h2 id="vectors-title">Give each word a few numbers so comparison becomes geometry.</h2>
+          <h2 id="vectors-title">Representing words as vectors - a list of numbers.</h2>
           <p>
-            Surprise told us <em>how wrong</em> a guess was. But before the model can
+            We used surprise to tell us <em>how wrong</em> our guess was. But before the model can
             guess at all, it needs a way to tell words apart - and, more usefully, to
             notice when two words are <em>alike</em>. You already do this without
             thinking: <code>cat</code> and <code>dog</code> feel like cousins, while
@@ -330,7 +393,7 @@
             word a short list of learned numbers, its vector. Stack all those rows into
             one table and you have an <strong>embedding matrix</strong>: one row per
             word, and "looking up a word" is simply grabbing its row. The row is not a
-            dictionary definition; it is a handle the model can tune. Here we shrink
+            dictionary definition; it is something that the learning algorithm can tune. Here we shrink
             each word down to just two numbers, so we can draw it as an arrow on a grid
             and actually see what the model sees.
           </p>
@@ -421,6 +484,32 @@
           </p>
         </div>
 
+<div class="math-formal" aria-label="Comparison in symbols">
+          <h3>The same comparison, in symbols</h3>
+          <p>
+            Why does multiplying and adding numbers measure meaning? Imagine each dimension in a word vector represents a hidden trait (like "furriness" or "royalty"). When you multiply matching components, you are checking for shared traits. If both <code>cat</code> and <code>dog</code> score high on "furry," multiplying those values produces a large number. Adding these up across all dimensions yields the <strong>dot product</strong>—a raw score of semantic overlap.
+          </p>
+          <p>
+            This mathematical trick wasn't invented for language. In the 1880s, physicists like Josiah Willard Gibbs formulated vector algebra to calculate how much of one physical force aligns with another (like wind pushing against a sail). They proved that the dot product inherently captures the geometric <strong>angle</strong> (\(\theta\)) between two arrows.
+          </p>
+          <p>
+            For language models, this geometric angle is crucial. Raw dot products have a flaw: they grow larger simply if a vector is longer (e.g., if a word appears more frequently during training). By dividing the dot product by the lengths of the two vectors, we strip away the magnitude. We are left only with the direction they point. This is <strong>cosine similarity</strong>:
+          </p>
+          $$a \cdot b = \sum_{i=1}^{n} a_i b_i \qquad \lVert a \rVert = \sqrt{a \cdot a} \qquad \cos\theta = \frac{a \cdot b}{\lVert a \rVert\,\lVert b \rVert}$$
+          <ul class="symbol-glossary">
+            <li>\(a_i\): the \(i\)-th number inside vector \(a\) (e.g., its score for a specific trait).</li>
+            <li>\(n\): how many numbers each vector holds (just 2 in this demo, but thousands in an LLM).</li>
+            <li>\(\lVert a \rVert\): the magnitude or overall length of the arrow \(a\).</li>
+            <li>\(\theta\): the angle between the two arrows. If they point the exact same way (identical meaning), the angle is 0&deg;, and \(\cos(0) = 1\).</li>
+          </ul>
+          <p class="microcopy">
+            With \(\text{cat} = [0.7, 0.3]\) and \(\text{dog} = [0.6, 0.4]\):
+            \(a \cdot b = 0.54\), \(\lVert \text{cat} \rVert \approx 0.76\),
+            \(\lVert \text{dog} \rVert \approx 0.72\), so \(\cos\theta \approx 0.98\).
+            The model ranks every candidate next word with this one operation, finding the vector that points in the most similar direction.
+          </p>
+        </div>
+        
         <div class="code-quiz" data-quiz-type="predict" data-explain="A dot product (and the cosine built from it) is large when two vectors point the same way. Words used in the same contexts get trained toward the same direction, so their dot product is large - which is how the model shares what it knows about one word with a similar one.">
           <p class="quiz-prompt">Quick check: two words are used in almost exactly the same way, so training pushed their vectors to point the same direction. Their dot product is&hellip;</p>
           <div class="quiz-options" role="group" aria-label="Dot product of similar words">
@@ -531,6 +620,34 @@
           </p>
         </div>
 
+        <div class="math-formal" aria-label="Learning in symbols">
+          <h3>Loss, gradient, and the update rule, in symbols</h3>
+          <p>
+            The loss is the average squared gap between the line's prediction \(\hat{y}\)
+            and the true value \(y\). The <strong>gradient</strong>
+            \(\frac{\partial L}{\partial w}\) reads as "how fast does the loss \(L\) change
+            if I nudge just the one knob \(w\), holding the rest still." That is all the
+            partial derivative \(\partial\) means here:
+          </p>
+          $$L = \frac{1}{N}\sum_{i=1}^{N}\big(\hat{y}_i - y_i\big)^2$$
+          $$\frac{\partial L}{\partial\,\text{slope}} = 2(\hat{y}-y)\,x \qquad \frac{\partial L}{\partial\,\text{intercept}} = 2(\hat{y}-y)$$
+          $$w \leftarrow w - \eta\,\frac{\partial L}{\partial w}$$
+          <ul class="symbol-glossary">
+            <li>\(\hat{y}\): the line's prediction, \(\text{slope}\cdot x + \text{intercept}\); \(y\): the true value.</li>
+            <li>\(N\): how many points we average the loss over.</li>
+            <li>\(\frac{\partial L}{\partial w}\): the gradient, the uphill slope of the loss for knob \(w\).</li>
+            <li>\(\eta\) (eta): the <strong>learning rate</strong>, the step size; the same slider in the lab.</li>
+            <li>\(\leftarrow\): "becomes," the weight is replaced by its nudged value.</li>
+          </ul>
+          <p class="microcopy">
+            One point \((x{=}1,\ y{=}1)\) with \(\text{slope}{=}0\) gives \(\hat{y}=0\) and
+            error \(\hat{y}-y = -1\), so \(\frac{\partial L}{\partial\,\text{slope}} =
+            2(-1)(1) = -2\), and \(\text{slope} \leftarrow 0 - 0.1(-2) = +0.2\). Subtracting
+            the gradient steps downhill; \(\eta\) sets how big that step is. Too small and
+            you crawl, too big and you leap past the bottom.
+          </p>
+        </div>
+
         <div class="code-quiz" data-quiz-type="predict" data-explain="The gradient points uphill (toward larger loss), so gradient descent subtracts it - a step in the opposite, downhill direction. That one subtraction is repeated for every weight in the network.">
           <p class="quiz-prompt">Quick check: the gradient of the loss points the way that makes the loss <em>larger</em>. To make the loss smaller, gradient descent steps&hellip;</p>
           <div class="quiz-options" role="group" aria-label="Which way gradient descent steps">
@@ -631,6 +748,62 @@
             <div id="softmaxPanel" class="probability-panel" aria-live="polite"></div>
             <div id="backpropPanel" class="backprop-panel" aria-live="polite"></div>
           </div>
+        </div>
+
+        <div class="worked-example" aria-label="Softmax by hand">
+          <h3>Softmax, then blame, by hand</h3>
+          <p>
+            Take the three raw scores above - <code>sat 1.70, ran 0.80, slept -1.10</code>
+            at temperature 1. Exponentiate each, then divide by the total so the
+            results sum to 1:
+          </p>
+          <div class="formula-stack">
+            <code>e^1.70 = 5.47, e^0.80 = 2.23, e^-1.10 = 0.33, total = 8.03</code>
+            <code>softmax: sat = 5.47/8.03 = 0.681, ran = 2.23/8.03 = 0.277, slept = 0.33/8.03 = 0.041</code>
+            <code>if sat is the true word: loss = -ln(0.681) ≈ 0.38 nats</code>
+            <code>blame = probability − target: sat 0.681−1 = −0.32, ran +0.28, slept +0.04</code>
+          </div>
+          <p class="microcopy">
+            The live panel recomputes these as you drag the scores. The blame on the
+            true word is negative (its score gets pushed up) while the others are
+            positive (pushed down): that single <code>probability − target</code>
+            vector is the error signal every weight will follow.
+          </p>
+        </div>
+
+        <div class="math-formal" aria-label="Softmax and blame in symbols">
+          <h3>Softmax, loss, and blame, in symbols</h3>
+          <p>
+            Softmax exponentiates each raw score \(z_i\) and divides by the total, so the
+            outputs are positive and sum to 1. Temperature \(T\) divides the scores first,
+            stretching or sharpening them. Cross-entropy then reads off the negative log
+            probability of the true word, and the gradient of that loss with respect to
+            each score collapses to one clean difference:
+          </p>
+          $$q_i = \frac{e^{z_i}}{\sum_{j} e^{z_j}} \qquad q_i^{(T)} = \frac{e^{z_i / T}}{\sum_{j} e^{z_j / T}}$$
+          $$L = -\sum_i y_i \log q_i = -\log q_{\text{true}} \qquad \frac{\partial L}{\partial z_i} = q_i - y_i$$
+          <ul class="symbol-glossary">
+            <li>\(z_i\): the raw score (logit) for word \(i\); \(q_i\): its softmax probability.</li>
+            <li>\(y_i\): the target, 1 for the true next word and 0 for every other word.</li>
+            <li>\(T\): temperature; \(T{=}1\) leaves the scores unchanged.</li>
+            <li>\(\frac{\partial L}{\partial z_i} = q_i - y_i\): the blame, "probability minus target."</li>
+          </ul>
+          <p class="microcopy">
+            With \(z = (1.70,\ 0.80,\ -1.10)\): \(q = (0.68,\ 0.28,\ 0.04)\). If
+            <code>sat</code> is the true word, \(L = -\ln(0.68) \approx 0.38\) nats, and the
+            blame is \((0.68{-}1,\ 0.28,\ 0.04) = (-0.32,\ +0.28,\ +0.04)\): push the true
+            word's score up, the others down.
+          </p>
+          <p>
+            <strong>And backpropagation?</strong> That blame vector is the starting point.
+            To reach a weight buried deeper in the network, backprop multiplies the local
+            sensitivities step by step along the path back to that weight. That
+            multiply-as-you-go bookkeeping is just the
+            <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">chain rule</a>
+            from calculus, applied layer by layer, and it hands every weight its own
+            \(\frac{\partial L}{\partial w}\) for the update rule from the last section. The
+            visual walk-throughs in the references trace it gradient by gradient.
+          </p>
         </div>
 
         <div class="code-quiz" data-quiz-type="predict" data-explain="Softmax exponentiates then divides by the total, so every output lands between 0 and 1 and the whole set sums to exactly 1 - a proper probability distribution. It does not make them equal; a bigger logit still earns a bigger probability.">
@@ -736,6 +909,35 @@
               pass, and update.
             </p>
           </div>
+        </div>
+
+        <div class="math-formal" aria-label="Forward pass in symbols">
+          <h3>The whole forward pass, in symbols</h3>
+          <p>
+            A single neuron takes its inputs \(x\), weights them, adds a bias, and runs
+            the result through an activation \(f\):
+          </p>
+          $$a = f(w \cdot x + b)$$
+          <p>
+            Stack those into the tiny next-word network. Look up an embedding row for
+            each of the two context words and join them, pass through one hidden layer
+            with a \(\tanh\) activation, produce one raw score per vocabulary word, and
+            finish with softmax:
+          </p>
+          $$e = \big[\,E_{w_1}\,;\,E_{w_2}\,\big] \qquad h = \tanh(W_1 e + b_1)$$
+          $$z = W_2 h + b_2 \qquad p = \text{softmax}(z)$$
+          <ul class="symbol-glossary">
+            <li>\(E_{w}\): the embedding row looked up for word \(w\); \(e\): the two rows joined.</li>
+            <li>\(W_1, b_1\): the hidden layer's weights and bias; \(\tanh\): its activation \(f\).</li>
+            <li>\(W_2, b_2\): the output weights and bias that turn the hidden layer into logits \(z\).</li>
+            <li>\(p\): the next-word probability for every word in the vocabulary.</li>
+          </ul>
+          <p class="microcopy">
+            This is exactly the network in the lab two sections down. Training learns
+            \(E\), \(W_1\), \(W_2\), \(b_1\), and \(b_2\) by running this forward pass,
+            scoring it with cross-entropy, and applying \(w \leftarrow w - \eta\,\frac{\partial L}{\partial w}\)
+            to every weight at once.
+          </p>
         </div>
       </div>
     </section>
@@ -849,11 +1051,29 @@
               <p class="quiz-feedback" aria-live="polite" hidden></p>
               <button class="quiz-skip" type="button">Just show me the code</button>
             </div>
-            <textarea class="code-input" spellcheck="false">return trainTinyNetwork(40);</textarea>
+            <textarea class="code-input" spellcheck="false">// One epoch = one pass over all the training dots. For each dot the
+// network runs the four beats from this chapter: a forward pass, the
+// cross-entropy loss, a backward pass for the gradients, then a small
+// step downhill (the weight update).
+const epochs = 40;
+
+const lossPerEpoch = [];
+for (let epoch = 1; epoch <= epochs; epoch++) {
+  trainOneEpoch();                  // the four beats, over every dot
+  lossPerEpoch.push(networkLoss()); // average loss after this epoch
+}
+
+// Loss should fall as the boundary fits the dots. Edit epochs, re-run.
+return {
+  epochs: epochs,
+  startLoss: lossPerEpoch[0],
+  endLoss: lossPerEpoch[epochs - 1],
+  trainAccuracy: networkAccuracy()
+};</textarea>
             <div class="code-output is-empty" aria-live="polite">
               <div class="output-message">
                 <strong>Ready to run</strong>
-                <span>This calls the same browser training loop used by the buttons.</span>
+                <span>This is the real per-epoch training loop the buttons use. Edit <code>epochs</code>, then press Run to watch the loss fall.</span>
               </div>
             </div>
           </article>
@@ -997,18 +1217,37 @@
             <div class="code-quiz" data-quiz-type="predict" data-explain="Perplexity is surprise: roughly how many words the model is choosing between. A model that has learned the patterns is rarely surprised, so its perplexity is low.">
               <p class="quiz-prompt">Predict first: this trains a tiny next-word model and reports its <strong>perplexity</strong>. A model that has learned to predict the next word well will have a perplexity that is&hellip;</p>
               <div class="quiz-options" role="group" aria-label="Predict the perplexity of a trained model">
-                <button class="quiz-option" type="button" data-correct="true">Low &mdash; it is rarely surprised</button>
-                <button class="quiz-option" type="button">High &mdash; it is usually surprised</button>
+                <button class="quiz-option" type="button" data-correct="true">Low: it is rarely surprised</button>
+                <button class="quiz-option" type="button">High: it is usually surprised</button>
                 <button class="quiz-option" type="button">Unrelated to how well it learned</button>
               </div>
               <p class="quiz-feedback" aria-live="polite" hidden></p>
               <button class="quiz-skip" type="button">Just show me the code</button>
             </div>
-            <textarea class="code-input" spellcheck="false">return trainNextWordModel(120);</textarea>
+            <textarea class="code-input" spellcheck="false">// One epoch = one pass over every (context -> next word) example.
+// Each example runs the same four beats: look up the two context
+// word vectors, a forward pass to next-word scores, the cross-entropy
+// loss, a backward pass, then update every weight (embeddings too).
+const epochs = 120;
+
+const lossPerEpoch = [];
+for (let epoch = 1; epoch <= epochs; epoch++) {
+  nwTrainOneEpoch();
+  lossPerEpoch.push(nextWordLoss());
+}
+
+// Lower loss means lower perplexity (less surprise). Then sample text.
+return {
+  epochs: epochs,
+  startLoss: lossPerEpoch[0],
+  endLoss: lossPerEpoch[epochs - 1],
+  perplexity: nextWordPerplexity(),
+  sample: generateSentence(0.8)
+};</textarea>
             <div class="code-output is-empty" aria-live="polite">
               <div class="output-message">
                 <strong>Ready to run</strong>
-                <span>This trains the same model the buttons use, then returns its loss, perplexity, and a sample.</span>
+                <span>This is the real per-epoch loop. Edit <code>epochs</code>, press Run, and read back the loss, perplexity, and a sampled sentence.</span>
               </div>
             </div>
           </article>
@@ -1092,6 +1331,21 @@
   </main>
 
   <script src="chapter4.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (window.renderMathInElement) {
+        renderMathInElement(document.body, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "\\(", right: "\\)", display: false }
+          ],
+          throwOnError: false
+        });
+      }
+    });
+  </script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script defer src="code-highlight.js"></script>
   <script defer src="code-quiz.js"></script>

@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pretraining LLMs - LLM Soup to Nuts</title>
+  <title>Training and Alignment - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter6.css">
+  <link rel="stylesheet" href="chapter6.css?v=20260621">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
   <header class="topbar">
@@ -23,6 +24,7 @@
       <a href="chapter-2.html">Ch 2</a>
       <a href="chapter-3.html">Ch 3</a>
       <a href="chapter-4.html">Ch 4</a>
+      <a href="chapter-5.html">Ch 5</a>
     </nav>
   </header>
 
@@ -30,11 +32,15 @@
     <p>Chapter 6</p>
     <nav>
       <a href="#overview"><span>00</span>Overview</a>
-      <a href="#objectives"><span>01</span>Pretraining objectives</a>
-      <a href="#data"><span>02</span>Training data</a>
-      <a href="#scaling"><span>03</span>Scaling laws</a>
-      <a href="#systems"><span>04</span>Distributed training</a>
-      <a href="#references"><span>05</span>References</a>
+      <a href="#stages"><span>01</span>Training stages</a>
+      <a href="#pretraining"><span>02</span>Pretraining loss</a>
+      <a href="#data"><span>03</span>Training data</a>
+      <a href="#scaling"><span>04</span>Scaling and systems</a>
+      <a href="#evaluation"><span>05</span>Evaluation and safety</a>
+      <a href="#sft"><span>06</span>SFT and LoRA</a>
+      <a href="#alignment"><span>07</span>Preference alignment</a>
+      <a href="#testtime"><span>08</span>Test-time compute</a>
+      <a href="#references"><span>09</span>References</a>
     </nav>
   </aside>
 
@@ -44,238 +50,306 @@
         <article class="intro-copy">
           <div class="progress-banner" role="status">
             <span class="progress-banner-badge">In Progress</span>
-            <p class="progress-banner-text">This chapter is still being written and reviewed &mdash; it is not finished yet, so parts may be rough or change. <a href="index.html#stay-notified">Get notified</a> when it is officially published.</p>
+            <p class="progress-banner-text">This chapter is still being written and reviewed, so parts may be rough or change. <a href="index.html#stay-notified">Get notified</a> when it is officially published.</p>
           </div>
           <p class="eyebrow">Learning by doing</p>
-          <h1 id="page-title">Pretraining: turn a pile of text into a base model.</h1>
+          <h1 id="page-title">Training and alignment: how a base model becomes useful.</h1>
           <p class="lead">
-            In Chapter 5 you ran a finished Transformer. This chapter is about where
-            that model comes from. <strong>Pretraining</strong> is the long, expensive
-            first phase where a fresh network reads an enormous amount of text and does
-            one simple thing billions of times: predict the next token, check how
-            surprised it was, and nudge its weights. The same four-beat loop from
-            Chapter 4, just very, very large.
+            In Chapter 5 you ran a finished Transformer. This chapter answers the question
+            that naturally follows: where did that model come from, and why is a raw
+            pretrained model still not the same thing as a helpful assistant?
           </p>
           <p>
-            Three decisions shape the result: the <strong>objective</strong> the model
-            trains on, the <strong>data</strong> it reads, and how much
-            <strong>compute</strong> you spend. Get the balance right and the model
-            keeps improving in a predictable way. This chapter lets you play with each
-            decision and watch the tradeoffs that real labs wrestle with.
+            The path has stages. First comes <strong>pretraining</strong>, where the model
+            predicts the next token across enormous text streams. Then comes
+            <strong>post-training</strong>: supervised instruction tuning, preference
+            alignment, and sometimes extra thinking at inference time. The same next-token
+            machine is underneath, but the training signal changes what behavior we ask it
+            to learn.
           </p>
-          <p class="example-note">
-            <em>Guiding question:</em> if you had a fixed budget of computer time, would
-            you spend it on a bigger model or on more data? The answer is not obvious,
-            and getting it wrong wastes millions of dollars.
+          <p class="example-note source-note">
+            This rewrite is grounded in the open <em>Speech and Language Processing</em>
+            lectures on Large Language Models and Post-training. I am using those lectures
+            as the coverage map, while keeping the course pattern: intuition, a small
+            worked calculation, symbols, and a live panel.
           </p>
           <div class="idea-flow" aria-label="Chapter flow">
             <div>
-              <strong>Pick an objective</strong>
-              <span>See which tokens next-token and masked training actually predict.</span>
+              <strong>Pretrain</strong>
+              <span>Predict the next token with teacher forcing and cross-entropy.</span>
             </div>
             <div>
-              <strong>Clean the data</strong>
-              <span>Follow raw web text through the filtering and dedup funnel.</span>
+              <strong>Choose data</strong>
+              <span>Filter, deduplicate, document, and notice what the corpus teaches.</span>
             </div>
             <div>
-              <strong>Spend compute well</strong>
-              <span>Balance model size against data with a scaling-law explorer.</span>
+              <strong>Scale</strong>
+              <span>Balance parameters, tokens, compute, and memory.</span>
             </div>
             <div>
-              <strong>Fit it on GPUs</strong>
-              <span>Add up training memory and see why it must be sharded.</span>
+              <strong>Align</strong>
+              <span>Use instructions and preferences to make the model more helpful.</span>
             </div>
+            <div>
+              <strong>Think at test time</strong>
+              <span>Spend extra inference work when a task needs step-by-step reasoning.</span>
+            </div>
+          </div>
+          <div class="example-note prereq-note">
+            <p><em>Before we dive in, a few needed prerequisites are in order.</em> This chapter stitches together the pieces you have already built. Use the links as quick refreshers if one of them feels rusty.</p>
+            <ul>
+              <li><strong><a href="chapter-1.html">Next-token prediction</a>.</strong> A language model assigns probabilities to possible next tokens.</li>
+              <li><strong><a href="chapter-3.html#why">Tokenization</a>.</strong> Text becomes token IDs before the model ever sees it.</li>
+              <li><strong><a href="chapter-4.html#softmax">Softmax, cross-entropy, and gradients</a>.</strong> Training lowers surprise by nudging weights.</li>
+              <li><strong><a href="chapter-5.html#forward">Transformer forward pass</a>.</strong> Tokens become vectors, blocks update them, and the LM head makes logits.</li>
+            </ul>
+            <p>What you do <strong>not</strong> need yet: production distributed-systems detail. We will count memory and compute enough to understand the pressure, then leave cluster engineering for deeper references.</p>
           </div>
         </article>
       </div>
     </section>
 
-    <section id="objectives" class="band" aria-labelledby="objectives-title">
+    <section id="stages" class="band" aria-labelledby="stages-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">1. Pretraining objectives</p>
-          <h2 id="objectives-title">What, exactly, is the model trying to predict?</h2>
+          <p class="eyebrow">1. Training stages</p>
+          <h2 id="stages-title">A model is trained more than once.</h2>
           <p>
-            An objective is the game the model plays during training. The dominant one
-            for chat models is <strong>next-token prediction</strong>, also called
-            causal language modeling: read the tokens so far, predict the next one. It
-            matches Chapter 1's question exactly, and because it only ever looks
-            backward, the trained model can generate text left to right.
+            A base model starts as random numbers. Pretraining teaches it broad language,
+            facts, styles, and patterns by asking one simple question again and again:
+            given the previous tokens, what comes next? That makes it a strong text
+            predictor, but not automatically a good assistant.
           </p>
           <p>
-            A different objective, <strong>masked language modeling</strong>, hides a
-            few tokens and asks the model to fill them in using context from both
-            sides. That builds rich understanding of a whole sentence, which is why it
-            powers search and classification models, but it does not directly give you
-            a generator. Switch between the two below and watch which tokens become
-            targets and what context each one is allowed to use.
+            Post-training changes the behavior we care about. <strong>Instruction tuning</strong>
+            shows the model examples of requests and good responses. <strong>Preference
+            alignment</strong> shows it pairs of responses and asks it to prefer the one
+            humans judge as better. <strong>Test-time compute</strong> is different again:
+            it spends extra work during inference, often by encouraging intermediate
+            reasoning steps.
           </p>
-          <p>
-            Under the hood, next-token pretraining is still the cross-entropy story
-            from Chapter 4. At position <code>t</code>, the model reads the earlier
-            tokens <code>x_&lt;t</code>, assigns a probability to the real next token
-            <code>x_t</code>, and pays surprise <code>-ln p(x_t | x_&lt;t)</code>.
-            Average that over billions of positions and you have the training loss.
-          </p>
-          <div class="worked-example" aria-label="Next-token loss by hand">
-            <h3>One next-token loss by hand</h3>
-            <p>
-              Suppose the context is <code>the cat sat on the</code> and the real next
-              token is <code>mat</code>. If the model assigns <code>mat</code> a
-              probability of 0.40, the loss for this one position is:
-            </p>
-            <div class="formula-stack">
-              <code>loss = -ln p(real next token | previous tokens)</code>
-              <code>loss = -ln 0.40 = 0.92 nats</code>
-              <code>if average loss = 1.20 nats, perplexity = exp(1.20) = 3.3 tokens</code>
-            </div>
-            <p class="microcopy">
-              Perplexity is back: it is the model's average uncertainty written as an
-              effective number of next-token choices.
-            </p>
-          </div>
         </div>
 
-        <div class="control-grid section-controls" aria-label="Objective controls">
-          <div class="choice-row" role="group" aria-label="Training objective">
-            <span class="choice-label">Objective</span>
-            <div class="choice-group">
-              <button class="choice-pill" type="button" data-objective="causal">Next-token (GPT)</button>
-              <button class="choice-pill" type="button" data-objective="masked">Masked (BERT)</button>
-            </div>
-          </div>
-          <label class="range-row" id="causalControls" for="causalPosSlider">
-            <span>Predict position</span>
-            <input id="causalPosSlider" type="range" min="0" max="5" step="1" value="3">
-            <output id="causalPosLabel" for="causalPosSlider">position 4</output>
-          </label>
+        <div class="stage-map" aria-label="Model training stages">
+          <button class="stage-card is-active" type="button" data-stage="pretraining">
+            <span>1</span>
+            <strong>Pretraining</strong>
+            <em>next-token loss on huge text</em>
+          </button>
+          <button class="stage-card" type="button" data-stage="sft">
+            <span>2</span>
+            <strong>Instruction tuning</strong>
+            <em>supervised request and response data</em>
+          </button>
+          <button class="stage-card" type="button" data-stage="preference">
+            <span>3</span>
+            <strong>Preference alignment</strong>
+            <em>chosen vs rejected responses</em>
+          </button>
+          <button class="stage-card" type="button" data-stage="testtime">
+            <span>4</span>
+            <strong>Test-time compute</strong>
+            <em>extra inference work</em>
+          </button>
         </div>
+        <div id="stageReadout" class="panel stage-readout" aria-live="polite"></div>
 
-        <div class="panel">
-          <div class="section-title-row">
-            <h3>The training example</h3>
-            <span class="pill">the cat sat on the mat</span>
+        <div class="code-quiz" data-quiz-type="predict" data-explain="A base model is pretrained to predict text. An aligned assistant has usually gone through post-training, such as instruction tuning and preference alignment, to better match human requests and preferences.">
+          <p class="quiz-prompt">Quick check: which model has learned broad next-token prediction but has not yet been instruction-tuned or preference-aligned?</p>
+          <div class="quiz-options" role="group" aria-label="Base model meaning">
+            <button class="quiz-option" type="button" data-correct="true">A base model</button>
+            <button class="quiz-option" type="button" data-feedback="Instruction-tuned models have already learned from request/response examples.">An instruction-tuned assistant</button>
+            <button class="quiz-option" type="button" data-feedback="Preference-aligned models come after another stage of training on preferences.">A preference-aligned model</button>
           </div>
-          <div id="objectiveRail" class="objective-rail" aria-live="polite"></div>
-          <p id="objectiveExplain" class="insight-note" aria-live="polite"></p>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
       </div>
     </section>
 
-    <section id="data" class="band band-muted" aria-labelledby="data-title">
+    <section id="pretraining" class="band band-muted" aria-labelledby="pretraining-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">2. Training data</p>
-          <h2 id="data-title">Most of pretraining is really data preparation.</h2>
+          <p class="eyebrow">2. Pretraining loss</p>
+          <h2 id="pretraining-title">The text itself supplies the labels.</h2>
           <p>
-            A base model is a mirror of its training data, so labs spend enormous
-            effort on what goes in. Raw web text is huge but messy. It gets filtered
-            for language and quality, <strong>deduplicated</strong> so repeated pages
-            do not dominate, stripped of personal information and unsafe content, and
-            checked so that test benchmarks do not leak in. Only then is it tokenized
-            into the stream the model actually trains on.
+            Pretraining is <strong>self-supervised</strong>. We do not need humans to label
+            every token because the next token is already sitting in the text. At position
+            \(t\), the model reads the true prefix \(w_1,\ldots,w_t\), predicts a
+            distribution over the vocabulary, and pays loss on the real next token
+            \(w_{t+1}\).
+          </p>
+          <p>
+            During training we use <strong>teacher forcing</strong>: even if the model
+            would have guessed the wrong token at one position, the next training position
+            still receives the true history from the corpus. That keeps the learning signal
+            clean and parallelizable across the whole sequence.
+          </p>
+          <div class="worked-example" aria-label="Pretraining loss by hand">
+            <h3>One tiny batch by hand</h3>
+            <p>
+              Suppose the corpus slice is <code>So long and thanks for all</code>. The
+              model predicts after each prefix. If it assigns these probabilities to the
+              correct next tokens, the batch loss is the average negative log probability:
+            </p>
+            <div class="formula-stack">
+              <code>P(long | So) = 0.50, loss = -ln(0.50) = 0.69</code>
+              <code>P(and | So long) = 0.40, loss = -ln(0.40) = 0.92</code>
+              <code>P(thanks | So long and) = 0.25, loss = -ln(0.25) = 1.39</code>
+              <code>average loss = (0.69 + 0.92 + 1.39) / 3 = 1.00 nats</code>
+              <code>perplexity = exp(1.00) = 2.7 effective next-token choices</code>
+            </div>
+          </div>
+          <div class="math-formal" aria-label="Pretraining loss in symbols">
+            <h3>The same training step, in symbols</h3>
+            <p>
+              Cross-entropy over a one-hot target collapses to the negative log probability
+              of the true next token. Average that over a sequence or batch:
+            </p>
+            $$L_t = -\sum_{w \in V} y_t[w]\log \hat{y}_t[w] = -\log \hat{y}_t[w_{t+1}]$$
+            $$L_{\text{batch}} = \frac{1}{T}\sum_{t=1}^{T} -\log \hat{y}_t[w_{t+1}] \qquad \text{perplexity}=e^{L_{\text{batch}}}$$
+            <ul class="symbol-glossary">
+              <li>\(V\): the vocabulary of tokens.</li>
+              <li>\(y_t\): the one-hot target, 1 for the true next token and 0 elsewhere.</li>
+              <li>\(\hat{y}_t\): the model's predicted distribution from the LM head.</li>
+              <li>\(T\): the number of predicted positions in the batch.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Teacher forcing controls">
+          <label class="range-row" for="teacherStepSlider">
+            <span>Training position</span>
+            <input id="teacherStepSlider" type="range" min="0" max="4" step="1" value="2">
+            <output id="teacherStepLabel" for="teacherStepSlider">position 3</output>
+          </label>
+        </div>
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Teacher forcing trace</h3>
+            <span class="pill">true history, true target</span>
+          </div>
+          <div id="teacherTrace" class="teacher-trace" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="data" class="band" aria-labelledby="data-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">3. Training data</p>
+          <h2 id="data-title">The corpus is a curriculum, whether we admit it or not.</h2>
+          <p>
+            Large language models are trained on web crawls plus curated sources such as
+            books, Wikipedia, academic papers, code, and dialogue. The source lecture names
+            open corpora like Common Crawl derivatives, C4, The Pile, and Dolma to make
+            the scale concrete. The exact mixture matters because the model learns from
+            frequency, not from what we wish were important.
+          </p>
+          <p>
+            A data pipeline filters for language and quality, removes boilerplate and
+            duplicates, tries to reduce personal information and unsafe content, checks for
+            benchmark contamination, and then tokenizes the cleaned text. Every stage is a
+            choice. A strict toxicity filter may reduce some harmful generations while
+            also removing dialectal text unfairly. Deduplication can stop one copied page
+            from overpowering thousands of unique pages. Copyright, data consent, privacy,
+            and geographic skew are not side notes; they shape what the base model knows.
           </p>
           <figure class="diagram-figure">
-            <svg class="pipeline-svg" viewBox="0 0 600 196" role="img" aria-labelledby="data-title-svg data-desc">
-              <title id="data-title-svg">The data preparation funnel</title>
-              <desc id="data-desc">Raw web crawl is reduced by quality filtering, deduplication, and safety and contamination removal, then tokenized into a much smaller, cleaner training set.</desc>
-              <rect x="14" y="40" width="96" height="104" rx="8" class="svg-box-soft"></rect>
-              <text x="62" y="96" class="svg-word" text-anchor="middle">raw</text>
-              <text x="62" y="112" class="svg-word" text-anchor="middle">crawl</text>
-              <rect x="156" y="56" width="96" height="72" rx="8" class="svg-box-plain"></rect>
-              <text x="204" y="88" class="svg-word" text-anchor="middle">quality</text>
-              <text x="204" y="104" class="svg-word" text-anchor="middle">filter</text>
-              <rect x="298" y="66" width="96" height="52" rx="8" class="svg-box-plain"></rect>
-              <text x="346" y="96" class="svg-word" text-anchor="middle">dedup</text>
-              <rect x="440" y="72" width="96" height="40" rx="8" class="svg-box-plain"></rect>
-              <text x="488" y="96" class="svg-word" text-anchor="middle">safety</text>
-              <rect x="552" y="74" width="40" height="36" rx="7" class="svg-box-accent"></rect>
-              <text x="572" y="96" class="svg-model-text" text-anchor="middle">tok</text>
-              <line x1="110" y1="92" x2="154" y2="92" class="svg-arrow" marker-end="url(#d-arrow)"></line>
-              <line x1="252" y1="92" x2="296" y2="92" class="svg-arrow" marker-end="url(#d-arrow)"></line>
-              <line x1="394" y1="92" x2="438" y2="92" class="svg-arrow" marker-end="url(#d-arrow)"></line>
-              <line x1="536" y1="92" x2="550" y2="92" class="svg-arrow" marker-end="url(#d-arrow)"></line>
-              <text x="300" y="176" class="svg-caption" text-anchor="middle">Each stage throws away more text. The clean training set is a small fraction of the raw crawl.</text>
+            <svg class="pipeline-svg data-pipeline-svg" viewBox="0 0 760 210" role="img" aria-labelledby="data-svg-title data-svg-desc">
+              <title id="data-svg-title">Pretraining data funnel</title>
+              <desc id="data-svg-desc">Raw crawls and curated sources flow through quality filtering, deduplication, safety and privacy checks, contamination checks, mixture weighting, and tokenization.</desc>
+              <rect x="20" y="50" width="110" height="58" rx="8" class="svg-box-soft"></rect>
+              <text x="75" y="72" class="svg-word" text-anchor="middle">raw crawl</text>
+              <text x="75" y="91" class="svg-caption" text-anchor="middle">plus curated data</text>
+              <line x1="130" y1="79" x2="165" y2="79" class="svg-arrow" marker-end="url(#data-arrow)"></line>
+              <rect x="165" y="50" width="104" height="58" rx="8" class="svg-box-plain"></rect>
+              <text x="217" y="72" class="svg-word" text-anchor="middle">quality</text>
+              <text x="217" y="91" class="svg-caption" text-anchor="middle">language, boilerplate</text>
+              <line x1="269" y1="79" x2="304" y2="79" class="svg-arrow" marker-end="url(#data-arrow)"></line>
+              <rect x="304" y="50" width="104" height="58" rx="8" class="svg-box-plain"></rect>
+              <text x="356" y="72" class="svg-word" text-anchor="middle">dedup</text>
+              <text x="356" y="91" class="svg-caption" text-anchor="middle">less repetition</text>
+              <line x1="408" y1="79" x2="443" y2="79" class="svg-arrow" marker-end="url(#data-arrow)"></line>
+              <rect x="443" y="50" width="104" height="58" rx="8" class="svg-box-plain"></rect>
+              <text x="495" y="72" class="svg-word" text-anchor="middle">safety</text>
+              <text x="495" y="91" class="svg-caption" text-anchor="middle">PII, toxicity</text>
+              <line x1="547" y1="79" x2="582" y2="79" class="svg-arrow" marker-end="url(#data-arrow)"></line>
+              <rect x="582" y="50" width="154" height="58" rx="8" class="svg-box-accent"></rect>
+              <text x="659" y="72" class="svg-model-text" text-anchor="middle">token stream</text>
+              <text x="659" y="91" class="svg-caption-light" text-anchor="middle">weighted mixture for training</text>
+              <text x="380" y="158" class="svg-caption" text-anchor="middle">Benchmark contamination checks sit before evaluation, because a memorized test is not a real test.</text>
               <defs>
-                <marker id="d-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <marker id="data-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                   <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
                 </marker>
               </defs>
             </svg>
-            <figcaption>The data funnel: raw crawl shrinks through quality filtering, deduplication, and safety checks before tokenization.</figcaption>
+            <figcaption>The data funnel is not just cleanup. It decides which evidence the model sees often, rarely, or never.</figcaption>
           </figure>
-          <p>
-            The choices here are not just technical. Licensing and copyright, removing
-            personal data, filtering toxic content, and avoiding benchmark
-            contamination are all decisions with real consequences, and they are
-            increasingly documented in dataset and model cards.
-          </p>
-          <div class="worked-example" aria-label="Data filtering and mixture math by hand">
-            <h3>Data preparation by hand</h3>
+          <div class="worked-example" aria-label="Deduplication and mixture by hand">
+            <h3>Deduplication by hand</h3>
             <p>
-              Deduplication is not just storage cleanup; it changes what the model is
-              trained to pay attention to. If one page appears 100 times beside 900
-              single-copy pages, that one page is 10% of the examples before dedup.
-              After exact deduplication, it is just one page out of 901.
+              If one page appears 100 times beside 900 single-copy pages, it is 10% of the
+              examples before deduplication. After exact deduplication, it is one page out
+              of 901:
             </p>
             <div class="formula-stack">
-              <code>before dedup: repeated page share = 100 / (100 + 900) = 10%</code>
-              <code>after dedup: repeated page share = 1 / (1 + 900) = 0.11%</code>
+              <code>before dedup: 100 / (100 + 900) = 10%</code>
+              <code>after dedup: 1 / (1 + 900) = 0.11%</code>
               <code>mixture example: 100B tokens * 20% code = 20B code tokens</code>
             </div>
-            <p class="microcopy">
-              The model does not know what "important" means. It sees frequency,
-              mixture weights, and loss. Data preparation is where humans decide what
-              evidence gets repeated and what gets removed.
-            </p>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="scaling" class="band" aria-labelledby="scaling-title">
+    <section id="scaling" class="band band-muted" aria-labelledby="scaling-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">3. Scaling laws</p>
-          <h2 id="scaling-title">Spend a fixed compute budget: bigger model or more data?</h2>
+          <p class="eyebrow">4. Scaling and systems</p>
+          <h2 id="scaling-title">Spend a fixed compute budget without starving the model.</h2>
           <p>
-            Here is one of the most useful results in modern AI: model loss falls in a
-            smooth, predictable way as you add parameters and data. A good
-            approximation is <code>loss = E + A / N^&#945; + B / D^&#946;</code>, where
-            <code>N</code> is the number of parameters and <code>D</code> is the number
-            of training tokens. Training compute is roughly <code>C &#8776; 6 &middot; N &middot; D</code>.
+            Scaling laws say that loss falls predictably as we add parameters, data, and
+            compute. The trap is that training compute is roughly \(C \approx 6ND\), where
+            \(N\) is parameter count and \(D\) is training tokens. With a fixed budget, a
+            bigger model must see fewer tokens. If it sees too little data, it is
+            undertrained.
           </p>
           <p>
-            That last equation is the catch. For a fixed compute budget you cannot
-            grow both <code>N</code> and <code>D</code> at once: a bigger model must
-            train on less data, and vice versa. Pick a budget, then slide the model
-            size along it. The curve shows the predicted loss, and the marked point is
-            the <strong>compute-optimal</strong> balance, the lesson made famous by the
-            <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noreferrer">Chinchilla result</a>: most early large models were too big and badly
-            undertrained.
+            For a dense decoder Transformer, a rough parameter estimate is
+            \(N \approx 12\,n_{\text{layer}}d^2\). A GPT-3-scale shape with 96 layers and
+            width 12,288 lands around 175B parameters. During training, examples are often
+            packed into full context windows with end-of-text separators, and batches are
+            counted in tokens, not just documents.
           </p>
           <div class="worked-example" aria-label="Scaling law compute by hand">
             <h3>Compute by hand</h3>
             <p>
-              A rough training-compute rule for dense decoder Transformers is
-              <code>C &asymp; 6ND</code>. It is not exact engineering accounting, but
-              it is good enough to feel the tradeoff. If you train a 1B-parameter model
-              on 20B tokens, the run costs about <code>1.2 * 10^20</code> FLOPs.
+              If you train a 1B-parameter model on 20B tokens, the run costs about
+              \(1.2 \times 10^{20}\) FLOPs by the rough dense-Transformer rule:
             </p>
             <div class="formula-stack">
               <code>C = 6 * 1B parameters * 20B tokens = 1.2e20 FLOPs</code>
               <code>same C with 10B parameters gives D = C / (6N) = 2B tokens</code>
-              <code>tokens per parameter: 2B / 10B = 0.2, far below the ~20 Chinchilla-style target</code>
+              <code>tokens per parameter: 2B / 10B = 0.2, far below a Chinchilla-style balance</code>
             </div>
-            <p class="microcopy">
-              Bigger is not automatically better. With the same compute, a much bigger
-              model may see too little data and stay undertrained.
-            </p>
           </div>
-          <figure class="intuition-figure">
-            <img src="assets/figures/chapter6-compute-balance.gif" width="720" height="360" alt="Animated seesaw showing a fixed compute budget, where increasing model size N reduces the amount of training data D, and a balanced middle point is marked." decoding="async">
-            <figcaption>For a fixed compute budget, model size and training data trade off against each other. The sweet spot is a balance, not the largest model you can name.</figcaption>
-          </figure>
+          <div class="math-formal" aria-label="Scaling equations">
+            <h3>The scaling pressure, in symbols</h3>
+            <p>
+              The constants vary across architectures and datasets, but the lesson is
+              stable: loss has separate terms for model size and data size, while compute
+              ties them together.
+            </p>
+            $$L(N,D) \approx E + \frac{A}{N^\alpha} + \frac{B}{D^\beta} \qquad C \approx 6ND$$
+            $$N \approx 12\,n_{\text{layer}}d^2$$
+            <ul class="symbol-glossary">
+              <li>\(N\): non-embedding parameter count.</li>
+              <li>\(D\): training tokens.</li>
+              <li>\(C\): training compute in FLOPs.</li>
+              <li>\(d\): model width, the size of each residual stream.</li>
+            </ul>
+          </div>
         </div>
 
         <div class="control-grid section-controls" aria-label="Scaling controls">
@@ -308,53 +382,23 @@
             <div id="scalingReadout" class="detail-list" aria-live="polite"></div>
           </div>
         </div>
-      </div>
-    </section>
 
-    <section id="systems" class="band band-muted" aria-labelledby="systems-title">
-      <div class="section-shell">
-        <div class="section-heading">
-          <p class="eyebrow">4. Distributed training</p>
-          <h2 id="systems-title">Why one GPU is never enough.</h2>
+        <div class="section-heading systems-heading">
+          <h3>Why one GPU is never enough</h3>
           <p>
-            Training memory is dominated not by the weights but by everything you keep
-            <em>around</em> them. For each parameter you typically store fp16 weights,
-            fp16 gradients, and the optimizer's fp32 momentum, variance, and master
-            copy, roughly <strong>16 bytes per parameter</strong> before you even count
-            activations. Slide the model size below and watch the total blow past a
-            single GPU almost immediately.
-          </p>
-          <p>
-            That is why large runs spread the work across many GPUs.
-            <strong>Data parallelism</strong> copies the model and splits the batch.
-            <strong>Tensor</strong> and <strong>pipeline parallelism</strong> split a
-            single model across devices. <strong>ZeRO</strong> and
-            <strong>FSDP</strong> shard the weights, gradients, and optimizer state so
-            no single GPU holds all of it. The sharding slider shows the effect on
-            per-GPU memory directly.
-          </p>
-          <p>
-            The <code>16 bytes</code> estimate is only the training state for the
-            parameters. Real training also needs activation memory for the forward
-            pass, temporary communication buffers, and room for batches. That is why
-            "fits the optimizer state" is necessary but not sufficient.
+            Training memory is dominated not only by weights, but also gradients,
+            optimizer state, master weights, activations, and communication buffers.
+            Data parallelism splits batches. Tensor and pipeline parallelism split model
+            computation. ZeRO and FSDP shard weights, gradients, and optimizer state so
+            one device does not carry the whole model.
           </p>
           <div class="worked-example" aria-label="Training memory by hand">
             <h3>Training memory by hand</h3>
-            <p>
-              With Adam-style training, a single parameter is not just one fp16 weight.
-              You also keep its gradient, two optimizer statistics, and often an fp32
-              master copy. That rough accounting gives the 16-byte rule used below.
-            </p>
             <div class="formula-stack">
               <code>bytes per parameter = 2 weight + 2 gradient + 8 Adam state + 4 master weight = 16</code>
               <code>7B parameters * 16 bytes = 112GB before activations</code>
               <code>70B parameters * 16 bytes = 1,120GB = 1.12TB before activations</code>
             </div>
-            <p class="microcopy">
-              Sharding does not make the model smaller; it divides the state across
-              devices so each GPU carries only part of the burden.
-            </p>
           </div>
         </div>
 
@@ -370,7 +414,6 @@
             <output id="shardLabel" for="shardSlider">1 GPU</output>
           </label>
         </div>
-
         <div class="panel">
           <div class="section-title-row">
             <h3>Training memory budget</h3>
@@ -381,53 +424,258 @@
       </div>
     </section>
 
-    <section id="references" class="band" aria-labelledby="references-title">
+    <section id="evaluation" class="band" aria-labelledby="evaluation-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">5. Going deeper</p>
-          <h2 id="references-title">Further reading.</h2>
+          <p class="eyebrow">5. Evaluation and safety</p>
+          <h2 id="evaluation-title">Low loss is useful, but it is not the whole report card.</h2>
           <p>
-            These references cover the objectives, the data, the scaling laws, and the
-            systems that make pretraining possible at scale.
+            Perplexity measures how surprised the model is by held-out text. Lower is
+            better, and it connects directly to the pretraining loss. But perplexity is
+            sensitive to tokenization, so it is most meaningful when comparing models with
+            the same tokenizer.
+          </p>
+          <p>
+            We also evaluate downstream tasks such as MMLU-style multiple-choice
+            questions, reasoning tasks, translation, summarization, latency, energy,
+            fairness, and robustness. Public benchmarks bring a hard warning:
+            <strong>data contamination</strong>. If test questions leaked into training,
+            the score can overstate real ability.
+          </p>
+          <p>
+            Safety is not separate from evaluation. A model can hallucinate, agree with a
+            false premise, expose memorized private data, produce toxic or stereotyped
+            text, or give dangerous advice. These are not just bad vibes; they are failure
+            modes of the training objective and data. Post-training tries to reduce them,
+            but evaluation has to keep checking.
           </p>
         </div>
 
+        <div class="control-grid section-controls" aria-label="Evaluation controls">
+          <label class="range-row" for="evalLossSlider">
+            <span>Average loss (nats)</span>
+            <input id="evalLossSlider" type="range" min="0.5" max="3.0" step="0.1" value="1.2">
+            <output id="evalLossLabel" for="evalLossSlider">1.2</output>
+          </label>
+        </div>
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Perplexity readout</h3>
+            <span class="pill">exp(loss)</span>
+          </div>
+          <div id="evalPanel" class="metric-card-grid" aria-live="polite"></div>
+          <p id="evalNarrative" class="insight-note"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="sft" class="band band-muted" aria-labelledby="sft-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">6. SFT and LoRA</p>
+          <h2 id="sft-title">Instruction tuning teaches the model what a request means.</h2>
+          <p>
+            A pretrained model knows how text tends to continue. That is not the same as
+            knowing that <code>Translate to French: The small dog</code> is a request to
+            translate, not a prefix to continue in English. <strong>Instruction tuning</strong>,
+            also called <strong>SFT</strong>, continues training on instruction-response
+            examples using the same next-token cross-entropy loss.
+          </p>
+          <p>
+            Instruction data can be written by people, converted from existing supervised
+            datasets with templates, created from detailed task guidelines, or generated
+            synthetically and reviewed. The goal is not one task; it is learning the habit
+            of following instructions across tasks and formats.
+          </p>
+          <p>
+            Full fine-tuning updates all parameters. <strong>LoRA</strong> is a
+            parameter-efficient alternative: freeze a large matrix \(W\), train two small
+            matrices \(A\) and \(B\), and add their low-rank product into the forward pass.
+          </p>
+          <div class="math-formal" aria-label="SFT and LoRA equations">
+            <h3>Same loss, smaller update</h3>
+            <p>
+              SFT uses the same language-modeling loss as pretraining, but the text is
+              curated request-and-response data. LoRA changes how many parameters move:
+            </p>
+            $$L_{\text{SFT}} = \frac{1}{T}\sum_{t=1}^{T} -\log \hat{y}_t[w_{t+1}]$$
+            $$h = xW + xAB \qquad r \ll \min(d,k)$$
+            <ul class="symbol-glossary">
+              <li>\(W\): a frozen pretrained weight matrix.</li>
+              <li>\(A,B\): small trainable matrices whose product has the same shape as \(W\).</li>
+              <li>\(r\): the low rank, much smaller than the original dimensions.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Instruction tuning is supervised because each instruction has a desired response, but the training mechanics are still next-token cross-entropy over that response text.">
+          <p class="quiz-prompt">Quick check: why is instruction tuning called supervised fine-tuning?</p>
+          <div class="quiz-options" role="group" aria-label="Why SFT is supervised">
+            <button class="quiz-option" type="button" data-correct="true">The data contains instructions paired with desired responses</button>
+            <button class="quiz-option" type="button" data-feedback="It still trains by predicting tokens; it does not need a separate classifier label for each token.">It replaces the LM head with a classifier for every task</button>
+            <button class="quiz-option" type="button" data-feedback="LoRA is one efficient way to fine-tune, but SFT can update all parameters too.">It always uses LoRA and never changes the model weights</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="alignment" class="band" aria-labelledby="alignment-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">7. Preference alignment</p>
+          <h2 id="alignment-title">Preferences turn "better response" into a training signal.</h2>
+          <p>
+            After SFT, a model can still be unhelpful, overconfident, unsafe, or correct
+            but awkward. Preference alignment starts from examples like: for this prompt,
+            response A was preferred over response B. The annotator does not have to write
+            the perfect answer; they only need to choose or rank outputs.
+          </p>
+          <p>
+            The Bradley-Terry model gives the bridge from preferences to probabilities.
+            If the reward score for the chosen response is much higher than the rejected
+            response, the model should assign a high probability to the preference. If the
+            scores are close, the preference is uncertain.
+          </p>
+          <div class="math-formal" aria-label="Preference alignment equations">
+            <h3>Preference math, in symbols</h3>
+            <p>
+              Let \(o_w\) be the winning response and \(o_l\) the losing response for a
+              prompt \(x\). A reward model learns a score \(r(x,o)\), then alignment
+              methods nudge the policy toward preferred outputs without drifting too far
+              from a reference model.
+            </p>
+            $$P(o_w \succ o_l \mid x) = \sigma(r(x,o_w) - r(x,o_l))$$
+            $$L_{\text{reward}} = -\log \sigma(r(x,o_w) - r(x,o_l))$$
+            $$\pi^* = \arg\max_{\pi} \mathbb{E}_{x,o \sim \pi}[r(x,o) - \beta \log \frac{\pi(o|x)}{\pi_{\text{ref}}(o|x)}]$$
+            $$L_{\text{DPO}} = -\log \sigma\!\left(\beta\log\frac{\pi_\theta(o_w|x)}{\pi_{\text{ref}}(o_w|x)} - \beta\log\frac{\pi_\theta(o_l|x)}{\pi_{\text{ref}}(o_l|x)}\right)$$
+            <ul class="symbol-glossary">
+              <li>\(\sigma\): logistic sigmoid, turning a score difference into a probability.</li>
+              <li>\(\pi_\theta\): the model being trained.</li>
+              <li>\(\pi_{\text{ref}}\): the reference model we do not want to drift too far from.</li>
+              <li>\(\beta\): the strength of the stay-close penalty.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Preference controls">
+          <label class="range-row" for="rewardDiffSlider">
+            <span>Reward gap: chosen minus rejected</span>
+            <input id="rewardDiffSlider" type="range" min="-4" max="4" step="0.1" value="1.5">
+            <output id="rewardDiffLabel" for="rewardDiffSlider">1.5</output>
+          </label>
+          <label class="range-row" for="dpoBetaSlider">
+            <span>DPO beta</span>
+            <input id="dpoBetaSlider" type="range" min="0.01" max="0.5" step="0.01" value="0.10">
+            <output id="dpoBetaLabel" for="dpoBetaSlider">0.10</output>
+          </label>
+        </div>
+        <div class="two-column">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Bradley-Terry preference</h3>
+              <span class="pill">sigmoid gap</span>
+            </div>
+            <div id="preferencePanel" class="preference-panel" aria-live="polite"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>DPO pressure</h3>
+              <span class="pill">prefer, but stay close</span>
+            </div>
+            <div id="dpoPanel" class="detail-list" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="testtime" class="band band-muted" aria-labelledby="testtime-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">8. Test-time compute</p>
+          <h2 id="testtime-title">Some work happens after training is over.</h2>
+          <p>
+            Pretraining, SFT, and preference alignment all change parameters. Test-time
+            compute does not. It spends extra inference work when answering a prompt. The
+            classic example is <strong>chain-of-thought prompting</strong>: demonstrations
+            include reasoning steps, so the model is more likely to produce intermediate
+            steps before the final answer.
+          </p>
+          <p>
+            The tradeoff is simple. More generated reasoning tokens can improve difficult
+            reasoning tasks, but they cost time and tokens. The point is not that every
+            response should be long. It is that inference-time work is another lever, after
+            the weights are already trained.
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Test-time compute controls">
+          <label class="range-row" for="reasoningStepsSlider">
+            <span>Reasoning steps to generate</span>
+            <input id="reasoningStepsSlider" type="range" min="0" max="6" step="1" value="3">
+            <output id="reasoningStepsLabel" for="reasoningStepsSlider">3</output>
+          </label>
+        </div>
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Answer-only vs step-by-step</h3>
+            <span class="pill">extra inference tokens</span>
+          </div>
+          <div id="testTimePanel" class="testtime-panel" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="references" class="band" aria-labelledby="references-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">9. Going deeper</p>
+          <h2 id="references-title">Further reading.</h2>
+          <p>
+            Start with the SLP lectures. They are the backbone for this chapter's
+            pretraining, evaluation, and post-training coverage.
+          </p>
+        </div>
         <ol class="reference-list">
           <li>
-            <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noreferrer">Kaplan et al., Scaling Laws for Neural Language Models</a>
-            <span>The first clear power-law relationship between loss, model size, data, and compute.</span>
+            <a href="https://web.stanford.edu/~jurafsky/slp3/" target="_blank" rel="noreferrer">Jurafsky &amp; Martin, Speech and Language Processing, Chapter 7: Large Language Models</a>
+            <span>Conditional generation, sampling, pretraining, corpora, evaluation, and safety.</span>
           </li>
           <li>
-            <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noreferrer">Hoffmann et al., Training Compute-Optimal Large Language Models (Chinchilla)</a>
-            <span>The result that most large models were undertrained, and how to balance N and D.</span>
+            <a href="https://web.stanford.edu/~jurafsky/slp3/" target="_blank" rel="noreferrer">Jurafsky &amp; Martin, Speech and Language Processing, Chapter 9: Post-training</a>
+            <span>Instruction tuning, preference data, reward models, DPO, and test-time compute.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noreferrer">Hoffmann et al., Training Compute-Optimal Large Language Models</a>
+            <span>The Chinchilla result on balancing model size and training tokens.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noreferrer">Kaplan et al., Scaling Laws for Neural Language Models</a>
+            <span>Power-law relationships between loss, model size, data, and compute.</span>
           </li>
           <li>
             <a href="https://arxiv.org/abs/2101.00027" target="_blank" rel="noreferrer">Gao et al., The Pile</a>
-            <span>A widely used, openly documented pretraining dataset.</span>
+            <span>An openly documented large pretraining corpus.</span>
           </li>
           <li>
-            <a href="https://arxiv.org/abs/2306.01116" target="_blank" rel="noreferrer">Penedo et al., The RefinedWeb Dataset</a>
-            <span>Large-scale filtering and deduplication of web text for pretraining.</span>
+            <a href="https://arxiv.org/abs/2402.00838" target="_blank" rel="noreferrer">Soldaini et al., Dolma</a>
+            <span>An open pretraining corpus and toolkit from the OLMo project.</span>
           </li>
           <li>
-            <a href="https://arxiv.org/abs/1910.02054" target="_blank" rel="noreferrer">Rajbhandari et al., ZeRO</a>
-            <span>Memory optimizations that shard optimizer state, gradients, and weights.</span>
+            <a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noreferrer">Hu et al., LoRA</a>
+            <span>Low-rank adaptation for parameter-efficient fine-tuning.</span>
           </li>
           <li>
-            <a href="https://arxiv.org/abs/1909.08053" target="_blank" rel="noreferrer">Shoeybi et al., Megatron-LM</a>
-            <span>Tensor and pipeline parallelism for training very large Transformers.</span>
+            <a href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noreferrer">Ouyang et al., InstructGPT</a>
+            <span>Instruction tuning and RLHF for more helpful and aligned assistants.</span>
           </li>
           <li>
-            <a href="https://huggingface.co/docs/transformers/perf_train_gpu_many" target="_blank" rel="noreferrer">Hugging Face, Multi-GPU Training Methods</a>
-            <span>A practical guide to data, tensor, and pipeline parallelism.</span>
+            <a href="https://arxiv.org/abs/2305.18290" target="_blank" rel="noreferrer">Rafailov et al., Direct Preference Optimization</a>
+            <span>DPO's direct preference loss without an explicit reward-model training loop.</span>
           </li>
           <li>
-            <a href="https://arxiv.org/abs/1910.10683" target="_blank" rel="noreferrer">Raffel et al., T5</a>
-            <span>A careful study of pretraining objectives and transfer with a unified text-to-text setup.</span>
-          </li>
-          <li>
-            <a href="https://jalammar.github.io/illustrated-bert/" target="_blank" rel="noreferrer">Alammar, The Illustrated BERT</a>
-            <span>A visual explanation of masked-language pretraining and contextual embeddings.</span>
+            <a href="https://arxiv.org/abs/2201.11903" target="_blank" rel="noreferrer">Wei et al., Chain-of-Thought Prompting</a>
+            <span>Using reasoning demonstrations to improve difficult reasoning tasks at inference time.</span>
           </li>
         </ol>
       </div>
@@ -446,7 +694,23 @@
     </section>
   </main>
 
-  <script src="chapter6.js"></script>
+  <script src="chapter6.js?v=20260621a"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (window.renderMathInElement) {
+        renderMathInElement(document.body, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "\\(", right: "\\)", display: false }
+          ],
+          throwOnError: false
+        });
+      }
+    });
+  </script>
+  <script defer src="code-quiz.js"></script>
   <script src="site.js" defer></script>
 </body>
 </html>

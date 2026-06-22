@@ -1567,15 +1567,52 @@ function handleGenerate() {
   );
 }
 
+// --- Transparent code-cell helpers: one visible step per call ------------
+// These let a code cell show the real per-epoch loop instead of hiding it
+// behind one opaque call. trainOneEpoch / nwTrainOneEpoch run a single pass
+// (the four beats over every example); the read-back helpers report loss,
+// accuracy, and perplexity so the cell can collect and return them.
+function trainOneEpoch() {
+  state.hasTrainedNetwork = true;
+  trainEpochs(1);
+}
+
+function networkLoss() {
+  return Number(evaluateNet(state.network, state.data.train).loss.toFixed(4));
+}
+
+function networkAccuracy() {
+  return Number(evaluateNet(state.network, state.data.train).accuracy.toFixed(3));
+}
+
+function nwTrainOneEpoch() {
+  nwState.hasTrained = true;
+  nwTrainEpochs(1);
+}
+
+function nextWordLoss() {
+  return Number(nwEvaluate(nwModel).loss.toFixed(4));
+}
+
+function nextWordPerplexity() {
+  return Number(nwEvaluate(nwModel).perplexity.toFixed(2));
+}
+
 function runCodeCell(cell) {
   const input = cell.querySelector(".code-input");
   const output = cell.querySelector(".code-output");
   output.className = "code-output is-running";
   output.textContent = "Running...";
   try {
-    const api = { trainTinyNetwork, networkSummary, trainNextWordModel, nextWordSummary, generateSentence };
-    const runner = new Function("api", `"use strict"; const { trainTinyNetwork, networkSummary, trainNextWordModel, nextWordSummary, generateSentence } = api; return (() => { ${input.value} })();`);
+    const api = {
+      trainOneEpoch, networkLoss, networkAccuracy,
+      nwTrainOneEpoch, nextWordLoss, nextWordPerplexity, generateSentence,
+      trainTinyNetwork, networkSummary, trainNextWordModel, nextWordSummary
+    };
+    const runner = new Function("api", `"use strict"; const { trainOneEpoch, networkLoss, networkAccuracy, nwTrainOneEpoch, nextWordLoss, nextWordPerplexity, generateSentence, trainTinyNetwork, networkSummary, trainNextWordModel, nextWordSummary } = api; return (() => { ${input.value} })();`);
     const result = runner(api);
+    renderNetworkLab();
+    renderNextWordLab();
     output.className = "code-output is-success";
     renderCodeResult(output, result);
   } catch (error) {

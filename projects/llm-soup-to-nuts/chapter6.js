@@ -1,67 +1,34 @@
-// Chapter 6: Pretraining LLMs.
-// Three self-contained interactives:
-//   1. objective comparison: which tokens each training objective predicts;
-//   2. a compute-optimal scaling-law explorer (Chinchilla-style approximation);
-//   3. a GPU-memory calculator that shows why training must be sharded.
-// All math runs in the browser with no downloads.
+// Chapter 6: Training and alignment.
+// Interactive panels for the full training arc:
+// stages, teacher forcing, scaling laws, memory, evaluation, preferences, and test-time compute.
 
-// --- shared helpers --------------------------------------------------------
 function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
+  return Math.min(max, Math.max(min, value));
+}
+
+function sigmoid(x) {
+  return 1 / (1 + Math.exp(-x));
 }
 
 function formatBig(n) {
-  if (n >= 1e12) return `${(n / 1e12).toFixed(n >= 1e13 ? 0 : 1)}T`;
-  if (n >= 1e9) return `${(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)}B`;
-  if (n >= 1e6) return `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M`;
-  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
-  return String(Math.round(n));
+  if (n >= 1e12) return `${(n / 1e12).toFixed(n >= 10e12 ? 0 : 1)}T`;
+  if (n >= 1e9) return `${(n / 1e9).toFixed(n >= 10e9 ? 0 : 1)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(n >= 10e6 ? 0 : 1)}M`;
+  return `${Math.round(n).toLocaleString()}`;
+}
+
+function formatRatio(n) {
+  if (n >= 10) return n.toFixed(0);
+  if (n >= 1) return n.toFixed(1);
+  if (n >= 0.01) return n.toFixed(2);
+  return n.toExponential(1);
 }
 
 function formatFlops(c) {
   const exp = Math.floor(Math.log10(c));
   const mantissa = c / Math.pow(10, exp);
-  return `${mantissa.toFixed(1)} \u00d7 10^${exp} FLOPs`;
+  return `${mantissa.toFixed(1)}e${exp} FLOPs`;
 }
-
-// --- Section 1: training objectives ---------------------------------------
-const SENTENCE = ["the", "cat", "sat", "on", "the", "mat"];
-// A fixed pseudo-random mask so the masked-LM view is stable across renders.
-const MASKED_POSITIONS = new Set([1, 4]);
-
-const state = {
-  objective: "causal",
-  causalPos: 3,
-  computeExp: 21,
-  sizeFraction: 0.5,
-  memLogParams: 9, // 10^9 = 1B
-  shardGpus: 1,
-  hasExploredObjective: false,
-  hasExploredScaling: false,
-  hasExploredMemory: false
-};
-
-const dom = {
-  objectiveButtons: Array.from(document.querySelectorAll("[data-objective]")),
-  causalControls: document.getElementById("causalControls"),
-  causalPosSlider: document.getElementById("causalPosSlider"),
-  causalPosLabel: document.getElementById("causalPosLabel"),
-  objectiveRail: document.getElementById("objectiveRail"),
-  objectiveExplain: document.getElementById("objectiveExplain"),
-
-  computeSlider: document.getElementById("computeSlider"),
-  computeLabel: document.getElementById("computeLabel"),
-  sizeSlider: document.getElementById("sizeSlider"),
-  sizeLabel: document.getElementById("sizeLabel"),
-  scalingChart: document.getElementById("scalingChart"),
-  scalingReadout: document.getElementById("scalingReadout"),
-
-  memSlider: document.getElementById("memSlider"),
-  memLabel: document.getElementById("memLabel"),
-  shardSlider: document.getElementById("shardSlider"),
-  shardLabel: document.getElementById("shardLabel"),
-  memPanel: document.getElementById("memPanel")
-};
 
 function notice(text) {
   const el = document.createElement("div");
@@ -70,48 +37,126 @@ function notice(text) {
   return el;
 }
 
-function renderObjective() {
-  const causal = state.objective === "causal";
-  dom.causalControls.hidden = !causal;
-  if (!state.hasExploredObjective) {
-    dom.objectiveRail.replaceChildren(notice("Pick an objective (or move the predict-position slider) to see which tokens are context and which are predicted."));
-    dom.objectiveExplain.replaceChildren();
-    return;
-  }
-  dom.objectiveRail.replaceChildren();
-  SENTENCE.forEach((word, index) => {
-    const chip = document.createElement("span");
-    chip.className = "obj-chip";
-    let role = "";
-    if (causal) {
-      if (index < state.causalPos) { chip.classList.add("is-context"); role = "context"; }
-      else if (index === state.causalPos) { chip.classList.add("is-target"); role = "predict"; }
-      else { chip.classList.add("is-hidden"); role = "future (hidden)"; }
-    } else {
-      if (MASKED_POSITIONS.has(index)) { chip.classList.add("is-target"); role = "predict"; }
-      else { chip.classList.add("is-context"); role = "context"; }
-    }
-    const text = document.createElement("strong");
-    text.textContent = (!causal && MASKED_POSITIONS.has(index)) ? "[mask]" : word;
-    const tag = document.createElement("small");
-    tag.textContent = role;
-    chip.append(text, tag);
-    dom.objectiveRail.append(chip);
-  });
-
-  if (causal) {
-    const target = SENTENCE[state.causalPos];
-    const context = SENTENCE.slice(0, state.causalPos).join(" ") || "(nothing yet)";
-    dom.objectiveExplain.innerHTML = `<strong>Causal (GPT-style):</strong> predict <code>${target}</code> using only what came before it: <code>${context}</code>. The model never sees future tokens, so the trained model can generate left to right.`;
-  } else {
-    dom.objectiveExplain.innerHTML = `<strong>Masked (BERT-style):</strong> hide a few tokens, then predict each <code>[mask]</code> from every other token on <em>both</em> sides. This is great for understanding a whole sentence, but it does not directly give a left-to-right generator.`;
-  }
+function detailRow(label, value) {
+  const row = document.createElement("div");
+  row.className = "detail-row";
+  const span = document.createElement("span");
+  span.textContent = label;
+  const strong = document.createElement("strong");
+  strong.textContent = value;
+  row.append(span, strong);
+  return row;
 }
 
-// --- Section 2: scaling laws (Chinchilla-style approximation) ---------------
-// L(N, D) = E + A / N^alpha + B / D^beta, with C ~= 6 N D.
-// Using equal exponents makes the compute-optimal ratio D/N a constant, tuned
-// here to the famous Chinchilla guideline of roughly 20 tokens per parameter.
+const state = {
+  stage: "pretraining",
+  teacherStep: 2,
+  computeExp: 21,
+  sizeFraction: 0.5,
+  memLogParams: 9,
+  shardGpus: 1,
+  evalLoss: 1.2,
+  rewardDiff: 1.5,
+  dpoBeta: 0.1,
+  reasoningSteps: 3,
+  hasScaled: false,
+  hasMemory: false
+};
+
+const dom = {};
+function grab(id) { return document.getElementById(id); }
+
+// ---------------------------------------------------------------------------
+// Stage map
+// ---------------------------------------------------------------------------
+
+const STAGES = {
+  pretraining: {
+    title: "Pretraining",
+    body: "The model reads huge token streams and pays cross-entropy loss on the real next token. The text supplies its own labels.",
+    signal: "Self-supervised next-token prediction.",
+    output: "A base model: broad and powerful, but not yet trained to reliably follow instructions."
+  },
+  sft: {
+    title: "Instruction tuning",
+    body: "The base model continues training on request-and-response examples. The loss is still next-token cross-entropy, but the data now carries a desired response.",
+    signal: "Supervised examples of what a good answer looks like.",
+    output: "A model that better understands instructions, formats, and conversational roles."
+  },
+  preference: {
+    title: "Preference alignment",
+    body: "The model sees prompts with preferred and rejected outputs. The training pressure increases likelihood for preferred responses while keeping the policy close to a reference model.",
+    signal: "Chosen vs rejected responses, rankings, or scalar preference ratings.",
+    output: "A model nudged toward helpful, honest, harmless behavior, though evaluation still matters."
+  },
+  testtime: {
+    title: "Test-time compute",
+    body: "The weights stay fixed. We spend extra inference tokens or passes, for example by asking for step-by-step reasoning before the final answer.",
+    signal: "More computation during generation, not more parameter updates.",
+    output: "Potentially better reasoning on hard tasks, with higher latency and token cost."
+  }
+};
+
+function renderStage() {
+  document.querySelectorAll("[data-stage]").forEach((btn) => {
+    btn.classList.toggle("is-active", btn.dataset.stage === state.stage);
+  });
+  const item = STAGES[state.stage];
+  dom.stageReadout.replaceChildren(
+    detailRow("stage", item.title),
+    detailRow("training signal", item.signal),
+    detailRow("what changes", item.output)
+  );
+  const p = document.createElement("p");
+  p.className = "insight-note";
+  p.textContent = item.body;
+  dom.stageReadout.append(p);
+}
+
+// ---------------------------------------------------------------------------
+// Teacher forcing trace
+// ---------------------------------------------------------------------------
+
+const TRAIN_TOKENS = ["So", "long", "and", "thanks", "for", "all"];
+const TRAIN_PROBS = [0.5, 0.4, 0.25, 0.35, 0.44];
+
+function renderTeacher() {
+  const step = Number(dom.teacherStepSlider.value);
+  state.teacherStep = step;
+  dom.teacherStepLabel.textContent = `position ${step + 1}`;
+  const prefix = TRAIN_TOKENS.slice(0, step + 1);
+  const target = TRAIN_TOKENS[step + 1];
+  const probability = TRAIN_PROBS[step];
+  const loss = -Math.log(probability);
+  dom.teacherTrace.replaceChildren();
+
+  const rail = document.createElement("div");
+  rail.className = "token-rail";
+  TRAIN_TOKENS.forEach((token, index) => {
+    const chip = document.createElement("span");
+    chip.className = "token-chip";
+    if (index <= step) chip.classList.add("is-context");
+    if (index === step + 1) chip.classList.add("is-target");
+    chip.textContent = token;
+    rail.append(chip);
+  });
+  dom.teacherTrace.append(rail);
+  dom.teacherTrace.append(
+    detailRow("true prefix", prefix.join(" ")),
+    detailRow("target token", target),
+    detailRow("model probability on target", probability.toFixed(2)),
+    detailRow("loss for this position", `${loss.toFixed(2)} nats`)
+  );
+  const note = document.createElement("p");
+  note.className = "microcopy";
+  note.textContent = "Teacher forcing means the next training row uses the true corpus history, even if the model would have guessed wrong here.";
+  dom.teacherTrace.append(note);
+}
+
+// ---------------------------------------------------------------------------
+// Scaling laws
+// ---------------------------------------------------------------------------
+
 const SCALE = { E: 1.69, A: 400, alpha: 0.34, B: 1108, beta: 0.34 };
 const D_MIN = 1e8;
 const D_MAX = 2e13;
@@ -120,8 +165,6 @@ function predictedLoss(N, D) {
   return SCALE.E + SCALE.A / Math.pow(N, SCALE.alpha) + SCALE.B / Math.pow(D, SCALE.beta);
 }
 
-// For a fixed compute budget C, model size N is chosen along the isocompute
-// curve D = C / (6N). Returns the valid log10(N) range for that budget.
 function sizeRangeForCompute(C) {
   const logNmin = Math.log10(C / (6 * D_MAX));
   const logNmax = Math.log10(C / (6 * D_MIN));
@@ -137,51 +180,43 @@ function scalingPointFromFraction(C, fraction) {
 }
 
 function optimalForCompute(C) {
-  const { logNmin, logNmax } = sizeRangeForCompute(C);
   let best = null;
-  const steps = 160;
-  for (let i = 0; i <= steps; i += 1) {
-    const f = i / steps;
-    const point = scalingPointFromFraction(C, f);
-    if (!best || point.loss < best.loss) best = { ...point, fraction: f };
+  for (let i = 0; i <= 180; i += 1) {
+    const p = scalingPointFromFraction(C, i / 180);
+    if (!best || p.loss < best.loss) best = { ...p, fraction: i / 180 };
   }
-  return { ...best, logNmin, logNmax };
+  return best;
 }
 
 function renderScaling() {
-  const C = Math.pow(10, state.computeExp);
+  const C = Math.pow(10, Number(dom.computeSlider.value));
+  state.computeExp = Number(dom.computeSlider.value);
+  state.sizeFraction = Number(dom.sizeSlider.value) / 100;
   const chosen = scalingPointFromFraction(C, state.sizeFraction);
+  const optimal = optimalForCompute(C);
   dom.computeLabel.textContent = formatFlops(C);
-  dom.sizeLabel.textContent = `${formatBig(chosen.N)} params`;
-  if (!state.hasExploredScaling) {
+  dom.sizeLabel.textContent = formatBig(chosen.N);
+
+  if (!state.hasScaled) {
     dom.scalingChart.replaceChildren(notice("Move the compute or model-size slider to plot the loss curve and find the compute-optimal point."));
     dom.scalingReadout.replaceChildren();
     return;
   }
-  const optimal = optimalForCompute(C);
 
-  // Build the loss curve along the isocompute line.
-  const { logNmin, logNmax } = optimal;
+  const { logNmin, logNmax } = sizeRangeForCompute(C);
   const points = [];
-  const steps = 80;
-  for (let i = 0; i <= steps; i += 1) {
-    const f = i / steps;
-    const p = scalingPointFromFraction(C, f);
-    points.push({ f, logN: p.logN, loss: p.loss });
-  }
+  for (let i = 0; i <= 90; i += 1) points.push(scalingPointFromFraction(C, i / 90));
   const losses = points.map((p) => p.loss);
   const minLoss = Math.min(...losses);
   const maxLoss = Math.max(...losses);
-
-  const W = 520;
-  const H = 240;
-  const padL = 46;
-  const padR = 16;
-  const padT = 16;
-  const padB = 40;
+  const W = 540;
+  const H = 250;
+  const padL = 48;
+  const padR = 18;
+  const padT = 18;
+  const padB = 42;
   const xOf = (logN) => padL + ((logN - logNmin) / (logNmax - logNmin)) * (W - padL - padR);
   const yOf = (loss) => padT + ((loss - minLoss) / Math.max(1e-6, maxLoss - minLoss)) * (H - padT - padB);
-
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -189,193 +224,242 @@ function renderScaling() {
   svg.setAttribute("role", "img");
   svg.setAttribute("aria-label", "Predicted loss along a fixed compute budget as model size changes.");
 
-  // axes
   const axis = document.createElementNS(svgNS, "path");
-  axis.setAttribute("d", `M${padL},${padT} L${padL},${H - padB} L${W - padR},${H - padB}`);
+  axis.setAttribute("d", `M${padL},${padT} V${H - padB} H${W - padR}`);
   axis.setAttribute("class", "scaling-axis");
   svg.append(axis);
-  const yLabel = document.createElementNS(svgNS, "text");
-  yLabel.setAttribute("x", padL - 8);
-  yLabel.setAttribute("y", padT + 6);
-  yLabel.setAttribute("class", "scaling-axis-label");
-  yLabel.setAttribute("text-anchor", "end");
-  yLabel.textContent = "loss";
-  svg.append(yLabel);
-  const xLabel = document.createElementNS(svgNS, "text");
-  xLabel.setAttribute("x", W - padR);
-  xLabel.setAttribute("y", H - padB + 28);
-  xLabel.setAttribute("class", "scaling-axis-label");
-  xLabel.setAttribute("text-anchor", "end");
-  xLabel.textContent = "bigger model, less data \u2192";
-  svg.append(xLabel);
-  const xLabel2 = document.createElementNS(svgNS, "text");
-  xLabel2.setAttribute("x", padL);
-  xLabel2.setAttribute("y", H - padB + 28);
-  xLabel2.setAttribute("class", "scaling-axis-label");
-  xLabel2.setAttribute("text-anchor", "start");
-  xLabel2.textContent = "\u2190 smaller model, more data";
-  svg.append(xLabel2);
 
-  // loss curve
   const path = document.createElementNS(svgNS, "path");
   path.setAttribute("d", points.map((p, i) => `${i ? "L" : "M"}${xOf(p.logN).toFixed(1)},${yOf(p.loss).toFixed(1)}`).join(" "));
   path.setAttribute("class", "scaling-curve");
   svg.append(path);
 
-  // optimal marker (minimum loss)
-  const optX = xOf(optimal.logN);
-  const optY = yOf(optimal.loss);
   const optLine = document.createElementNS(svgNS, "line");
-  optLine.setAttribute("x1", optX); optLine.setAttribute("y1", padT);
-  optLine.setAttribute("x2", optX); optLine.setAttribute("y2", H - padB);
+  optLine.setAttribute("x1", xOf(optimal.logN));
+  optLine.setAttribute("x2", xOf(optimal.logN));
+  optLine.setAttribute("y1", padT);
+  optLine.setAttribute("y2", H - padB);
   optLine.setAttribute("class", "scaling-optimal-line");
   svg.append(optLine);
+
   const optDot = document.createElementNS(svgNS, "circle");
-  optDot.setAttribute("cx", optX); optDot.setAttribute("cy", optY);
-  optDot.setAttribute("r", 5); optDot.setAttribute("class", "scaling-optimal-dot");
+  optDot.setAttribute("cx", xOf(optimal.logN));
+  optDot.setAttribute("cy", yOf(optimal.loss));
+  optDot.setAttribute("r", 5);
+  optDot.setAttribute("class", "scaling-optimal-dot");
   svg.append(optDot);
 
-  // chosen marker
-  const chX = xOf(chosen.logN);
-  const chY = yOf(chosen.loss);
-  const chDot = document.createElementNS(svgNS, "circle");
-  chDot.setAttribute("cx", chX); chDot.setAttribute("cy", chY);
-  chDot.setAttribute("r", 6); chDot.setAttribute("class", "scaling-chosen-dot");
-  svg.append(chDot);
+  const chosenDot = document.createElementNS(svgNS, "circle");
+  chosenDot.setAttribute("cx", xOf(chosen.logN));
+  chosenDot.setAttribute("cy", yOf(chosen.loss));
+  chosenDot.setAttribute("r", 6);
+  chosenDot.setAttribute("class", "scaling-chosen-dot");
+  svg.append(chosenDot);
+
+  const xLabel = document.createElementNS(svgNS, "text");
+  xLabel.setAttribute("x", W / 2);
+  xLabel.setAttribute("y", H - 12);
+  xLabel.setAttribute("class", "scaling-axis-label");
+  xLabel.setAttribute("text-anchor", "middle");
+  xLabel.textContent = "model size along a fixed compute budget";
+  svg.append(xLabel);
+
+  const yLabel = document.createElementNS(svgNS, "text");
+  yLabel.setAttribute("x", 16);
+  yLabel.setAttribute("y", 24);
+  yLabel.setAttribute("class", "scaling-axis-label");
+  yLabel.textContent = "loss";
+  svg.append(yLabel);
 
   dom.scalingChart.replaceChildren(svg);
-
-  // readout
+  dom.scalingReadout.replaceChildren(
+    detailRow("your model", `${formatBig(chosen.N)} params`),
+    detailRow("your data", `${formatBig(chosen.D)} tokens`),
+    detailRow("tokens per parameter", `${formatRatio(chosen.D / chosen.N)} (optimal near ${formatRatio(optimal.D / optimal.N)})`),
+    detailRow("your predicted loss", chosen.loss.toFixed(3)),
+    detailRow("best loss at this budget", `${optimal.loss.toFixed(3)} at ${formatBig(optimal.N)} params`)
+  );
+  const verdict = document.createElement("p");
+  verdict.className = "insight-note";
   const ratio = chosen.D / chosen.N;
   const optRatio = optimal.D / optimal.N;
-  let verdict;
-  if (ratio < optRatio * 0.5) verdict = "This model is too big for its data: it is undertrained. More tokens (or a smaller model) would lower the loss for the same compute.";
-  else if (ratio > optRatio * 2) verdict = "This model is small for this much data. A bigger model would use the compute better.";
-  else verdict = "This is close to compute-optimal: model size and data are balanced for this budget.";
-
-  dom.scalingReadout.replaceChildren();
-  const rows = [
-    ["your model", `${formatBig(chosen.N)} params`],
-    ["your data", `${formatBig(chosen.D)} tokens`],
-    ["tokens per parameter", `${ratio.toFixed(1)} (optimal \u2248 ${optRatio.toFixed(0)})`],
-    ["your predicted loss", chosen.loss.toFixed(3)],
-    ["best possible at this budget", `${optimal.loss.toFixed(3)} at ${formatBig(optimal.N)} params`]
-  ];
-  rows.forEach(([label, value]) => {
-    const row = document.createElement("div");
-    row.className = "detail-row";
-    const span = document.createElement("span");
-    span.textContent = label;
-    const strong = document.createElement("strong");
-    strong.textContent = value;
-    row.append(span, strong);
-    dom.scalingReadout.append(row);
-  });
-  const note = document.createElement("p");
-  note.className = "insight-note";
-  note.textContent = verdict;
-  dom.scalingReadout.append(note);
+  if (ratio < optRatio * 0.5) verdict.textContent = "This model is too big for its data. More tokens, or a smaller model, would use the same compute better.";
+  else if (ratio > optRatio * 2) verdict.textContent = "This model is small for this much data. A bigger model would use the compute better.";
+  else verdict.textContent = "This is close to compute-optimal: model size and data are balanced for this budget.";
+  dom.scalingReadout.append(verdict);
 }
 
-// --- Section 3: GPU memory calculator --------------------------------------
-const GPU_GB = 80; // an 80 GB data-center GPU
+// ---------------------------------------------------------------------------
+// Memory
+// ---------------------------------------------------------------------------
+
+const GPU_GB = 80;
 const BYTES_PER_PARAM = {
-  weights: 2,   // fp16 weights
-  grads: 2,     // fp16 gradients
-  optimizer: 8, // Adam: fp32 momentum + variance
-  master: 4     // fp32 master copy of weights
+  weights: 2,
+  gradients: 2,
+  adam: 8,
+  master: 4
 };
 
 function renderMemory() {
-  const N = Math.pow(10, state.memLogParams);
-  const shards = state.shardGpus;
+  const N = Math.pow(10, Number(dom.memSlider.value) / 10);
+  const shards = Number(dom.shardSlider.value);
+  state.memLogParams = Number(dom.memSlider.value) / 10;
+  state.shardGpus = shards;
   dom.memLabel.textContent = `${formatBig(N)} params`;
   dom.shardLabel.textContent = `${shards} GPU${shards === 1 ? "" : "s"}`;
-  if (!state.hasExploredMemory) {
+
+  if (!state.hasMemory) {
     dom.memPanel.replaceChildren(notice("Move the model-size or sharding slider to see how training memory splits across GPUs."));
     return;
   }
 
   const bytesPerParam = Object.values(BYTES_PER_PARAM).reduce((s, b) => s + b, 0);
-  const totalBytes = N * bytesPerParam;
-  const totalGB = totalBytes / 1e9;
+  const totalGB = (N * bytesPerParam) / 1e9;
   const perGpuGB = totalGB / shards;
   const gpusNeeded = Math.ceil(totalGB / GPU_GB);
-
-  dom.memPanel.replaceChildren();
-  const breakdown = [
-    ["fp16 weights", (N * BYTES_PER_PARAM.weights) / 1e9],
-    ["fp16 gradients", (N * BYTES_PER_PARAM.grads) / 1e9],
-    ["Adam state (momentum + variance)", (N * BYTES_PER_PARAM.optimizer) / 1e9],
-    ["fp32 master weights", (N * BYTES_PER_PARAM.master) / 1e9]
-  ];
-  breakdown.forEach(([label, gb]) => {
-    const row = document.createElement("div");
-    row.className = "detail-row";
-    const span = document.createElement("span");
-    span.textContent = label;
-    const strong = document.createElement("strong");
-    strong.textContent = `${gb.toFixed(gb >= 10 ? 0 : 1)} GB`;
-    row.append(span, strong);
-    dom.memPanel.append(row);
-  });
-
-  const totalRow = document.createElement("div");
-  totalRow.className = "detail-row is-total";
-  const tSpan = document.createElement("span");
-  tSpan.textContent = "total training memory";
-  const tStrong = document.createElement("strong");
-  tStrong.textContent = `${totalGB.toFixed(totalGB >= 10 ? 0 : 1)} GB`;
-  totalRow.append(tSpan, tStrong);
-  dom.memPanel.append(totalRow);
-
+  dom.memPanel.replaceChildren(
+    detailRow("weights", `${((N * BYTES_PER_PARAM.weights) / 1e9).toFixed(1)} GB`),
+    detailRow("gradients", `${((N * BYTES_PER_PARAM.gradients) / 1e9).toFixed(1)} GB`),
+    detailRow("Adam state", `${((N * BYTES_PER_PARAM.adam) / 1e9).toFixed(1)} GB`),
+    detailRow("master weights", `${((N * BYTES_PER_PARAM.master) / 1e9).toFixed(1)} GB`),
+    detailRow("total training state", `${totalGB.toFixed(1)} GB`),
+    detailRow("per GPU after sharding", `${perGpuGB.toFixed(1)} GB`),
+    detailRow("80GB GPUs for state alone", `${gpusNeeded}`)
+  );
   const note = document.createElement("p");
   note.className = "insight-note";
-  if (totalGB <= GPU_GB) {
-    note.textContent = `This fits on a single ${GPU_GB} GB GPU, with about ${perGpuGB.toFixed(1)} GB per GPU after sharding across ${shards}. Note that weights are only a small slice; the optimizer state is the heavy part.`;
-  } else {
-    note.textContent = `Training needs about ${totalGB.toFixed(0)} GB, which is ${gpusNeeded} GPUs' worth just to hold the state. Sharding across ${shards} GPUs drops it to ${perGpuGB.toFixed(1)} GB each. This is exactly why ZeRO and FSDP split weights, gradients, and optimizer state across many GPUs.`;
-  }
+  note.textContent = perGpuGB <= GPU_GB
+    ? "The parameter state fits under 80GB per GPU, but activations and buffers still need room."
+    : "Even after sharding, the parameter state alone is over 80GB per GPU. More sharding or memory-saving techniques are needed.";
   dom.memPanel.append(note);
 }
 
-// --- wiring ----------------------------------------------------------------
-function setObjective(value) {
-  state.objective = value;
-  dom.objectiveButtons.forEach((btn) => btn.classList.toggle("is-active", btn.dataset.objective === value));
-  renderObjective();
+// ---------------------------------------------------------------------------
+// Evaluation and safety
+// ---------------------------------------------------------------------------
+
+function renderEvaluation() {
+  const loss = Number(dom.evalLossSlider.value);
+  state.evalLoss = loss;
+  const ppl = Math.exp(loss);
+  dom.evalLossLabel.textContent = loss.toFixed(1);
+  dom.evalPanel.replaceChildren();
+  [
+    ["Average loss", `${loss.toFixed(2)} nats`],
+    ["Perplexity", `${ppl.toFixed(1)} tokens`],
+    ["Plain meaning", `roughly ${ppl.toFixed(1)} effective choices`]
+  ].forEach(([label, value]) => {
+    const card = document.createElement("div");
+    card.className = "metric-card";
+    const strong = document.createElement("strong");
+    strong.textContent = value;
+    const span = document.createElement("span");
+    span.textContent = label;
+    card.append(strong, span);
+    dom.evalPanel.append(card);
+  });
+  dom.evalNarrative.textContent = "Use perplexity for same-tokenizer language-model comparisons. For assistants, pair it with task benchmarks, contamination checks, latency, fairness, and safety evaluations.";
 }
 
+// ---------------------------------------------------------------------------
+// Preferences and DPO
+// ---------------------------------------------------------------------------
+
+function renderPreference() {
+  const diff = Number(dom.rewardDiffSlider.value);
+  const beta = Number(dom.dpoBetaSlider.value);
+  state.rewardDiff = diff;
+  state.dpoBeta = beta;
+  dom.rewardDiffLabel.textContent = diff.toFixed(1);
+  dom.dpoBetaLabel.textContent = beta.toFixed(2);
+  const p = sigmoid(diff);
+  const scaled = sigmoid(beta * diff);
+
+  dom.preferencePanel.replaceChildren();
+  const meter = document.createElement("div");
+  meter.className = "preference-meter";
+  const fill = document.createElement("span");
+  fill.style.width = `${clamp(p * 100, 0, 100)}%`;
+  meter.append(fill);
+  dom.preferencePanel.append(
+    detailRow("P(chosen preferred)", `${(p * 100).toFixed(0)}%`),
+    detailRow("reward gap", diff.toFixed(1)),
+    meter
+  );
+  const note = document.createElement("p");
+  note.className = "microcopy";
+  note.textContent = diff > 0
+    ? "The chosen response scores higher, so the preference probability is above 50%."
+    : "The rejected response scores higher in this toy setting, so the preference probability falls below 50%.";
+  dom.preferencePanel.append(note);
+
+  dom.dpoPanel.replaceChildren(
+    detailRow("beta", beta.toFixed(2)),
+    detailRow("sigmoid(beta * gap)", `${(scaled * 100).toFixed(0)}%`),
+    detailRow("training pressure", diff >= 0 ? "increase chosen likelihood" : "the pair disagrees with the chosen label")
+  );
+  const dpoNote = document.createElement("p");
+  dpoNote.className = "insight-note";
+  dpoNote.textContent = "Larger beta makes the preference term bite harder, but the reference-model ratio still keeps the trained policy from drifting without limit.";
+  dom.dpoPanel.append(dpoNote);
+}
+
+// ---------------------------------------------------------------------------
+// Test-time compute
+// ---------------------------------------------------------------------------
+
+function renderTestTime() {
+  const steps = Number(dom.reasoningStepsSlider.value);
+  state.reasoningSteps = steps;
+  dom.reasoningStepsLabel.textContent = String(steps);
+  const answerOnly = 18;
+  const stepTokens = steps * 14;
+  const total = answerOnly + stepTokens;
+  dom.testTimePanel.replaceChildren(
+    detailRow("answer-only tokens", `${answerOnly}`),
+    detailRow("reasoning tokens", `${stepTokens}`),
+    detailRow("total output budget", `${total}`),
+    detailRow("tradeoff", steps === 0 ? "fast, little intermediate reasoning" : "slower, more room for reasoning")
+  );
+  const trace = document.createElement("div");
+  trace.className = "reasoning-trace";
+  if (steps === 0) {
+    trace.append(notice("No intermediate reasoning. The model jumps straight to the answer."));
+  } else {
+    for (let i = 1; i <= steps; i += 1) {
+      const row = document.createElement("span");
+      row.textContent = `Step ${i}`;
+      trace.append(row);
+    }
+    const final = document.createElement("strong");
+    final.textContent = "Final answer";
+    trace.append(final);
+  }
+  dom.testTimePanel.append(trace);
+}
+
+// ---------------------------------------------------------------------------
+// Wiring
+// ---------------------------------------------------------------------------
+
 function wireEvents() {
-  dom.objectiveButtons.forEach((btn) => {
-    btn.addEventListener("click", () => { state.hasExploredObjective = true; setObjective(btn.dataset.objective); });
+  document.querySelectorAll("[data-stage]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.stage = btn.dataset.stage;
+      renderStage();
+    });
   });
-  dom.causalPosSlider.addEventListener("input", () => {
-    state.hasExploredObjective = true;
-    state.causalPos = Number(dom.causalPosSlider.value);
-    dom.causalPosLabel.textContent = `position ${state.causalPos + 1}`;
-    renderObjective();
-  });
-  dom.computeSlider.addEventListener("input", () => {
-    state.hasExploredScaling = true;
-    state.computeExp = Number(dom.computeSlider.value);
-    renderScaling();
-  });
-  dom.sizeSlider.addEventListener("input", () => {
-    state.hasExploredScaling = true;
-    state.sizeFraction = Number(dom.sizeSlider.value) / 100;
-    renderScaling();
-  });
-  dom.memSlider.addEventListener("input", () => {
-    state.hasExploredMemory = true;
-    state.memLogParams = Number(dom.memSlider.value) / 10;
-    renderMemory();
-  });
-  dom.shardSlider.addEventListener("input", () => {
-    state.hasExploredMemory = true;
-    state.shardGpus = Number(dom.shardSlider.value);
-    renderMemory();
-  });
+
+  dom.teacherStepSlider.addEventListener("input", () => renderTeacher());
+  dom.computeSlider.addEventListener("input", () => { state.hasScaled = true; renderScaling(); });
+  dom.sizeSlider.addEventListener("input", () => { state.hasScaled = true; renderScaling(); });
+  dom.memSlider.addEventListener("input", () => { state.hasMemory = true; renderMemory(); });
+  dom.shardSlider.addEventListener("input", () => { state.hasMemory = true; renderMemory(); });
+  dom.evalLossSlider.addEventListener("input", () => renderEvaluation());
+  dom.rewardDiffSlider.addEventListener("input", () => renderPreference());
+  dom.dpoBetaSlider.addEventListener("input", () => renderPreference());
+  dom.reasoningStepsSlider.addEventListener("input", () => renderTestTime());
 }
 
 function setupSectionSpy() {
@@ -397,14 +481,45 @@ function setupSectionSpy() {
 }
 
 function init() {
+  Object.assign(dom, {
+    stageReadout: grab("stageReadout"),
+    teacherStepSlider: grab("teacherStepSlider"),
+    teacherStepLabel: grab("teacherStepLabel"),
+    teacherTrace: grab("teacherTrace"),
+    computeSlider: grab("computeSlider"),
+    computeLabel: grab("computeLabel"),
+    sizeSlider: grab("sizeSlider"),
+    sizeLabel: grab("sizeLabel"),
+    scalingChart: grab("scalingChart"),
+    scalingReadout: grab("scalingReadout"),
+    memSlider: grab("memSlider"),
+    memLabel: grab("memLabel"),
+    shardSlider: grab("shardSlider"),
+    shardLabel: grab("shardLabel"),
+    memPanel: grab("memPanel"),
+    evalLossSlider: grab("evalLossSlider"),
+    evalLossLabel: grab("evalLossLabel"),
+    evalPanel: grab("evalPanel"),
+    evalNarrative: grab("evalNarrative"),
+    rewardDiffSlider: grab("rewardDiffSlider"),
+    rewardDiffLabel: grab("rewardDiffLabel"),
+    dpoBetaSlider: grab("dpoBetaSlider"),
+    dpoBetaLabel: grab("dpoBetaLabel"),
+    preferencePanel: grab("preferencePanel"),
+    dpoPanel: grab("dpoPanel"),
+    reasoningStepsSlider: grab("reasoningStepsSlider"),
+    reasoningStepsLabel: grab("reasoningStepsLabel"),
+    testTimePanel: grab("testTimePanel")
+  });
+
   wireEvents();
-  setObjective("causal");
-  state.causalPos = Number(dom.causalPosSlider.value);
-  dom.causalPosLabel.textContent = `position ${state.causalPos + 1}`;
-  state.sizeFraction = Number(dom.sizeSlider.value) / 100;
+  renderStage();
+  renderTeacher();
   renderScaling();
-  state.memLogParams = Number(dom.memSlider.value) / 10;
   renderMemory();
+  renderEvaluation();
+  renderPreference();
+  renderTestTime();
   setupSectionSpy();
 }
 

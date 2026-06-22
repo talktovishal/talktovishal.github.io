@@ -798,6 +798,51 @@
   overflow-x: auto;
 }
 
+.math-formal {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: 10px;
+  background: #f6fbfb;
+}
+
+.math-formal h3 {
+  margin: 0 0 8px;
+}
+
+.math-formal > p {
+  margin: 0 0 10px;
+}
+
+.math-formal .microcopy {
+  margin-bottom: 0;
+}
+
+.math-formal .katex-display {
+  margin: 12px 0;
+  padding: 4px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.symbol-glossary {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.symbol-glossary li {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  font-size: 0.92rem;
+  color: #123a3a;
+}
+
 .workbook-block {
   margin-top: 16px;
   padding: 14px 16px;

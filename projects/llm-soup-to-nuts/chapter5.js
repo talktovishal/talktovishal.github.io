@@ -171,20 +171,71 @@ function temperedDistribution(temp) {
   return DECODE_BASE.map((d, i) => ({ t: d.t, p: adj[i] / sum }));
 }
 
+function renormalize(dist) {
+  const sum = dist.reduce((total, d) => total + d.p, 0) || 1;
+  return dist.map((d) => ({ ...d, p: d.p / sum }));
+}
+
+function decodingDistribution() {
+  const mode = dom.decodeMode.value;
+  const temp = Number(dom.decodeTemp.value);
+  const topK = Number(dom.topKSlider.value);
+  const topP = Number(dom.topPSlider.value);
+  const sorted = temperedDistribution(temp).slice().sort((a, b) => b.p - a.p);
+
+  if (mode === "greedy") {
+    return { full: sorted, kept: [{ ...sorted[0], p: 1 }], label: "top 1 token" };
+  }
+
+  if (mode === "topk") {
+    const keptRaw = sorted.slice(0, topK);
+    return { full: sorted, kept: renormalize(keptRaw), label: `top ${topK} tokens` };
+  }
+
+  if (mode === "topp") {
+    const keptRaw = [];
+    let mass = 0;
+    for (const item of sorted) {
+      keptRaw.push(item);
+      mass += item.p;
+      if (mass >= topP) break;
+    }
+    return { full: sorted, kept: renormalize(keptRaw), label: `mass >= ${topP.toFixed(2)}` };
+  }
+
+  return { full: sorted, kept: sorted, label: "all tokens" };
+}
+
+function strategyName() {
+  const mode = dom.decodeMode.value;
+  if (mode === "topk") return "top-k";
+  if (mode === "topp") return "top-p";
+  if (mode === "temperature") return "temperature sampling";
+  return "greedy";
+}
+
 function renderDecodeBars() {
   const temp = Number(dom.decodeTemp.value);
   dom.decodeTempLabel.textContent = temp.toFixed(1);
+  dom.topKLabel.textContent = String(dom.topKSlider.value);
+  dom.topPLabel.textContent = Number(dom.topPSlider.value).toFixed(2);
+  const { full, kept, label } = decodingDistribution();
   dom.decodeDistPill.textContent = `temperature ${temp.toFixed(1)}`;
+  dom.candidatePill.textContent = label;
   const bars = dom.decodeBars;
+  const candidateSet = dom.candidateSet;
   bars.replaceChildren();
+  candidateSet.replaceChildren();
   if (!state.hasDecoded) {
-    bars.append(emptyState("Nudge the temperature or press \u201cPick a token\u201d to reveal the distribution."));
+    bars.append(emptyState("Choose a decoding strategy or press \u201cPick a token\u201d to reveal the distribution."));
+    candidateSet.append(emptyState("The kept tokens will appear here after the first decoding action."));
     return;
   }
-  const dist = temperedDistribution(temp).slice().sort((a, b) => b.p - a.p);
-  dist.forEach((d) => {
+  const keptNames = new Set(kept.map((d) => d.t));
+  full.forEach((d) => {
     const row = document.createElement("div");
     row.className = "attn-bar-row";
+    if (!keptNames.has(d.t)) row.classList.add("is-muted");
     const label = document.createElement("span");
     label.className = "attn-token";
     label.textContent = d.t;
@@ -200,20 +251,33 @@ function renderDecodeBars() {
     row.append(label, track, value);
     bars.append(row);
   });
+
+  kept.forEach((d, index) => {
+    const chip = document.createElement("div");
+    chip.className = "candidate-chip";
+    const name = document.createElement("strong");
+    name.textContent = d.t;
+    const detail = document.createElement("span");
+    detail.textContent = dom.decodeMode.value === "greedy"
+      ? "chosen every time"
+      : `${(d.p * 100).toFixed(0)}% after renormalizing`;
+    chip.append(name, detail);
+    if (index === 0) chip.classList.add("is-top");
+    candidateSet.append(chip);
+  });
 }
 
 function pickToken() {
   state.hasDecoded = true;
-  const temp = Number(dom.decodeTemp.value);
-  const dist = temperedDistribution(temp);
+  const { kept } = decodingDistribution();
   let chosen;
   if (dom.decodeMode.value === "greedy") {
-    chosen = dist.reduce((best, d) => (d.p > best.p ? d : best), dist[0]).t;
+    chosen = kept[0].t;
   } else {
     const r = Math.random();
     let acc = 0;
-    chosen = dist[dist.length - 1].t;
-    for (const d of dist) { acc += d.p; if (r <= acc) { chosen = d.t; break; } }
+    chosen = kept[kept.length - 1].t;
+    for (const d of kept) { acc += d.p; if (r <= acc) { chosen = d.t; break; } }
   }
   state.decodeTally[chosen] = (state.decodeTally[chosen] || 0) + 1;
   state.decodeRolls += 1;
@@ -231,7 +295,7 @@ function renderDecodeTally() {
   const entries = Object.entries(state.decodeTally).sort((a, b) => b[1] - a[1]);
   const head = document.createElement("p");
   head.className = "microcopy";
-  head.textContent = `${state.decodeRolls} pick${state.decodeRolls === 1 ? "" : "s"} so far (${dom.decodeMode.value === "greedy" ? "greedy" : "sampling"}):`;
+  head.textContent = `${state.decodeRolls} pick${state.decodeRolls === 1 ? "" : "s"} so far (${strategyName()}):`;
   el.append(head);
   entries.forEach(([token, count]) => {
     const row = document.createElement("div");
@@ -507,7 +571,7 @@ function normalize(weights) {
 function headMeaning(qi) {
   return attentionRow(qi, false).weights;
 }
-// Head B: "previous token" — looks mostly at the token just before.
+// Head B: "previous token" - looks mostly at the token just before.
 function headPrev(qi) {
   const w = TOKENS.map(() => 0);
   if (qi === 0) { w[0] = 1; return w; }
@@ -516,7 +580,7 @@ function headPrev(qi) {
   for (let j = 0; j < qi - 1; j += 1) w[j] = 0.16 / Math.max(qi - 1, 1);
   return normalize(w);
 }
-// Head C: "subject anchor" — always leans on the sentence subject (Sarah).
+// Head C: "subject anchor" - always leans on the sentence subject (Sarah).
 function headSubject(qi) {
   const w = TOKENS.map(() => 0);
   if (qi === 0) { w[0] = 1; return w; }
@@ -726,8 +790,11 @@ function wireEvents() {
   dom.genResetBtn.addEventListener("click", () => { state.genStep = 0; renderGenLoop(); });
 
   // Decoding
-  dom.decodeMode.addEventListener("change", () => { renderDecodeBars(); renderDecodeTally(); });
+  dom.decodeMode.addEventListener("pointerdown", () => { state.hasDecoded = true; renderDecodeBars(); });
+  dom.decodeMode.addEventListener("change", () => { state.hasDecoded = true; renderDecodeBars(); renderDecodeTally(); });
   dom.decodeTemp.addEventListener("input", () => { state.hasDecoded = true; renderDecodeBars(); });
+  dom.topKSlider.addEventListener("input", () => { state.hasDecoded = true; renderDecodeBars(); });
+  dom.topPSlider.addEventListener("input", () => { state.hasDecoded = true; renderDecodeBars(); });
   dom.decodePickBtn.addEventListener("click", () => pickToken());
   dom.decodeResetBtn.addEventListener("click", () => {
     state.decodeTally = {}; state.decodeRolls = 0; renderDecodeTally();
@@ -799,7 +866,13 @@ function init() {
     decodeMode: grab("decodeMode"),
     decodeTemp: grab("decodeTemp"),
     decodeTempLabel: grab("decodeTempLabel"),
+    topKSlider: grab("topKSlider"),
+    topKLabel: grab("topKLabel"),
+    topPSlider: grab("topPSlider"),
+    topPLabel: grab("topPLabel"),
     decodeDistPill: grab("decodeDistPill"),
+    candidatePill: grab("candidatePill"),
+    candidateSet: grab("candidateSet"),
     decodeBars: grab("decodeBars"),
     decodePickBtn: grab("decodePickBtn"),
     decodeResetBtn: grab("decodeResetBtn"),
