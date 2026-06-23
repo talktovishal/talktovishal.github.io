@@ -244,10 +244,10 @@
 // The vocabulary is the set of unique tokens.
 const vocabulary = <span class="quiz-blank">?</span>;</pre>
             <div class="quiz-options" role="group" aria-label="Choose the expression that builds the vocabulary">
-              <button class="quiz-option" type="button" data-correct="true">[...new Set(tokens)]</button>
               <button class="quiz-option" type="button" data-feedback="tokens.slice() just copies the list, so every repeat is still there.">tokens.slice()</button>
               <button class="quiz-option" type="button" data-feedback="tokens.sort() reorders the tokens but keeps every repeat, so it is not the unique set.">tokens.sort()</button>
               <button class="quiz-option" type="button">Object.keys(tokens)</button>
+              <button class="quiz-option" type="button" data-correct="true">[...new Set(tokens)]</button>
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
             <button class="quiz-skip" type="button">Just show me the code</button>
@@ -491,8 +491,8 @@ return {
           <div class="code-quiz" data-quiz-type="predict" data-explain="A trigram fixes two context words instead of one, so there are many more distinct contexts and each one shows up fewer times.">
             <p class="quiz-prompt">Predict first: if you switch the model from <strong>bigrams</strong> (one word of context) to <strong>trigrams</strong> (two words of context), the number of <em>distinct</em> contexts in the table will usually&hellip;</p>
             <div class="quiz-options" role="group" aria-label="Predict how trigrams change the number of contexts">
-              <button class="quiz-option" type="button" data-correct="true">Go up</button>
               <button class="quiz-option" type="button">Go down</button>
+              <button class="quiz-option" type="button" data-correct="true">Go up</button>
               <button class="quiz-option" type="button">Stay about the same</button>
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -582,9 +582,9 @@ return {
           <div class="code-quiz" data-quiz-type="predict" data-explain="A probability is the next-token count divided by the context count: 41 / 303 = 13.5%. The raw count on its own is not a probability.">
             <p class="quiz-prompt">Predict first: <code>king</code> followed <code>said the</code> <strong>41</strong> times, and <code>said the</code> appeared <strong>303</strong> times in all. What is <code>P(king | said the)</code>?</p>
             <div class="quiz-options" role="group" aria-label="Predict the probability">
-              <button class="quiz-option" type="button" data-correct="true">About 13.5% (41 &divide; 303)</button>
               <button class="quiz-option" type="button">About 7.4 (303 &divide; 41)</button>
-              <button class="quiz-option" type="button">41 &mdash; the raw count</button>
+              <button class="quiz-option" type="button">41 (the raw count)</button>
+              <button class="quiz-option" type="button" data-correct="true">About 13.5% (41 &divide; 303)</button>
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
             <button class="quiz-skip" type="button">Just show me the code</button>
@@ -691,8 +691,8 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <div class="code-quiz" data-quiz-type="predict" data-explain="Top-pick always takes the single most likely token, so it repeats. Sampling draws with weighted randomness, so lower-probability tokens sometimes slip in and the text varies.">
             <p class="quiz-prompt">Predict first: which decoding rule produces <em>more varied</em> text from the same starting context?</p>
             <div class="quiz-options" role="group" aria-label="Predict which rule is more varied">
-              <button class="quiz-option" type="button" data-correct="true">Sampling (weighted random)</button>
               <button class="quiz-option" type="button">Top-pick (always the strongest)</button>
+              <button class="quiz-option" type="button" data-correct="true">Sampling (weighted random)</button>
               <button class="quiz-option" type="button">They produce the same text</button>
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -834,9 +834,9 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <div class="code-quiz" data-quiz-type="predict" data-explain="With no smoothing or backoff, an unseen context has a count of zero, so the raw probability is exactly zero. That dead end is what backoff and smoothing are built to rescue.">
             <p class="quiz-prompt">Predict first: the trigram context <code>softly said</code> never appeared in the corpus. With <strong>no</strong> backoff or smoothing, what probability does the raw model give the next token?</p>
             <div class="quiz-options" role="group" aria-label="Predict the probability for an unseen context">
-              <button class="quiz-option" type="button" data-correct="true">Zero &mdash; there is no evidence</button>
               <button class="quiz-option" type="button">A small but non-zero number</button>
               <button class="quiz-option" type="button">The same as the unigram guess</button>
+              <button class="quiz-option" type="button" data-correct="true">Zero (there is no evidence)</button>
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
             <button class="quiz-skip" type="button">Just show me the code</button>
@@ -850,6 +850,16 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
 });</textarea>
           <div class="code-output" aria-live="polite"></div>
         </article>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Add-alpha smoothing adds the same alpha to every count. Crank it high and it swamps the real counts, so every token drifts toward the same probability (1 over the vocabulary size) and the model stops trusting what it actually saw.">
+          <p class="quiz-prompt">Quick check: you crank the smoothing strength <code>alpha</code> very high, far past a tiny value. What happens to the model's predictions?</p>
+          <div class="quiz-options" role="group" aria-label="Predict the effect of very large smoothing">
+            <button class="quiz-option" type="button">They sharpen onto the single most frequent token.</button>
+            <button class="quiz-option" type="button">Nothing changes; alpha only touches unseen contexts.</button>
+            <button class="quiz-option" type="button" data-correct="true">They flatten toward uniform, washing out the real evidence.</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
       </div>
     </section>
 
@@ -1020,8 +1030,8 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
           <div class="code-quiz" data-quiz-type="predict" data-explain="Perplexity measures surprise: it is roughly how many equally likely words the model is choosing between. Lower means less surprised, which usually means a better fit on the held-out text.">
             <p class="quiz-prompt">Predict first: a model with <strong>lower</strong> perplexity on the held-out text is&hellip;</p>
             <div class="quiz-options" role="group" aria-label="Predict what lower perplexity means">
-              <button class="quiz-option" type="button" data-correct="true">Less surprised &mdash; a better fit</button>
-              <button class="quiz-option" type="button">More surprised &mdash; a worse fit</button>
+              <button class="quiz-option" type="button" data-correct="true">Less surprised (a better fit)</button>
+              <button class="quiz-option" type="button">More surprised (a worse fit)</button>
               <button class="quiz-option" type="button">Unrelated to how well it fits</button>
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -1035,6 +1045,16 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
 });</textarea>
           <div class="code-output" aria-live="polite"></div>
         </article>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="A high-order model can almost memorize the training text, so training perplexity falls toward 1. But its long contexts barely appear in new text, so the estimates get unreliable and held-out perplexity climbs back up. That gap is overfitting.">
+          <p class="quiz-prompt">Quick check: as you raise the n-gram order from bigram to 5-gram, perplexity on the <em>training</em> text keeps dropping toward 1. What usually happens to perplexity on the <em>held-out</em> text?</p>
+          <div class="quiz-options" role="group" aria-label="Predict held-out perplexity as n grows">
+            <button class="quiz-option" type="button">It also keeps dropping toward 1; more context is always better.</button>
+            <button class="quiz-option" type="button" data-correct="true">It improves for a while, then gets worse as contexts become too rare.</button>
+            <button class="quiz-option" type="button">It stays flat, because held-out text does not depend on n.</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
       </div>
     </section>
 

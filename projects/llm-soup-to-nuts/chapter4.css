@@ -870,6 +870,57 @@
   margin-bottom: 10px;
 }
 
+.model-shape-bridge {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
+  border-radius: 10px;
+  background: #fffaf0;
+}
+
+.model-shape-bridge h3 {
+  margin: 0 0 8px;
+}
+
+.model-shape-bridge p {
+  margin: 0;
+}
+
+.shape-symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.shape-symbol-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.shape-symbol-card strong {
+  color: var(--teal);
+  font-size: 1.4rem;
+}
+
+.shape-symbol-card span {
+  color: var(--ink);
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.shape-symbol-card em {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-style: normal;
+}
+
 /* ---- Word-shaped network nodes ---- */
 .network-node.is-best {
   fill: #e8f4ed;
@@ -977,7 +1028,8 @@
 
   .toolkit-strip,
   .loop-bridge-grid,
-  .corpus-lines {
+  .corpus-lines,
+  .shape-symbol-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -989,6 +1041,7 @@
   .corpus-lines,
   .practice-grid,
   .nw-controls,
+  .shape-symbol-grid,
   .network-grid .control-grid {
     grid-template-columns: 1fr;
   }

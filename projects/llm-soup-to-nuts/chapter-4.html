@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter4.css">
+  <link rel="stylesheet" href="chapter4.css?v=20260622">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -314,8 +314,8 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="Entropy is the unavoidable floor set by the evidence itself; cross-entropy is the model's actual surprise, which sits on or above that floor. Training pushes cross-entropy down toward the entropy floor - it can never dip below it.">
           <p class="quiz-prompt">Quick check: this context honestly allows several next words. As the model learns, its <strong>cross-entropy</strong> falls - how low can it possibly go?</p>
           <div class="quiz-options" role="group" aria-label="How low can cross-entropy go">
-            <button class="quiz-option" type="button" data-correct="true">Down to the entropy floor, but no lower</button>
             <button class="quiz-option" type="button" data-feedback="Zero would mean the model is never surprised - impossible when the context truly allows several different next words.">All the way to zero</button>
+            <button class="quiz-option" type="button" data-correct="true">Down to the entropy floor, but no lower</button>
             <button class="quiz-option" type="button" data-feedback="It falls as the guesses move toward the evidence; it does not climb.">It just keeps rising</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -513,9 +513,9 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="A dot product (and the cosine built from it) is large when two vectors point the same way. Words used in the same contexts get trained toward the same direction, so their dot product is large - which is how the model shares what it knows about one word with a similar one.">
           <p class="quiz-prompt">Quick check: two words are used in almost exactly the same way, so training pushed their vectors to point the same direction. Their dot product is&hellip;</p>
           <div class="quiz-options" role="group" aria-label="Dot product of similar words">
-            <button class="quiz-option" type="button" data-correct="true">Large and positive - they point the same way</button>
             <button class="quiz-option" type="button" data-feedback="Near zero is for unrelated words sitting at right angles, not for look-alikes.">Near zero</button>
             <button class="quiz-option" type="button" data-feedback="Large and negative means the arrows point opposite ways - the model would treat them as opposites.">Large and negative</button>
+            <button class="quiz-option" type="button" data-correct="true">Large and positive - they point the same way</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
@@ -654,6 +654,16 @@
             <button class="quiz-option" type="button" data-correct="true">The opposite way - it subtracts the gradient</button>
             <button class="quiz-option" type="button" data-feedback="Stepping along the gradient climbs toward higher loss - the wrong direction.">Along the gradient, the same way</button>
             <button class="quiz-option" type="button" data-feedback="The gradient gives a definite downhill direction; the step is not a guess.">In a random direction each time</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Each step moves the weights by eta times the gradient. Too large a step jumps past the bottom of the loss curve, so the loss oscillates or blows up instead of converging.">
+          <p class="quiz-prompt">Quick check: you set the learning rate <code>eta</code> very large. What is the most likely result during training?</p>
+          <div class="quiz-options" role="group" aria-label="Effect of a very large learning rate">
+            <button class="quiz-option" type="button" data-feedback="A single giant step almost never lands on the minimum; it usually flies past it.">The loss reaches its minimum in a single step</button>
+            <button class="quiz-option" type="button" data-feedback="The learning rate scales every update, so it very much changes what training does.">Nothing changes; the rate only affects how weights are stored</button>
+            <button class="quiz-option" type="button" data-correct="true">The updates overshoot the minimum, so the loss bounces or diverges instead of settling</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
@@ -809,9 +819,19 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="Softmax exponentiates then divides by the total, so every output lands between 0 and 1 and the whole set sums to exactly 1 - a proper probability distribution. It does not make them equal; a bigger logit still earns a bigger probability.">
           <p class="quiz-prompt">Quick check: you feed three raw scores (logits) into softmax. What is guaranteed about the three numbers that come out?</p>
           <div class="quiz-options" role="group" aria-label="What softmax guarantees">
-            <button class="quiz-option" type="button" data-correct="true">Each is between 0 and 1, and together they sum to 1</button>
             <button class="quiz-option" type="button" data-feedback="Softmax does not flatten them to equal - a bigger logit still gets a bigger probability.">They all come out equal</button>
+            <button class="quiz-option" type="button" data-correct="true">Each is between 0 and 1, and together they sum to 1</button>
             <button class="quiz-option" type="button" data-feedback="That is the point of softmax: it converts any-value scores into probabilities.">They stay any value, positive or negative</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Softmax paired with cross-entropy collapses to the gradient q_i minus y_i (probability minus target): push the true word's score up and the others down. That clean form is why the pair is everywhere in deep learning.">
+          <p class="quiz-prompt">Quick check: for softmax with cross-entropy loss, the gradient that flows back to each score <code>z_i</code> is famously simple. What is it?</p>
+          <div class="quiz-options" role="group" aria-label="The softmax cross-entropy gradient">
+            <button class="quiz-option" type="button" data-correct="true">The predicted probability minus the target, <code>q_i &minus; y_i</code></button>
+            <button class="quiz-option" type="button" data-feedback="The learning rate scales the whole update later; it is not the gradient on the score itself.">The raw score times the learning rate</button>
+            <button class="quiz-option" type="button" data-feedback="It is non-zero for the true word too: q_true minus 1, which still pushes its score up.">Always zero for the correct word</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
@@ -909,6 +929,53 @@
               pass, and update.
             </p>
           </div>
+        </div>
+
+        <div class="model-shape-bridge" aria-label="Bridge from toy network dimensions to Transformer model-card symbols">
+          <div>
+            <p class="eyebrow">Shape bridge</p>
+            <h3>The same math grows into model-card numbers.</h3>
+            <p>
+              This toy network is deliberately tiny, but the knobs already have the same
+              jobs as a real language model. From here on, papers and model cards mostly
+              talk in shapes: how many tokens fit in the context, how many vocabulary
+              rows exist, how wide each vector is, and how many layers repeat the same
+              pattern.
+            </p>
+          </div>
+          <div class="shape-symbol-grid">
+            <div class="shape-symbol-card">
+              <strong>\(T\)</strong>
+              <span>tokens in the current context window</span>
+              <em>toy: 2 context words</em>
+            </div>
+            <div class="shape-symbol-card">
+              <strong>\(V\)</strong>
+              <span>vocabulary rows and output choices</span>
+              <em>toy: 5 words</em>
+            </div>
+            <div class="shape-symbol-card">
+              <strong>\(d\)</strong>
+              <span>width of each learned vector</span>
+              <em>real LLMs: thousands</em>
+            </div>
+            <div class="shape-symbol-card">
+              <strong>\(L\)</strong>
+              <span>repeated layers or blocks</span>
+              <em>real LLMs: dozens or more</em>
+            </div>
+            <div class="shape-symbol-card">
+              <strong>\(H\)</strong>
+              <span>attention heads in a Transformer block</span>
+              <em>toy: not used yet</em>
+            </div>
+          </div>
+          <p class="insight-note">
+            Keep this map in your pocket for Chapter 5: a Transformer mostly replaces
+            the tiny hidden layer with repeated attention and feed-forward blocks, but it
+            still starts with token IDs, looks up vectors, produces logits over \(V\),
+            and trains by lowering cross-entropy.
+          </p>
         </div>
 
         <div class="math-formal" aria-label="Forward pass in symbols">
@@ -1044,9 +1111,9 @@
             <div class="code-quiz" data-quiz-type="predict" data-explain="Training is the process of lowering the error. As the network sees the data over more epochs, its loss generally falls and the decision boundary fits the points better.">
               <p class="quiz-prompt">Predict first: this runs the training loop for several epochs. As it trains, the network's <strong>loss</strong> (its error) should usually&hellip;</p>
               <div class="quiz-options" role="group" aria-label="Predict what happens to the loss">
-                <button class="quiz-option" type="button" data-correct="true">Go down</button>
                 <button class="quiz-option" type="button">Go up</button>
                 <button class="quiz-option" type="button">Stay flat</button>
+                <button class="quiz-option" type="button" data-correct="true">Go down</button>
               </div>
               <p class="quiz-feedback" aria-live="polite" hidden></p>
               <button class="quiz-skip" type="button">Just show me the code</button>

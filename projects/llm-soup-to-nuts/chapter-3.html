@@ -323,8 +323,8 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="A byte base has exactly 256 values, so a byte-level tokenizer can spell every character ever written - including ones the tokenizer never saw in training - and that set never changes underfoot. Unicode code points number ~150,000 and keep growing, which makes a poor fixed base vocabulary.">
           <p class="quiz-prompt">Quick check: why do many GPT-style tokenizers start from <strong>bytes</strong> (0-255) rather than directly from the ~150,000 Unicode characters?</p>
           <div class="quiz-options" role="group" aria-label="Why bytes not code points">
-            <button class="quiz-option" type="button" data-correct="true">256 byte values can spell anything ever written, and that set never changes</button>
             <button class="quiz-option" type="button" data-feedback="Bytes do not shorten the text - that is exactly what the BPE merges in the next section are for.">Because bytes always make the text shorter</button>
+            <button class="quiz-option" type="button" data-correct="true">256 byte values can spell anything ever written, and that set never changes</button>
             <button class="quiz-option" type="button" data-feedback="There are about 150,000 Unicode characters and the standard grows every year - far too many, and a moving target.">Because there are only a few hundred Unicode characters</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -418,9 +418,9 @@
           <div class="code-quiz" data-quiz-type="predict" data-explain="Whole-word tokenization keeps sequences short, but the vocabulary gets huge. That means a huge embedding table and a huge output softmax, plus unknown-word trouble. Subwords are the middle ground.">
             <p class="quiz-prompt">Quick check: if a tokenizer stores every unique word as its own token, what is the first big problem?</p>
             <div class="quiz-options" role="group" aria-label="Whole word tokenizer problem">
-              <button class="quiz-option" type="button" data-correct="true">The vocabulary, embedding table, and output softmax become huge</button>
               <button class="quiz-option" type="button" data-feedback="Whole-word tokenization usually makes sequences shorter, not longer. The problem is the giant vocabulary and unknown words.">Every sentence becomes far too many tokens</button>
               <button class="quiz-option" type="button" data-feedback="A whole-word tokenizer can read common words. It struggles with rare or unseen ones.">The model cannot read any common word</button>
+              <button class="quiz-option" type="button" data-correct="true">The vocabulary, embedding table, and output softmax become huge</button>
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
           </div>
@@ -679,9 +679,9 @@
             <div class="code-quiz" data-quiz-type="predict" data-explain="Regex pre-splitting forces clean boundaries (especially consistent one-to-three-digit number chunks) and byte-level pieces never hit an unknown character, which together help math and code. That structural control, not a multilingual failure, is why Llama 3 and Mistral v3 moved to tiktoken-style byte-level BPE.">
               <p class="quiz-prompt">Quick check: why did Llama 3 and Mistral v3 switch from SentencePiece to <code>tiktoken</code>-style byte-level BPE?</p>
               <div class="quiz-options" role="group" aria-label="Why models moved to byte-level BPE">
-                <button class="quiz-option" type="button" data-correct="true">Regex pre-splitting and byte-level pieces give cleaner, stronger math and code behavior</button>
                 <button class="quiz-option" type="button" data-feedback="SentencePiece is fully multilingual - that is its strength. The pivot was about structural control for math and code, not a language failure.">Because SentencePiece cannot handle more than one language</button>
                 <button class="quiz-option" type="button" data-feedback="Token counts depend on the language and corpus; byte-level BPE is not universally shorter. The real draw is structural control.">Because byte-level BPE always uses fewer tokens for every language</button>
+                <button class="quiz-option" type="button" data-correct="true">Regex pre-splitting and byte-level pieces give cleaner, stronger math and code behavior</button>
               </div>
               <p class="quiz-feedback" aria-live="polite" hidden></p>
             </div>
@@ -834,8 +834,8 @@
           <div class="code-quiz" data-quiz-type="predict" data-explain="The regex step creates boundaries before BPE learns merges. That boundary policy shapes the vocabulary: common pieces can merge inside a region, while punctuation, numbers, and whitespace can be treated more deliberately.">
             <p class="quiz-prompt">Quick check: in GPT-style byte-level BPE, why split text with a regex before running BPE?</p>
             <div class="quiz-options" role="group" aria-label="Why GPT-style tokenizers pre-tokenize before BPE">
-              <button class="quiz-option" type="button" data-correct="true">To control which neighboring pairs are allowed to merge</button>
               <button class="quiz-option" type="button" data-feedback="The text can still be encoded as bytes either way. The regex step is about boundaries and useful vocabulary slots.">Because bytes cannot represent punctuation</button>
+              <button class="quiz-option" type="button" data-correct="true">To control which neighboring pairs are allowed to merge</button>
               <button class="quiz-option" type="button" data-feedback="BPE still learns from data. The regex step only sets the regions where merges are allowed.">Because it removes the need to train a tokenizer</button>
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -1084,8 +1084,8 @@
             <div class="code-quiz" data-quiz-type="predict" data-explain="Unigram LM does not replay a merge list. It keeps scored candidate pieces and chooses the lowest-cost path that covers the text. Dynamic programming is the efficient way to find that path.">
               <p class="quiz-prompt">Quick check: when a SentencePiece Unigram model encodes a word, what is it choosing?</p>
               <div class="quiz-options" role="group" aria-label="What SentencePiece Unigram chooses at encoding time">
-                <button class="quiz-option" type="button" data-correct="true">The lowest-cost route through candidate pieces</button>
                 <button class="quiz-option" type="button" data-feedback="That is BPE's training rule. Unigram keeps scored candidate pieces and chooses a route.">The single most frequent adjacent pair</button>
+                <button class="quiz-option" type="button" data-correct="true">The lowest-cost route through candidate pieces</button>
                 <button class="quiz-option" type="button" data-feedback="It can choose a whole-word piece if that piece exists and has a good score, but it is not forced to use whole words.">Always exactly one whole word token</button>
               </div>
               <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -1119,6 +1119,16 @@
             discussed: regex chunks, raw SentencePiece spaces, byte fallback,
             normalization, and special tokens.
           </p>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="WordPiece merges the pair with the highest count(AB) / (count(A) * count(B)). That rewards pairs that occur together more than their individual frequencies would predict, rather than the raw frequency BPE uses.">
+          <p class="quiz-prompt">Quick check: BPE merges the most <em>frequent</em> adjacent pair. WordPiece scans the same pairs but picks differently. What does WordPiece favor instead?</p>
+          <div class="quiz-options" role="group" aria-label="What WordPiece maximizes">
+            <button class="quiz-option" type="button" data-feedback="That would just be a longest-match rule; WordPiece scores pairs, it does not chase length.">The longest possible pair, regardless of frequency</button>
+            <button class="quiz-option" type="button" data-feedback="Merging the rarest pair would waste vocabulary slots; WordPiece rewards strong co-occurrence, not rarity.">The rarest pair, to give rare words their own tokens</button>
+            <button class="quiz-option" type="button" data-correct="true">The pair whose count(AB) / (count(A) &times; count(B)) score is highest, rewarding above-chance co-occurrence</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
         <div class="panel tokenizer-corpus-setup" style="margin-bottom: 14px;">
@@ -1171,9 +1181,9 @@
           <div class="code-quiz" data-quiz-type="predict" data-explain="Each learning rule carves text differently, so the same sentence becomes a different number of pieces. Production tokenizers also differ in their boundary policy before the learning rule starts.">
             <p class="quiz-prompt">Predict first: you encode the <em>same</em> sentence with this toy BPE, WordPiece, SentencePiece-style Unigram LM, and byte-level view. Will they produce&hellip;</p>
             <div class="quiz-options" role="group" aria-label="Predict whether tokenizers agree">
-              <button class="quiz-option" type="button" data-correct="true">Different numbers of pieces</button>
               <button class="quiz-option" type="button">Exactly the same pieces every time</button>
               <button class="quiz-option" type="button">Always one piece per word</button>
+              <button class="quiz-option" type="button" data-correct="true">Different numbers of pieces</button>
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
             <button class="quiz-skip" type="button">Just show me the code</button>
@@ -1282,6 +1292,16 @@ return { text: text, results: results };</textarea>
             <button class="quiz-option" type="button" data-correct="true">The whole word is one token, so the letters inside are hidden from it</button>
             <button class="quiz-option" type="button" data-feedback="Models handle plenty of long words fine - the issue is not length, it is that the letters are bundled inside one token.">It is simply too long a word for any model</button>
             <button class="quiz-option" type="button" data-feedback="Counting to twelve is easy; the trouble is the model cannot see the individual letters to count.">Counting that high is genuinely hard math</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="GPT-style tokenizers fold the leading space into the following word, so ' the' is one token and 'the' (no space) is a different token. That is why the same word can get different IDs depending on the space in front of it.">
+          <p class="quiz-prompt">Quick check: in a GPT-style byte-level tokenizer, <code>"the"</code> at the very start of a text and <code>" the"</code> (a leading space, then the word) mid-sentence usually become&hellip;</p>
+          <div class="quiz-options" role="group" aria-label="Same word with and without a leading space">
+            <button class="quiz-option" type="button" data-feedback="The leading space is folded into the token, so the two are not identical.">The exact same single token, since it is the same word</button>
+            <button class="quiz-option" type="button" data-correct="true">Two different tokens, because the leading space is folded into the word piece</button>
+            <button class="quiz-option" type="button" data-feedback="The space does not stay separate; byte-level BPE merges it into the following word.">A separate space token plus the word token, every time</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>

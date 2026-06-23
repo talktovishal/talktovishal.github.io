@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Training and Alignment - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter6.css?v=20260621">
+  <link rel="stylesheet" href="chapter6.css?v=20260622">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -154,11 +154,45 @@
         </div>
         <div id="stageReadout" class="panel stage-readout" aria-live="polite"></div>
 
+        <div class="model-card-reader" aria-label="How to read model-card details">
+          <div class="section-title-row">
+            <h3>How to read a model card without mixing things up</h3>
+            <span class="pill">architecture vs weights</span>
+          </div>
+          <p class="microcopy">
+            Model cards often put several kinds of facts next to each other. Keep them
+            separate and the rest of this chapter becomes easier to place.
+          </p>
+          <div class="model-card-grid">
+            <div>
+              <strong>Architecture</strong>
+              <span>The recipe: decoder-only Transformer, attention, FFN, norms, RoPE, dense or MoE.</span>
+            </div>
+            <div>
+              <strong>Configuration</strong>
+              <span>The shape: layers, width, heads, vocabulary size, context length, dense vs active parameters.</span>
+            </div>
+            <div>
+              <strong>Weights</strong>
+              <span>The learned numbers after training. Same architecture, different weights, different model.</span>
+            </div>
+            <div>
+              <strong>Training stage</strong>
+              <span>Base, instruction-tuned, preference-aligned, or a system spending extra test-time compute.</span>
+            </div>
+          </div>
+          <p class="insight-note">
+            A 70B base model and a 70B chat model may share the same broad architecture.
+            The behavior difference usually comes from weights and post-training, not a
+            brand-new forward pass.
+          </p>
+        </div>
+
         <div class="code-quiz" data-quiz-type="predict" data-explain="A base model is pretrained to predict text. An aligned assistant has usually gone through post-training, such as instruction tuning and preference alignment, to better match human requests and preferences.">
           <p class="quiz-prompt">Quick check: which model has learned broad next-token prediction but has not yet been instruction-tuned or preference-aligned?</p>
           <div class="quiz-options" role="group" aria-label="Base model meaning">
-            <button class="quiz-option" type="button" data-correct="true">A base model</button>
             <button class="quiz-option" type="button" data-feedback="Instruction-tuned models have already learned from request/response examples.">An instruction-tuned assistant</button>
+            <button class="quiz-option" type="button" data-correct="true">A base model</button>
             <button class="quiz-option" type="button" data-feedback="Preference-aligned models come after another stage of training on preferences.">A preference-aligned model</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -229,6 +263,16 @@
             <span class="pill">true history, true target</span>
           </div>
           <div id="teacherTrace" class="teacher-trace" aria-live="polite"></div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="No humans are needed to label pretraining data. At each position the correct next token is already in the text, so the data supplies its own labels. That is what self-supervised means.">
+          <p class="quiz-prompt">Quick check: pretraining is called <em>self-supervised</em>. Where do the training labels come from?</p>
+          <div class="quiz-options" role="group" aria-label="Where pretraining labels come from">
+            <button class="quiz-option" type="button" data-correct="true">From the text itself: the next token is the label at every position</button>
+            <button class="quiz-option" type="button" data-feedback="No human labeling is needed; that is exactly what self-supervised avoids.">From human annotators who label each token</button>
+            <button class="quiz-option" type="button" data-feedback="Pretraining uses raw text, not a purchased per-task labeled set.">From a separate labeled dataset bought for the task</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
       </div>
     </section>
@@ -321,6 +365,13 @@
             width 12,288 lands around 175B parameters. During training, examples are often
             packed into full context windows with end-of-text separators, and batches are
             counted in tokens, not just documents.
+          </p>
+          <p>
+            That estimate is for a <strong>dense</strong> model, where every token uses the
+            same feed-forward weights. Mixture-of-Experts models complicate model-card
+            reading: they may report a large total parameter count, but a router activates
+            only a few expert FFNs for each token. When you compare compute or inference
+            cost, look for <strong>active parameters</strong>, not only total parameters.
           </p>
           <div class="worked-example" aria-label="Scaling law compute by hand">
             <h3>Compute by hand</h3>
@@ -421,6 +472,16 @@
           </div>
           <div id="memPanel" class="detail-list" aria-live="polite"></div>
         </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Chinchilla showed that for a fixed compute budget, model size and the number of training tokens should grow together. Earlier giant models were undertrained: too many parameters for too few tokens.">
+          <p class="quiz-prompt">Quick check: you have a fixed compute budget. Scaling-law work (Chinchilla) found the best results come from&hellip;</p>
+          <div class="quiz-options" role="group" aria-label="Compute-optimal scaling">
+            <button class="quiz-option" type="button" data-feedback="A huge model on too little data is undertrained - the classic pre-Chinchilla mistake.">Making the model as large as possible, even on a small dataset</button>
+            <button class="quiz-option" type="button" data-correct="true">Scaling model size and training tokens together, in balance</button>
+            <button class="quiz-option" type="button" data-feedback="Re-reading a tiny dataset many times wastes compute and overfits; fresh tokens matter.">Keeping the model tiny and training many epochs on the same data</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
       </div>
     </section>
 
@@ -441,6 +502,13 @@
             fairness, and robustness. Public benchmarks bring a hard warning:
             <strong>data contamination</strong>. If test questions leaked into training,
             the score can overstate real ability.
+          </p>
+          <p>
+            Long-context evaluation needs its own care. A huge context window does not
+            prove the model uses every position equally well. Tests like key-value
+            retrieval and multi-document question answering can reveal a
+            <strong>lost-in-the-middle</strong> pattern, where evidence near the middle of
+            the prompt is harder for the model to use than evidence near the start or end.
           </p>
           <p>
             Safety is not separate from evaluation. A model can hallucinate, agree with a
@@ -511,9 +579,9 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="Instruction tuning is supervised because each instruction has a desired response, but the training mechanics are still next-token cross-entropy over that response text.">
           <p class="quiz-prompt">Quick check: why is instruction tuning called supervised fine-tuning?</p>
           <div class="quiz-options" role="group" aria-label="Why SFT is supervised">
-            <button class="quiz-option" type="button" data-correct="true">The data contains instructions paired with desired responses</button>
             <button class="quiz-option" type="button" data-feedback="It still trains by predicting tokens; it does not need a separate classifier label for each token.">It replaces the LM head with a classifier for every task</button>
             <button class="quiz-option" type="button" data-feedback="LoRA is one efficient way to fine-tune, but SFT can update all parameters too.">It always uses LoRA and never changes the model weights</button>
+            <button class="quiz-option" type="button" data-correct="true">The data contains instructions paired with desired responses</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
@@ -586,6 +654,16 @@
             <div id="dpoPanel" class="detail-list" aria-live="polite"></div>
           </div>
         </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="A reward model is trained on human preference comparisons to score responses. That learned score becomes the training signal that nudges the policy model toward answers people prefer.">
+          <p class="quiz-prompt">Quick check: in preference alignment (RLHF), what is the job of the <strong>reward model</strong>?</p>
+          <div class="quiz-options" role="group" aria-label="What the reward model does">
+            <button class="quiz-option" type="button" data-feedback="The policy model writes the answers; the reward model only judges them.">To generate the assistant's final answers directly</button>
+            <button class="quiz-option" type="button" data-feedback="Tokenization happens up front and is unrelated to the reward model's scoring job.">To tokenize the prompt before training</button>
+            <button class="quiz-option" type="button" data-correct="true">To score candidate responses so the policy can be tuned toward the preferred ones</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
       </div>
     </section>
 
@@ -654,12 +732,24 @@
             <span>Power-law relationships between loss, model size, data, and compute.</span>
           </li>
           <li>
+            <a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noreferrer">Fedus, Zoph, and Shazeer, Switch Transformers</a>
+            <span>Mixture-of-Experts scaling and why total parameters can differ from active compute.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2401.04088" target="_blank" rel="noreferrer">Jiang et al., Mixtral of Experts</a>
+            <span>A modern sparse MoE model-card example with total and active parameter counts.</span>
+          </li>
+          <li>
             <a href="https://arxiv.org/abs/2101.00027" target="_blank" rel="noreferrer">Gao et al., The Pile</a>
             <span>An openly documented large pretraining corpus.</span>
           </li>
           <li>
             <a href="https://arxiv.org/abs/2402.00838" target="_blank" rel="noreferrer">Soldaini et al., Dolma</a>
             <span>An open pretraining corpus and toolkit from the OLMo project.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2307.03172" target="_blank" rel="noreferrer">Liu et al., Lost in the Middle</a>
+            <span>A long-context evaluation study showing that relevant information in the middle of a prompt can be harder for models to use.</span>
           </li>
           <li>
             <a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noreferrer">Hu et al., LoRA</a>

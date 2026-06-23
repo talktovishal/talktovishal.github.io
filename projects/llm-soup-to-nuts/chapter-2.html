@@ -307,8 +307,8 @@ small rabbit</textarea>
         <div class="code-quiz" data-quiz-type="predict" data-explain="Skip-gram is a training routine - a guessing game whose rules decide how to nudge each word's numbers. The row of numbers itself is the word vector that the game produces, not the game.">
           <p class="quiz-prompt">Quick check: in your own words, what <em>is</em> skip-gram?</p>
           <div class="quiz-options" role="group" aria-label="What is skip-gram">
-            <button class="quiz-option" type="button" data-correct="true">A training game that decides how to nudge each word's numbers</button>
             <button class="quiz-option" type="button" data-feedback="That row of numbers is the word vector - the thing skip-gram produces, not skip-gram itself.">The row of numbers stored for each word</button>
+            <button class="quiz-option" type="button" data-correct="true">A training game that decides how to nudge each word's numbers</button>
             <button class="quiz-option" type="button" data-feedback="Counting exact phrases is the count-table approach from the previous section, the very thing we are moving beyond.">A way to count how often exact phrases appear</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -471,9 +471,9 @@ small rabbit</textarea>
         <div class="code-quiz" data-quiz-type="predict" data-explain="The made-up (negative) pairs teach the model what does NOT belong together. Without them, every word could drift toward every other word and the map would collapse.">
           <p class="quiz-prompt">Quick check: skip-gram also trains on a few <em>made-up</em> pairs that never actually appeared. Why bother?</p>
           <div class="quiz-options" role="group" aria-label="Why train on made-up pairs">
-            <button class="quiz-option" type="button" data-correct="true">To teach the model what does not belong together, keeping unrelated words apart</button>
             <button class="quiz-option" type="button" data-feedback="They are deliberately fake, so they are not real evidence - their whole job is to be negative examples.">To add more real evidence about which words go together</button>
             <button class="quiz-option" type="button" data-feedback="Skip-gram never counts phrase frequencies - that is the count-table idea from the previous section.">To count how frequent each phrase is</button>
+            <button class="quiz-option" type="button" data-correct="true">To teach the model what does not belong together, keeping unrelated words apart</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
@@ -536,8 +536,8 @@ small rabbit</textarea>
         <div class="code-quiz" data-quiz-type="predict" data-explain="One full sweep through all of the training pairs is called an epoch. The training-depth control below just sets how many of these sweeps to run.">
           <p class="quiz-prompt">Quick check: one full pass through <em>all</em> of the word pairs, nudging the numbers as it goes, is called&hellip;</p>
           <div class="quiz-options" role="group" aria-label="What one full pass is called">
-            <button class="quiz-option" type="button" data-correct="true">An epoch</button>
             <button class="quiz-option" type="button" data-feedback="A dimension is one of the 36 numbers inside a word's vector, not a pass over the data.">A dimension</button>
+            <button class="quiz-option" type="button" data-correct="true">An epoch</button>
             <button class="quiz-option" type="button" data-feedback="A hyperparameter is a setting you pick before training, like the number of dimensions - not the pass itself.">A hyperparameter</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -636,9 +636,9 @@ small rabbit</textarea>
           <div class="code-quiz" data-quiz-type="predict" data-explain="After training, a word's nearest neighbors by cosine similarity are the words it was used like - so two words from similar contexts come out close together in the list.">
             <p class="quiz-prompt">Predict first: training nudges a word's vector using the words around it. Two words that keep showing up in <em>similar</em> contexts should end up with vectors that are&hellip;</p>
             <div class="quiz-options" role="group" aria-label="Predict what training does to similar words">
-              <button class="quiz-option" type="button" data-correct="true">Closer together (more similar)</button>
               <button class="quiz-option" type="button">Farther apart</button>
               <button class="quiz-option" type="button">Exactly identical</button>
+              <button class="quiz-option" type="button" data-correct="true">Closer together (more similar)</button>
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
             <button class="quiz-skip" type="button">Just show me the code</button>
@@ -672,6 +672,16 @@ const neighbors = vocabulary               // every trained word
 return { focus: focusWord, neighbors };</textarea>
           <div class="code-output" aria-live="polite"></div>
         </article>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Word vectors capture distributional similarity: words used in the same slots get similar vectors. 'good' and 'bad' fill nearly identical contexts (a ___ movie), so they land close together even though they are opposites.">
+          <p class="quiz-prompt">Quick check: after training on a large corpus, the nearest neighbors of <code>good</code> often include <code>bad</code>. Why would two opposite words land close together?</p>
+          <div class="quiz-options" role="group" aria-label="Why opposites can be neighbors">
+            <button class="quiz-option" type="button" data-feedback="The vectors do not store dictionary meaning - only how each word is used.">Because the model decided they mean the same thing</button>
+            <button class="quiz-option" type="button" data-correct="true">They appear in very similar contexts, and skip-gram places words by context, not by meaning</button>
+            <button class="quiz-option" type="button" data-feedback="It is expected, not a bug: distributional similarity routinely pulls antonyms together.">It is a bug; opposites should always be far apart</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
       </div>
     </section>
 
@@ -713,6 +723,16 @@ return { focus: focusWord, neighbors };</textarea>
             shouted-dialogue words simply because that is how the book uses her - not
             because of any dictionary definition.
           </p>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Individual dimensions are not human-labeled features. The model learns whatever coordinates make similar words point the same way, so meaning lives in the whole vector's direction, not in any single number.">
+          <p class="quiz-prompt">Quick check: you open the trained vector for <code>cat</code> and read dimension 7 on its own. What does that single number mean?</p>
+          <div class="quiz-options" role="group" aria-label="What one embedding dimension means">
+            <button class="quiz-option" type="button" data-correct="true">Nothing on its own; only directions and distances across the whole vector carry meaning</button>
+            <button class="quiz-option" type="button" data-feedback="Counts live in the count tables from Chapter 1; a trained dimension is not a frequency.">The number of times <code>cat</code> appeared in the text</button>
+            <button class="quiz-option" type="button" data-feedback="Dimensions are not hand-labeled like that; the model never assigns one axis to part of speech.">The probability that <code>cat</code> is a noun</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
         <div class="embedding-guide-grid">

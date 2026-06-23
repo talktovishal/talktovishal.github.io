@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Transformers and Attention - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter5.css?v=20260621a">
+  <link rel="stylesheet" href="chapter5.css?v=20260622">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -230,8 +230,8 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="A Transformer LLM generates one token per forward pass: it predicts a token, appends it to the input, and runs again. The full answer is built up over many passes, not produced in a single shot.">
           <p class="quiz-prompt">Quick check: when an LLM writes you a three-sentence reply, how many tokens does a single forward pass produce?</p>
           <div class="quiz-options" role="group" aria-label="Tokens per forward pass">
-            <button class="quiz-option" type="button" data-correct="true">Exactly one: the reply is built one token per pass</button>
             <button class="quiz-option" type="button" data-feedback="The model does not emit a whole sentence per pass; it commits to a single token, appends it, and runs again.">One full sentence per pass</button>
+            <button class="quiz-option" type="button" data-correct="true">Exactly one: the reply is built one token per pass</button>
             <button class="quiz-option" type="button" data-feedback="It is not produced in one shot. That is the whole point of the autoregressive loop.">The entire reply in one pass</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -368,9 +368,9 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="The LM head sits at the top of the stack and outputs one score for every token in the vocabulary; softmax turns those into next-token probabilities. The tokenizer is the first component, not the last.">
           <p class="quiz-prompt">Quick check: what does the language modeling head at the top of the stack produce?</p>
           <div class="quiz-options" role="group" aria-label="What the LM head produces">
-            <button class="quiz-option" type="button" data-correct="true">A probability for every token in the vocabulary</button>
             <button class="quiz-option" type="button" data-feedback="Splitting text into tokens is the tokenizer's job, and it happens at the very start of the pass, not the end.">The token IDs for the input text</button>
             <button class="quiz-option" type="button" data-feedback="Embedding lookup happens right after tokenization, near the bottom of the stack, not at the head.">The embedding vectors for each token</button>
+            <button class="quiz-option" type="button" data-correct="true">A probability for every token in the vocabulary</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
@@ -649,8 +649,8 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="Attention is a weighted sum: the model assigns relevance weights to visible tokens, then blends their vectors according to those weights. The later query/key/value version is the real way Transformers learn those weights.">
           <p class="quiz-prompt">Quick check: what is the output of attention in this simplified picture?</p>
           <div class="quiz-options" role="group" aria-label="Simplified attention output">
-            <button class="quiz-option" type="button" data-correct="true">A weighted blend of the visible token vectors</button>
             <button class="quiz-option" type="button" data-feedback="The LM head makes vocabulary scores later. Attention is still working inside the hidden vector stream.">A final probability for every vocabulary token</button>
+            <button class="quiz-option" type="button" data-correct="true">A weighted blend of the visible token vectors</button>
             <button class="quiz-option" type="button" data-feedback="The output is a vector, not one raw word. It may carry lots of information from a strongly attended token.">A single copied word</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -818,9 +818,19 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="Relevance scoring compares the current token's query with every token's key using a dot product, then softmax turns those scores into weights. The values are what get blended afterward, in step two.">
           <p class="quiz-prompt">Quick check: in step one (relevance scoring), what gets compared against what?</p>
           <div class="quiz-options" role="group" aria-label="What relevance scoring compares">
-            <button class="quiz-option" type="button" data-correct="true">The current token's <strong>query</strong> against every token's <strong>key</strong></button>
             <button class="quiz-option" type="button" data-feedback="Values are not used for scoring; they are blended in step two, after the weights are known.">Every token's value against every other value</button>
             <button class="quiz-option" type="button" data-feedback="Queries are compared with keys, not with other queries. The query asks; the keys answer.">Each token's query against every other query</button>
+            <button class="quiz-option" type="button" data-correct="true">The current token's <strong>query</strong> against every token's <strong>key</strong></button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Attention compares every token's query with every token's key, so the score grid is length by length. Double the length and you quadruple the comparisons. That length-squared cost is why long context windows are so expensive.">
+          <p class="quiz-prompt">Quick check: every token scores against every other token. If you double the sequence length, the work in one attention layer grows by roughly&hellip;</p>
+          <div class="quiz-options" role="group" aria-label="How attention cost scales with length">
+            <button class="quiz-option" type="button" data-feedback="The score grid is length by length, not length by one, so it grows faster than linearly.">2x, it scales linearly with length</button>
+            <button class="quiz-option" type="button" data-correct="true">4x, because every token scores against every token (it scales with length squared)</button>
+            <button class="quiz-option" type="button" data-feedback="Cost very much depends on length; that growth is exactly what limits context windows.">It does not change; attention cost is fixed</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
@@ -922,6 +932,16 @@
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Before softmax, the mask adds negative infinity to the scores for future positions. exp(negative infinity) is 0, so those tokens get exactly zero weight and contribute nothing, without being removed from the sequence.">
+          <p class="quiz-prompt">Quick check: how does the causal mask actually stop a token from attending to future tokens?</p>
+          <div class="quiz-options" role="group" aria-label="How the causal mask works">
+            <button class="quiz-option" type="button" data-correct="true">It sets the future scores to negative infinity before softmax, so their weights become zero</button>
+            <button class="quiz-option" type="button" data-feedback="The future tokens stay in the sequence; the mask just drives their attention weights to zero.">It deletes the future tokens from the sequence entirely</button>
+            <button class="quiz-option" type="button" data-feedback="No second pass is needed; the masking happens inside the single attention computation.">It runs a second forward pass to remove them afterward</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
         <details class="exercise-card">
           <summary>Exercise: draw one masked row</summary>
           <p>
@@ -963,6 +983,33 @@
             then add the feed-forward result. The dimensions match all the way through, so
             the blocks can be stacked dozens of times.
           </p>
+          <p>
+            The feed-forward network deserves a slower look. It is usually the largest
+            learned part of a dense Transformer block. Attention decides what other tokens
+            to read; the FFN takes each token stream by itself and runs an
+            <strong>expand, bend, compress</strong> move: widen the vector, apply a
+            nonlinearity, then project it back to the model width. That bend is crucial.
+            Without it, two linear layers would collapse into one linear layer, no matter
+            how many times you stacked them.
+          </p>
+          <div class="idea-flow ffn-flow" aria-label="Feed-forward network roles">
+            <div>
+              <strong>Expand</strong>
+              <span>Map a \(d\)-wide residual stream into a much wider hidden space.</span>
+            </div>
+            <div>
+              <strong>Bend</strong>
+              <span>Apply a nonlinearity such as GELU or SwiGLU so the block can model real patterns.</span>
+            </div>
+            <div>
+              <strong>Compress</strong>
+              <span>Project back to width \(d\), then add the update into the residual stream.</span>
+            </div>
+            <div>
+              <strong>Store patterns</strong>
+              <span>Many facts and concepts appear to live across FFN weights and activations, not in attention alone.</span>
+            </div>
+          </div>
           <figure class="diagram-figure block-figure">
             <svg class="pipeline-svg block-svg" viewBox="0 0 300 320" role="img" aria-labelledby="block-svg-title block-svg-desc">
               <title id="block-svg-title">One Transformer block</title>
@@ -1006,12 +1053,13 @@
             </p>
             $$O = X + \operatorname{MultiHeadAttention}(\operatorname{LayerNorm}(X))$$
             $$H = O + \operatorname{FFN}(\operatorname{LayerNorm}(O))$$
-            $$\operatorname{FFN}(x) = \operatorname{ReLU}(xW_1 + b_1)W_2 + b_2$$
+            $$\operatorname{FFN}(x) = W_2\,\phi(W_1x + b_1) + b_2$$
             $$\operatorname{LayerNorm}(x) = \gamma \frac{x - \mu}{\sigma} + \beta$$
             <ul class="symbol-glossary">
               <li>\(X\): the matrix of all token streams entering this block.</li>
               <li>\(O\): the stream after attention has added context.</li>
               <li>\(H\): the block output, ready for the next layer.</li>
+              <li>\(\phi\): the nonlinearity. Older teaching examples often use ReLU; modern LLMs often use GELU or SwiGLU-style gates.</li>
               <li>\(\mu,\sigma\): the mean and standard deviation of one token vector.</li>
               <li>\(\gamma,\beta\): learned scale and shift terms for layer norm.</li>
             </ul>
@@ -1021,8 +1069,8 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="Attention is the token-mixing component: it reaches across positions to pull in information from other token streams. The feed-forward network processes each token stream independently with learned patterns.">
           <p class="quiz-prompt">Quick check: which part of the block actually mixes information across token positions?</p>
           <div class="quiz-options" role="group" aria-label="Which layer mixes tokens">
-            <button class="quiz-option" type="button" data-correct="true">Multi-head attention</button>
             <button class="quiz-option" type="button" data-feedback="The feed-forward network is powerful, but it is applied separately to each token position.">The feed-forward network alone</button>
+            <button class="quiz-option" type="button" data-correct="true">Multi-head attention</button>
             <button class="quiz-option" type="button" data-feedback="Layer norm stabilizes each stream's numbers; it does not move information between tokens.">Layer normalization</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -1126,14 +1174,20 @@
             </svg>
             <figcaption>RoPE injects order into the attention score itself by rotating query and key vectors before they are compared.</figcaption>
           </figure>
+          <p class="insight-note">
+            Long context is not magic context. Even with RoPE and a large window, models
+            can use information near the beginning or end of a prompt more reliably than
+            information buried in the middle. Keep that limit in mind when you later design
+            retrieval prompts or evaluate long-document systems.
+          </p>
         </div>
 
         <div class="code-quiz" data-quiz-type="predict" data-explain="Self-attention needs position information because the same tokens in a different order can mean something completely different. RoPE encodes that position by rotating queries and keys before relevance scoring.">
           <p class="quiz-prompt">Quick check: why is position information necessary if attention already sees all the tokens?</p>
           <div class="quiz-options" role="group" aria-label="Why position matters">
-            <button class="quiz-option" type="button" data-correct="true">Because word order changes meaning, and plain attention is order-blind</button>
             <button class="quiz-option" type="button" data-feedback="The tokenizer creates token IDs, but it does not by itself tell attention where each token sat in the sequence.">Because tokenizers cannot split text into words</button>
             <button class="quiz-option" type="button" data-feedback="The LM head scores next tokens; position information is needed much earlier, inside the stream and attention calculations.">Because the LM head has no vocabulary</button>
+            <button class="quiz-option" type="button" data-correct="true">Because word order changes meaning, and plain attention is order-blind</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
@@ -1168,12 +1222,13 @@
             care about a different kind of pattern.
           </p>
           <p>
-            Mechanically it is "split, attend, combine." The token's vector is split across
-            the heads, each head does the two-step attention you just built, and their
-            results are stitched back together. It is like asking several friends to read
-            the same sentence, each with a different highlighter. One marks pronouns, one
-            marks previous words, one marks subjects, and together they give you a richer
-            picture.
+            A common shorthand is "split, attend, combine," but do not picture fixed
+            chunks of the original vector being handed to fixed heads. Each head has its
+            own learned projection matrices. It reads the full residual stream and maps it
+            into a smaller query/key/value space for that head. The head outputs are then
+            stitched back together. It is like asking several friends to read the same
+            sentence, each with a different highlighter. One marks pronouns, one marks
+            previous words, one marks subjects, and together they give you a richer picture.
           </p>
           <p>
             Pick a query token below and compare three heads we hand-designed. One chases
@@ -1307,8 +1362,8 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="The KV cache stores the key and value vectors of past tokens so they are computed once and reused. Without it, every generation step re-processes the entire growing prefix, so total work grows quadratically with length.">
           <p class="quiz-prompt">Quick check: what does the KV cache actually save you from doing?</p>
           <div class="quiz-options" role="group" aria-label="What the KV cache saves">
-            <button class="quiz-option" type="button" data-correct="true">Recomputing the past tokens' keys and values on every new step</button>
             <button class="quiz-option" type="button" data-feedback="It does not change the vocabulary or the LM head; it caches per-token attention vectors so the past is not recomputed.">Storing the whole vocabulary in memory</button>
+            <button class="quiz-option" type="button" data-correct="true">Recomputing the past tokens' keys and values on every new step</button>
             <button class="quiz-option" type="button" data-feedback="The cache speeds up generation, but the model still produces one token per forward pass either way.">Running more than one forward pass per token</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -1400,9 +1455,10 @@
           <p>
             The Transformer you just built is, remarkably, still the core of a 2024-era
             model like Llama 3. But a few well-earned tweaks make modern models faster and
-            cheaper. Most of the tweaks answer one of two practical questions: can we make
-            attention less expensive, and can we make the block easier to train? Here is a
-            field guide, aka the names you will keep seeing in LLM architecture diagrams.
+            cheaper. Most of the tweaks answer one of three practical questions: can we
+            make attention less expensive, can we make the block easier to train, and can
+            we serve the next token faster? Here is a field guide, aka the names you will
+            keep seeing in LLM architecture diagrams.
           </p>
           <p>
             There is also a research question hiding inside the machinery: what do these
@@ -1430,12 +1486,34 @@
               <span>Modern blocks normalize <em>before</em> each sub-layer instead of after, use the simpler, faster <strong>RMSNorm</strong>, and swap the old ReLU for a <strong>SwiGLU</strong> activation in the feed-forward network.</span>
             </div>
             <div>
+              <strong>Mixture of Experts (MoE)</strong>
+              <span>Replace one dense FFN with several expert FFNs plus a router. A token uses only a few experts, so total parameters can grow faster than active compute per token.</span>
+            </div>
+            <div>
               <strong>Document packing</strong>
               <span>Training contexts are long but many documents are short, so several are <em>packed</em> into one context with separators to avoid wasting the window on padding. It is a small efficiency trick with a real impact at scale.</span>
             </div>
             <div>
+              <strong>Speculative decoding</strong>
+              <span>A small draft model proposes a few next tokens. The large model verifies them in parallel, keeping the same target-model distribution while reducing latency when drafts are accepted.</span>
+            </div>
+            <div>
               <strong>Induction heads</strong>
               <span>Some attention heads learn a copy-after-a-repeat circuit, helping the model extend patterns it sees in the prompt. This is one concrete clue for how in-context learning can happen inside a forward pass.</span>
+            </div>
+          </div>
+          <div class="worked-example" aria-label="Dense model versus mixture-of-experts parameters">
+            <h3>Total parameters are not always active parameters</h3>
+            <p>
+              Dense model: every token runs through the same FFN weights in every layer.
+              MoE model: a router picks a few expert FFNs for each token. That is why a
+              model can advertise a large total parameter count while using a smaller
+              active parameter count per token.
+            </p>
+            <div class="formula-stack">
+              <code>dense: one FFN path per token, all dense FFN weights active</code>
+              <code>MoE: 8 expert FFNs, top-2 router -> 2 experts active for this token</code>
+              <code>model-card habit: ask for both total parameters and active parameters</code>
             </div>
           </div>
           <figure class="diagram-figure">
@@ -1483,9 +1561,9 @@
         <div class="code-quiz" data-quiz-type="predict" data-explain="Grouped-query and multi-query attention reduce how many separate key/value sets the model keeps, so there is less memory to move during generation. The attention math itself is unchanged.">
           <p class="quiz-prompt">Quick check: what is the main thing grouped-query attention saves compared with classic multi-head attention?</p>
           <div class="quiz-options" role="group" aria-label="What grouped-query attention saves">
-            <button class="quiz-option" type="button" data-correct="true">Memory: heads share key/value sets instead of each owning one</button>
             <button class="quiz-option" type="button" data-feedback="It does not change what attention computes; queries still score against keys and blend values. It only shares the key/value sets.">It replaces the dot-product score with a cheaper one</button>
             <button class="quiz-option" type="button" data-feedback="The number of query heads can stay the same; what shrinks is the number of key/value sets they share.">It removes the query heads entirely</button>
+            <button class="quiz-option" type="button" data-correct="true">Memory: heads share key/value sets instead of each owning one</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
@@ -1496,13 +1574,17 @@
             Match each bottleneck to a likely improvement: "GPU memory traffic dominates
             attention," "the model needs cheaper inference-time key/value storage,"
             "many training examples are shorter than the context window," and "very long
-            documents make full attention expensive."
+            documents make full attention expensive," "you want more parameters without
+            running all of them for every token," and "the large model is waiting on one
+            autoregressive step at a time."
           </p>
           <p>
             Answer: FlashAttention targets GPU memory traffic; grouped-query or
             multi-query attention shrinks key/value storage; document packing reduces
             wasted context during training; local or sparse attention trims the full
-            attention pattern for long sequences.
+            attention pattern for long sequences; MoE increases total parameters while
+            activating only a few experts; speculative decoding drafts ahead and lets the
+            large model verify.
           </p>
         </details>
       </div>
@@ -1558,6 +1640,10 @@
             <span>Rotary positional embeddings, the position scheme used by most modern LLMs.</span>
           </li>
           <li>
+            <a href="https://arxiv.org/abs/2307.03172" target="_blank" rel="noreferrer">Liu et al., Lost in the Middle</a>
+            <span>Evidence that long-context models often use information near the beginning and end more reliably than information in the middle.</span>
+          </li>
+          <li>
             <a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noreferrer">Ainslie et al., GQA: Grouped-Query Attention</a>
             <span>The shared key/value scheme behind Llama 2 and 3.</span>
           </li>
@@ -1580,6 +1666,18 @@
           <li>
             <a href="https://arxiv.org/abs/2002.05202" target="_blank" rel="noreferrer">Shazeer, GLU Variants Improve Transformer</a>
             <span>The source of SwiGLU-style feed-forward activations used in newer LLM blocks.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noreferrer">Fedus, Zoph, and Shazeer, Switch Transformers</a>
+            <span>A clear route into sparse Mixture-of-Experts Transformers and the total-vs-active-parameters distinction.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2401.04088" target="_blank" rel="noreferrer">Jiang et al., Mixtral of Experts</a>
+            <span>A modern open-weight sparse MoE model where only a subset of experts is active for each token.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2211.17192" target="_blank" rel="noreferrer">Leviathan, Kalman, and Matias, Speculative Decoding</a>
+            <span>A serving-time decoding method where a draft model proposes tokens and the larger model verifies them.</span>
           </li>
           <li>
             <a href="https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html" target="_blank" rel="noreferrer">Olsson et al., In-Context Learning and Induction Heads</a>
