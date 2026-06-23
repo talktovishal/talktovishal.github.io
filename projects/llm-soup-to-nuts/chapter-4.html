@@ -525,14 +525,14 @@
     <section id="gradients" class="band" aria-labelledby="gradients-title">
       <div class="section-shell">
         <div class="section-heading">
+
           <p class="eyebrow">3. Gradients, gradient descent, and loss</p>
           <h2 id="gradients-title">When the guess is wrong, which way do we nudge?</h2>
           <p>
             We can now measure surprise and compare words - but measuring a mistake is
-            not the same as fixing it. This is the part I like because learning stops
-            feeling mystical and becomes a nudge. Here is the question that actually
+            not the same as fixing it. Here is the question that actually
             does the learning: when a guess is wrong, which way, and how far, should we
-            move the numbers? To see the answer with nothing in the way, let's shrink
+            move the numbers? Let's start simple, we will shrink
             the model to the simplest thing that can possibly learn - a straight line
             with two knobs, a <code>slope</code> and an <code>intercept</code> - and
             ask it to pass through a cloud of dots. The <strong>loss</strong> is just
@@ -541,17 +541,12 @@
             cross-entropy loss, but the nudging idea is exactly the same.)
           </p>
           <p>
-            Now the move that does all the work. The <strong>gradient</strong> answers
-            "if I jiggle this one knob, does the loss climb or fall, and how steeply?" -
-            it points straight uphill. So to head <em>downhill</em>, we simply step the
-            opposite way.
-            <a href="https://en.wikipedia.org/wiki/Gradient_descent" target="_blank" rel="noreferrer">Gradient descent</a>
-            is nothing grander than repeating that one move: measure the slope, take a
-            small <code>step size</code> downhill, repeat, until the line settles into the
-            dots. Do you already feel why the step size is delicate? Too small and you
-            crawl; too big and you leap clean over the bottom. Press <em>Step descent</em>
-            below and watch the line walk toward the dots, one nudge at a time.
+            Now the move that does all the work. Imagine you are standing blindfolded on the side of a hilly valley, trying to reach the absolute bottom (where your loss is zero). Because you can't see the whole landscape, you just feel the angle of the ground directly under your feet. The <strong>gradient</strong> is the math calculating that slope. It answers "if I jiggle this one knob, does the loss climb or fall, and how steeply?" By mathematical definition, a gradient always points toward the direction of steepest <em>increase</em>—straight uphill. So, to head downhill toward our goal, we take that exact measurement and deliberately step in the opposite direction.
           </p>
+          <p>
+            <a href="https://en.wikipedia.org/wiki/Gradient_descent" target="_blank" rel="noreferrer">Gradient descent</a>
+            is nothing grander than repeating that one blindfolded move: measure the slope, take a downhill step, repeat, until the line settles perfectly into the dots. This is where the <code>step size</code> (often called the <em>learning rate</em>) becomes incredibly delicate. If your step size is too tiny, you merely crawl, taking an eternity to reach the bottom. But if your step size is too massive, you leap clean over the bottom of the valley, landing even higher up on the opposite wall and making your mistake <em>worse</em>. Press <em>Step descent</em> below and watch the line walk toward the dots, one calculated nudge at a time.
+          </p>          
         </div>
 
         <figure class="intuition-figure">
@@ -582,71 +577,70 @@
                 <output id="lineRateLabel" for="lineRateSlider">0.08</output>
               </label>
             </div>
+            <p class="microcopy">
+              That <strong>step size</strong> (<code>0.08</code>) is the
+              <strong>learning rate</strong>: each Step moves a knob by this fraction of its
+              gradient. Small keeps training stable; larger takes bigger, riskier leaps.
+            </p>
             <div class="stepper-row gradient-buttons">
               <button id="gradientStepButton" class="primary-button" type="button">Step descent</button>
               <button id="gradientAutoButton" class="ghost-button" type="button">Auto train</button>
               <button id="gradientResetButton" class="ghost-button" type="button">Reset</button>
             </div>
             <svg id="lineFitSvg" class="line-fit-svg" viewBox="0 0 560 360" role="img" aria-label="Line fit and training points"></svg>
+            <p class="microcopy">
+              The sloped line is the model's current guess: its <strong>tilt</strong> is the
+              <code>slope</code> and its <strong>height</strong> where it crosses the centre
+              (marked <em>intercept</em>) is the <code>intercept</code>. Each dot is a data
+              point, and the short vertical gaps between the line and the dots are the
+              <strong>errors</strong> that the loss squares and averages.
+            </p>
           </div>
 
           <div class="panel">
             <div class="section-title-row">
-              <h3>Loss and gradients</h3>
-              <span id="lossLabel" class="pill">mean squared error</span>
+              <h3>The exact math, live</h3>
+              <span id="lossLabel" class="pill">recomputed each Step</span>
             </div>
             <div id="gradientMetrics" class="metric-card-grid" aria-live="polite"></div>
             <div id="gradientExplanation" class="gradient-explanation" aria-live="polite"></div>
           </div>
         </div>
 
-        <div class="worked-example" aria-label="One gradient step by hand">
-          <h3>One step, by hand</h3>
-          <p>
-            Take a single point <code>(x = 1, y = 1)</code> and a line currently set
-            to <code>slope = 0, intercept = 0</code>, so it predicts
-            <code>0</code>. The squared-error loss and its gradients are:
-          </p>
-          <div class="formula-stack">
-            <code>error = prediction − y = 0 − 1 = −1, loss = error² = 1</code>
-            <code>gradient on slope = 2·error·x = 2·(−1)·1 = −2</code>
-            <code>new slope = slope − stepSize·gradient = 0 − 0.1·(−2) = +0.2</code>
-          </div>
-          <p class="microcopy">
-            A negative gradient means "go up," so the update nudges the slope upward
-            toward the point. Repeat across all points and the line settles into the
-            cloud. That is the whole trick. Every weight in the next-word model is
-            trained by this same subtraction, just thousands of them at once.
-          </p>
-        </div>
-
         <div class="math-formal" aria-label="Learning in symbols">
           <h3>Loss, gradient, and the update rule, in symbols</h3>
           <p>
             The loss is the average squared gap between the line's prediction \(\hat{y}\)
-            and the true value \(y\). The <strong>gradient</strong>
-            \(\frac{\partial L}{\partial w}\) reads as "how fast does the loss \(L\) change
-            if I nudge just the one knob \(w\), holding the rest still." That is all the
-            partial derivative \(\partial\) means here:
+            and the true value \(y\). To fix a bad prediction, we need to know how tweaking our knobs affects that loss. In machine learning, we group all adjustable knobs (like our slope and our intercept) under the universal label of <strong>weights</strong>, represented by the letter \(w\). Think of \(w\) as a generic blank space: the update rule at the bottom is a template. You run the template once substituting \(w\) for the slope, and then you run it again substituting \(w\) for the intercept.
           </p>
-          $$L = \frac{1}{N}\sum_{i=1}^{N}\big(\hat{y}_i - y_i\big)^2$$
+          <p>
+            The <strong>gradient</strong> \(\frac{\partial L}{\partial w}\) reads as "how fast does the loss \(L\) change if I nudge just this one specific weight \(w\), holding the rest perfectly still." That is all the partial derivative \(\partial\) symbol means: isolating one knob at a time.
+          </p>
+          <p class="microcopy">
+            <em><strong>Calculus Refreshers:</strong> If the \(\partial\) symbol looks unfamiliar, Wikipedia has excellent, visual primers on <u><a href="https://en.wikipedia.org/wiki/Partial_derivative" target="_blank" rel="noreferrer">Partial derivatives</a></u> and the <u><a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a></u>.</em>
+          </p>
+          <p>
+            How do we calculate that exact gradient number? We use the Chain Rule. Working from the outside in: the \(2\) from the squared error drops down to the front, and then we multiply by the inner variable attached to our knob. Because our prediction is \((\text{slope} \cdot x + \text{intercept})\), the variable attached to the slope is \(x\). The variable attached to the intercept is just \(1\).
+          </p>
+
+          $$L = \frac{1}{N}\sum_{i=1}^{N}\big(\hat{y}_i - y_i\big)^2 \qquad (\text{where } \hat{y} = \text{slope} \cdot x + \text{intercept})$$
           $$\frac{\partial L}{\partial\,\text{slope}} = 2(\hat{y}-y)\,x \qquad \frac{\partial L}{\partial\,\text{intercept}} = 2(\hat{y}-y)$$
           $$w \leftarrow w - \eta\,\frac{\partial L}{\partial w}$$
+
           <ul class="symbol-glossary">
-            <li>\(\hat{y}\): the line's prediction, \(\text{slope}\cdot x + \text{intercept}\); \(y\): the true value.</li>
+            <li>\(\hat{y}\): the line's prediction; \(y\): the true value in the data.</li>
             <li>\(N\): how many points we average the loss over.</li>
-            <li>\(\frac{\partial L}{\partial w}\): the gradient, the uphill slope of the loss for knob \(w\).</li>
-            <li>\(\eta\) (eta): the <strong>learning rate</strong>, the step size; the same slider in the lab.</li>
-            <li>\(\leftarrow\): "becomes," the weight is replaced by its nudged value.</li>
+            <li>\(w\): a generic "weight"&mdash;a placeholder. You swap in either "slope" or "intercept" when applying the math.</li>
+            <li>\(\frac{\partial L}{\partial w}\): the gradient, representing the uphill slope of the loss for that specific weight \(w\).</li>
+            <li>\(\eta\) (eta): the <strong>learning rate</strong> or step size (the same slider used in the lab).</li>
+            <li>\(\leftarrow\): "becomes" (we replace the old weight with its newly nudged value).</li>
           </ul>
           <p class="microcopy">
-            One point \((x{=}1,\ y{=}1)\) with \(\text{slope}{=}0\) gives \(\hat{y}=0\) and
-            error \(\hat{y}-y = -1\), so \(\frac{\partial L}{\partial\,\text{slope}} =
-            2(-1)(1) = -2\), and \(\text{slope} \leftarrow 0 - 0.1(-2) = +0.2\). Subtracting
-            the gradient steps downhill; \(\eta\) sets how big that step is. Too small and
-            you crawl, too big and you leap past the bottom.
+            <strong>Walking through one step for the slope:</strong> For a single data point \((x{=}1,\ y{=}1)\) and a starting \(\text{slope}{=}0\), our prediction is \(\hat{y}=0\). The error is \(\hat{y}-y = -1\).
+            <br><br>
+            The gradient for the slope is \(2(-1)(1) = -2\). Now we use the update rule template, swapping \(w\) for the slope: \(\text{slope} \leftarrow 0 - 0.1(-2) = +0.2\). Subtracting the gradient ensures we step <em>downhill</em>, and \(\eta\) (set to \(0.1\) here) scales how big that step is.
           </p>
-        </div>
+        </div>        
 
         <div class="code-quiz" data-quiz-type="predict" data-explain="The gradient points uphill (toward larger loss), so gradient descent subtracts it - a step in the opposite, downhill direction. That one subtraction is repeated for every weight in the network.">
           <p class="quiz-prompt">Quick check: the gradient of the loss points the way that makes the loss <em>larger</em>. To make the loss smaller, gradient descent steps&hellip;</p>

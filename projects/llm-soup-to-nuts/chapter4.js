@@ -512,11 +512,11 @@ function lineLossAndGradients(w, b) {
 }
 
 function renderGradient() {
-  const { w, b } = readLineParams();
+  const { w, b, lr } = readLineParams();
   if (!state.hasExploredGradient) {
     dom.gradientStatus.textContent = "press Step";
     renderLineFitPlaceholder();
-    dom.gradientMetrics.replaceChildren(createElement("div", "empty-state", "Move the slope, intercept, or rate slider \u2014 or press Step \u2014 to fit the line and see the gradients."));
+    dom.gradientMetrics.replaceChildren(createElement("div", "empty-state", "Move the slope, intercept, or step-size slider \u2014 or press Step \u2014 to fit the line and watch each knob move."));
     dom.gradientExplanation.replaceChildren();
     return;
   }
@@ -524,25 +524,104 @@ function renderGradient() {
   dom.gradientStatus.textContent = `loss ${formatNumber(info.loss, 3)}`;
   renderLineFitSvg(w, b);
   renderMetricCards(dom.gradientMetrics, [
-    {
-      label: "loss",
-      value: formatNumber(info.loss, 4),
-      note: "mean squared error"
-    },
-    {
-      label: "dLoss / dSlope",
-      value: formatNumber(info.dw, 4),
-      note: info.dw > 0 ? "descent lowers slope" : "descent raises slope"
-    },
-    {
-      label: "dLoss / dIntercept",
-      value: formatNumber(info.db, 4),
-      note: info.db > 0 ? "descent lowers intercept" : "descent raises intercept"
-    }
+    { label: "loss", value: formatNumber(info.loss, 4), note: "average squared gap (lower fits better)" },
+    { label: "slope", value: formatNumber(w, 2), note: "the line's tilt" },
+    { label: "intercept", value: formatNumber(b, 2), note: "its height at the centre" }
   ]);
-  const p = createElement("p");
-  p.textContent = `Next descent step: slope = slope - stepSize * ${formatNumber(info.dw, 3)}, intercept = intercept - stepSize * ${formatNumber(info.db, 3)}. That small subtraction is the parameter update.`;
-  dom.gradientExplanation.replaceChildren(p);
+  const nextW = clamp(w - lr * info.dw, -2, 2);
+  const nextB = clamp(b - lr * info.db, -1, 1);
+  const nextLoss = lineLossAndGradients(nextW, nextB).loss;
+  renderGradientDerivation({ w, b, lr, info, nextLoss });
+}
+
+function signedFactor(value, digits = 2) {
+  const text = formatNumber(Math.abs(value), digits);
+  return value < 0 ? `(\u2212${text})` : text;
+}
+
+function derivCell(text) {
+  const td = createElement("td");
+  td.textContent = text;
+  return td;
+}
+
+function renderGradientDerivation({ w, b, lr, info, nextLoss }) {
+  const container = dom.gradientExplanation;
+  const n = lineData.length;
+
+  const intro = createElement("div", "step-lead", `Every Step is just this calculation, recomputed from all ${n} points for the current line. The prediction is \u0177 = slope\u00b7x + intercept and the error is e = \u0177 \u2212 y:`);
+
+  const wrap = createElement("div", "deriv-table-wrap");
+  const table = createElement("table", "deriv-table");
+  const thead = createElement("thead");
+  const htr = createElement("tr");
+  ["x", "y", "\u0177", "e", "e\u00b2", "e\u00b7x"].forEach((h) => htr.append(createElement("th", "", h)));
+  thead.append(htr);
+  const tbody = createElement("tbody");
+  let sumSq = 0;
+  let sumEx = 0;
+  let sumE = 0;
+  lineData.forEach((pt) => {
+    const pred = w * pt.x + b;
+    const e = pred - pt.y;
+    sumSq += e * e;
+    sumEx += e * pt.x;
+    sumE += e;
+    const tr = createElement("tr");
+    tr.append(
+      derivCell(formatNumber(pt.x, 2)),
+      derivCell(formatNumber(pt.y, 2)),
+      derivCell(formatNumber(pred, 2)),
+      derivCell(formatNumber(e, 3)),
+      derivCell(formatNumber(e * e, 4)),
+      derivCell(formatNumber(e * pt.x, 3))
+    );
+    tbody.append(tr);
+  });
+  const tfoot = createElement("tfoot");
+  const ftr = createElement("tr");
+  const sumLabel = createElement("td", "row-label", "sums (\u03a3)");
+  sumLabel.setAttribute("colspan", "3");
+  ftr.append(sumLabel, derivCell(formatNumber(sumE, 3)), derivCell(formatNumber(sumSq, 4)), derivCell(formatNumber(sumEx, 3)));
+  tfoot.append(ftr);
+  table.append(thead, tbody, tfoot);
+  wrap.append(table);
+
+  const loss = sumSq / n;
+  const dw = (2 * sumEx) / n;
+  const db = (2 * sumE) / n;
+  const newW = w - lr * dw;
+  const newB = b - lr * db;
+  const stack = createElement("div", "formula-stack");
+  [
+    `loss = (1/${n}) \u00d7 \u03a3e\u00b2 = (1/${n}) \u00d7 ${formatNumber(sumSq, 4)} = ${formatNumber(loss, 4)}`,
+    `\u2202loss/\u2202slope = (2/${n}) \u00d7 \u03a3(e\u00b7x) = ${formatNumber(dw, 3)}`,
+    `\u2202loss/\u2202intercept = (2/${n}) \u00d7 \u03a3e = ${formatNumber(db, 3)}`,
+    `then nudge each knob by rate \u00d7 gradient:`,
+    `new slope = ${formatNumber(w, 2)} \u2212 ${formatNumber(lr, 2)} \u00d7 ${signedFactor(dw, 3)} = ${formatNumber(newW, 3)}`,
+    `new intercept = ${formatNumber(b, 2)} \u2212 ${formatNumber(lr, 2)} \u00d7 ${signedFactor(db, 3)} = ${formatNumber(newB, 3)}`
+  ].forEach((line) => stack.append(createElement("code", "", line)));
+
+  const reason = createElement("p");
+  const settled = Math.abs(info.dw) < 0.01 && Math.abs(info.db) < 0.01;
+  if (settled) {
+    reason.textContent = "The errors are tiny now, so the sums are near zero and each Step barely moves the line - it has essentially fit the dots.";
+  } else {
+    const heightReason = info.db < -0.01
+      ? "sits a little below the dots, so the step lifts it"
+      : info.db > 0.01
+        ? "sits a little above the dots, so the step lowers it"
+        : "is centred on the dots";
+    const tiltReason = info.dw < -0.01
+      ? "is tilted too shallow, so the step steepens it"
+      : info.dw > 0.01
+        ? "is tilted too steep, so the step flattens it"
+        : "already matches their trend";
+    const dir = nextLoss < info.loss ? "down" : "up";
+    reason.textContent = `Reading it back: the line ${heightReason}, and it ${tiltReason}. Applying both updates moves the loss from ${formatNumber(info.loss, 4)} to ${formatNumber(nextLoss, 4)} (${dir}).`;
+  }
+
+  container.replaceChildren(intro, wrap, stack, reason);
 }
 
 function renderLineFitPlaceholder() {
@@ -572,6 +651,11 @@ function renderLineFitSvg(w, b) {
     x2: toX(x2),
     y2: toY(w * x2 + b)
   }));
+  // Mark the intercept: where the line crosses the centre vertical axis (x = 0).
+  svg.append(createSvgElement("circle", { class: "intercept-marker", cx: toX(0), cy: toY(b), r: 5 }));
+  const interceptLabel = createSvgElement("text", { class: "svg-annot", x: toX(0) + 16, y: toY(b) - 12 });
+  interceptLabel.textContent = "intercept";
+  svg.append(interceptLabel);
   lineData.forEach((point) => {
     const predictedY = w * point.x + b;
     svg.append(createSvgElement("line", {

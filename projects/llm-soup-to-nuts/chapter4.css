@@ -578,6 +578,72 @@
   font-size: 0.92rem;
 }
 
+.step-lead {
+  font-size: 0.86rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.deriv-table-wrap {
+  overflow-x: auto;
+  margin: 2px 0;
+}
+
+.deriv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.deriv-table th,
+.deriv-table td {
+  padding: 3px 6px;
+  text-align: right;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  white-space: nowrap;
+}
+
+.deriv-table th {
+  color: var(--muted);
+  font-weight: 850;
+  border-bottom: 1.5px solid var(--line);
+}
+
+.deriv-table tbody td {
+  color: #123a3a;
+  border-bottom: 1px solid #eee5d8;
+}
+
+.deriv-table tfoot td {
+  font-weight: 900;
+  color: var(--ink);
+  border-top: 1.5px solid var(--line);
+}
+
+.deriv-table .row-label {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+#gradientExplanation .formula-stack code {
+  font-size: 0.8rem;
+  padding: 6px 8px;
+}
+
+.intercept-marker {
+  fill: #ffffff;
+  stroke: var(--teal);
+  stroke-width: 3;
+}
+
+.svg-annot {
+  fill: var(--teal);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .backprop-panel {
   margin-top: 10px;
 }
