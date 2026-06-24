@@ -169,7 +169,8 @@ const state = {
   isNetworkTraining: false,
   hasExploredProbability: false,
   hasExploredGradient: false,
-  hasTrainedNetwork: false
+  hasTrainedNetwork: false,
+  forwardFocus: null
 };
 
 function formatNumber(value, digits = 3) {
@@ -804,24 +805,150 @@ function renderForwardPass() {
   const embA = forwardEmbeddings[wordA];
   const embB = forwardEmbeddings[wordB];
   const input = [embA[0], embA[1], embB[0], embB[1]];
+  const inputLabels = [`${wordA}.x`, `${wordA}.y`, `${wordB}.x`, `${wordB}.y`];
   const z1 = forwardB1.map((bias, j) => bias + input.reduce((sum, value, i) => sum + value * forwardW1[i][j], 0));
   const hidden = z1.map((value) => activation(activationName, value));
   const logits = forwardB2.map((bias, k) => bias + hidden.reduce((sum, value, j) => sum + value * forwardW2[j][k], 0));
   const probs = softmax(logits);
   const bestIndex = probs.indexOf(Math.max(...probs));
+
+  // Default focus = the hidden neuron that pushes hardest on the winning word.
+  let focus = state.forwardFocus;
+  if (focus === null || focus === undefined) {
+    const responsibility = hidden.map((value, j) => Math.abs(value * forwardW2[j][bestIndex]));
+    focus = responsibility.indexOf(Math.max(...responsibility));
+  }
+  focus = clamp(focus, 0, hidden.length - 1);
+
+  // Signed, data-dependent contributions, used to colour and weight the SVG edges.
+  const inContrib = [0, 1].map((wordIdx) => (
+    hidden.map((_, j) => input[wordIdx * 2] * forwardW1[wordIdx * 2][j] + input[wordIdx * 2 + 1] * forwardW1[wordIdx * 2 + 1][j])
+  ));
+  const hidContrib = hidden.map((value, j) => logits.map((_, k) => value * forwardW2[j][k]));
+
   dom.forwardSummary.textContent = `predict "${forwardCandidates[bestIndex]}"`;
-  renderNetworkSvg([wordA, wordB], hidden, forwardCandidates, probs);
-  dom.forwardPanel.replaceChildren(
-    lookupRow(`look up ${wordA}`, `[${embA.map((value) => formatNumber(value, 2)).join(", ")}]`),
-    lookupRow(`look up ${wordB}`, `[${embB.map((value) => formatNumber(value, 2)).join(", ")}]`),
-    lookupRow(`${activationName} hidden`, `[${hidden.map((value) => formatNumber(value, 2)).join(", ")}]`),
-    lookupRow("output logits", `[${logits.map((value) => formatNumber(value, 2)).join(", ")}]`),
-    lookupRow("softmax", forwardCandidates.map((word, i) => `${word} ${formatPercent(probs[i])}`).join(", "))
-  );
+  renderNetworkSvg([wordA, wordB], hidden, forwardCandidates, probs, { focus, bestIndex, inContrib, hidContrib });
+  dom.forwardPanel.replaceChildren(...buildForwardBreakdown({
+    wordA, wordB, embA, embB, input, inputLabels, activationName, z1, hidden, logits, probs, bestIndex, focus
+  }));
 }
 
-function renderNetworkSvg(contextWords, hidden, candidates, probs) {
+function activationEffectTag(name, z) {
+  if (name === "relu") return z <= 0 ? "clipped to 0" : "kept as is";
+  if (name === "sigmoid") return "squashed to (0, 1)";
+  return "squashed to (-1, 1)";
+}
+
+function signedProduct(value, weight) {
+  const v = formatNumber(value, 2);
+  const w = formatNumber(weight, 2);
+  return `${value < 0 ? `(${v})` : v}x${weight < 0 ? `(${w})` : w}`;
+}
+
+function forwardStepHead(text) {
+  return createElement("p", "forward-step-head", text);
+}
+
+function buildForwardBreakdown(ctx) {
+  const { wordA, wordB, embA, embB, input, inputLabels, activationName, z1, hidden, logits, probs, bestIndex, focus } = ctx;
+  const nodes = [];
+
+  nodes.push(forwardStepHead("1 - Look up each word vector, then join them"));
+  nodes.push(lookupRow(`look up ${wordA}`, `[${embA.map((value) => formatNumber(value, 2)).join(", ")}]`));
+  nodes.push(lookupRow(`look up ${wordB}`, `[${embB.map((value) => formatNumber(value, 2)).join(", ")}]`));
+  nodes.push(lookupRow("join -> input", inputLabels.map((label, i) => `${label} ${formatNumber(input[i], 2)}`).join(",  ")));
+
+  nodes.push(forwardStepHead(`2 - Hidden neuron h${focus + 1}, multiply-and-add (click any neuron to switch)`));
+  const hiddenStack = createElement("div", "formula-stack");
+  const hiddenTerms = input.map((value, i) => signedProduct(value, forwardW1[i][focus])).join(" + ");
+  hiddenStack.append(
+    createElement("code", "", "z = bias + sum(input x weight)"),
+    createElement("code", "", `z = ${formatNumber(forwardB1[focus], 2)} + ${hiddenTerms}`),
+    createElement("code", "", `z = ${formatNumber(z1[focus], 2)}`),
+    createElement("code", "", `${activationName}(${formatNumber(z1[focus], 2)}) = ${formatNumber(hidden[focus], 2)}   (${activationEffectTag(activationName, z1[focus])})`)
+  );
+  nodes.push(hiddenStack);
+
+  nodes.push(forwardStepHead(`3 - What ${activationName} did to all three neurons`));
+  nodes.push(buildActivationTable(activationName, z1, hidden, focus));
+
+  nodes.push(forwardStepHead(`4 - Output score (logit) for "${forwardCandidates[bestIndex]}"`));
+  const logitStack = createElement("div", "formula-stack");
+  const logitTerms = hidden.map((value, j) => signedProduct(value, forwardW2[j][bestIndex])).join(" + ");
+  logitStack.append(
+    createElement("code", "", "logit = bias + sum(hidden x weight)"),
+    createElement("code", "", `logit = ${formatNumber(forwardB2[bestIndex], 2)} + ${logitTerms}`),
+    createElement("code", "", `logit = ${formatNumber(logits[bestIndex], 2)}`)
+  );
+  nodes.push(logitStack);
+
+  nodes.push(forwardStepHead("5 - Softmax turns the three logits into probabilities"));
+  nodes.push(buildForwardSoftmax(forwardCandidates, probs, bestIndex));
+
+  nodes.push(buildForwardReading(activationName, z1, forwardCandidates[bestIndex], probs[bestIndex]));
+  return nodes;
+}
+
+function buildActivationTable(name, z1, hidden, focus) {
+  const wrap = createElement("div", "deriv-table-wrap");
+  const table = createElement("table", "deriv-table forward-activation-table");
+  const thead = createElement("thead");
+  const headRow = createElement("tr");
+  ["neuron", "z (pre)", `${name}(z)`, "effect"].forEach((title) => headRow.append(createElement("th", "", title)));
+  thead.append(headRow);
+  const tbody = createElement("tbody");
+  z1.forEach((z, j) => {
+    const row = createElement("tr", j === focus ? "is-focus-row" : "");
+    row.append(
+      createElement("td", "row-label", `h${j + 1}`),
+      createElement("td", "", formatNumber(z, 2)),
+      createElement("td", "", formatNumber(hidden[j], 2)),
+      createElement("td", "row-label", activationEffectTag(name, z))
+    );
+    tbody.append(row);
+  });
+  table.append(thead, tbody);
+  wrap.append(table);
+  return wrap;
+}
+
+function buildForwardSoftmax(names, probs, bestIndex) {
+  const panel = createElement("div", "probability-panel forward-softmax");
+  names.forEach((name, i) => {
+    const row = createElement("div", `softmax-row${i === bestIndex ? " is-answer" : ""}`);
+    const track = createElement("div", "softmax-track");
+    const fill = createElement("span");
+    fill.style.width = `${probs[i] * 100}%`;
+    track.append(fill);
+    row.append(createElement("strong", "", name), track, createElement("em", "", formatPercent(probs[i])));
+    panel.append(row);
+  });
+  return panel;
+}
+
+function buildForwardReading(name, z1, bestWord, bestProb) {
+  let effect;
+  if (name === "relu") {
+    const clipped = z1.filter((z) => z <= 0).length;
+    effect = clipped > 0
+      ? `ReLU clipped ${clipped} of the three neurons to zero, so they pass nothing forward.`
+      : "ReLU kept all three neurons positive, so each one feeds the output.";
+  } else if (name === "sigmoid") {
+    effect = "Sigmoid bent every neuron into the range (0, 1) before it reached the output.";
+  } else {
+    effect = "tanh bent every neuron into the range (-1, 1) before it reached the output.";
+  }
+  const note = createElement("p", "insight-note forward-reading");
+  note.textContent = `Read it as one chain: two vectors in, a hidden layer in the middle, three probabilities out. ${effect} The model leans toward "${bestWord}" at ${formatPercent(bestProb)} - change the context or activation above, or click a different neuron, and watch every number, edge, and bar move.`;
+  return note;
+}
+
+function renderNetworkSvg(contextWords, hidden, candidates, probs, opts = {}) {
   const svg = dom.networkSvg;
+  const focus = opts.focus ?? null;
+  const bestIndex = opts.bestIndex ?? probs.indexOf(Math.max(...probs));
+  const inContrib = opts.inContrib ?? null;
+  const hidContrib = opts.hidContrib ?? null;
   svg.replaceChildren();
   const inputNodes = contextWords.map((word, index) => ({
     x: 88,
@@ -834,9 +961,9 @@ function renderNetworkSvg(contextWords, hidden, candidates, probs) {
     x: 280,
     y: 60 + index * 90,
     label: `h${index + 1}`,
-    value: formatNumber(value, 2)
+    value: formatNumber(value, 2),
+    index
   }));
-  const bestIndex = probs.indexOf(Math.max(...probs));
   const outputNodes = candidates.map((word, index) => ({
     x: 474,
     y: 60 + index * 90,
@@ -845,30 +972,41 @@ function renderNetworkSvg(contextWords, hidden, candidates, probs) {
     isWord: true,
     isBest: index === bestIndex
   }));
-  inputNodes.forEach((source) => {
-    hiddenNodes.forEach((target) => {
+  const edgeWidth = (magnitude) => clamp(1 + magnitude * 3.4, 1, 6).toFixed(2);
+  const edgeClass = (weight, hiddenIndex) => {
+    const sign = weight >= 0 ? "is-pos" : "is-neg";
+    if (focus === null) return `network-edge ${sign}`;
+    return `network-edge ${sign} ${hiddenIndex === focus ? "is-focus" : "is-muted"}`;
+  };
+  inputNodes.forEach((source, i) => {
+    hiddenNodes.forEach((target, j) => {
+      const contribution = inContrib ? inContrib[i][j] : 0;
       svg.append(createSvgElement("line", {
-        class: "network-edge",
+        class: edgeClass(contribution, j),
         x1: source.x + 40,
         y1: source.y,
         x2: target.x - 24,
-        y2: target.y
+        y2: target.y,
+        "stroke-width": edgeWidth(Math.abs(contribution))
       }));
     });
   });
-  hiddenNodes.forEach((source) => {
-    outputNodes.forEach((target) => {
+  hiddenNodes.forEach((source, j) => {
+    outputNodes.forEach((target, k) => {
+      const contribution = hidContrib ? hidContrib[j][k] : 0;
       svg.append(createSvgElement("line", {
-        class: target.isBest ? "network-edge is-active" : "network-edge",
+        class: edgeClass(contribution, j),
         x1: source.x + 24,
         y1: source.y,
         x2: target.x - 40,
-        y2: target.y
+        y2: target.y,
+        "stroke-width": edgeWidth(Math.abs(contribution))
       }));
     });
   });
   const drawNode = (node, kind) => {
     const group = createSvgElement("g");
+    const isFocusNode = kind === "is-hidden" && node.index === focus;
     if (node.isWord) {
       group.append(createSvgElement("rect", {
         class: `network-node ${kind}${node.isBest ? " is-best" : ""}`,
@@ -879,13 +1017,25 @@ function renderNetworkSvg(contextWords, hidden, candidates, probs) {
         rx: 11
       }));
     } else {
-      group.append(createSvgElement("circle", { class: `network-node ${kind}`, cx: node.x, cy: node.y, r: 25 }));
+      group.append(createSvgElement("circle", {
+        class: `network-node ${kind}${isFocusNode ? " is-focus" : ""}`,
+        cx: node.x,
+        cy: node.y,
+        r: 25
+      }));
     }
     const label = createSvgElement("text", { class: "network-label", x: node.x, y: node.y - 2 });
     label.textContent = node.label;
     const value = createSvgElement("text", { class: "network-value", x: node.x, y: node.y + 15 });
     value.textContent = node.value;
     group.append(label, value);
+    if (kind === "is-hidden") {
+      group.style.cursor = "pointer";
+      group.addEventListener("click", () => {
+        state.forwardFocus = node.index;
+        renderForwardPass();
+      });
+    }
     svg.append(group);
   };
   inputNodes.forEach((node) => drawNode(node, "is-input"));

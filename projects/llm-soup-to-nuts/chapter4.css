@@ -668,6 +668,65 @@
   stroke-width: 3;
 }
 
+.network-edge.is-pos {
+  stroke: var(--teal);
+}
+
+.network-edge.is-neg {
+  stroke: var(--coral);
+}
+
+.network-edge.is-muted {
+  opacity: 0.2;
+}
+
+.network-edge.is-focus {
+  opacity: 1;
+}
+
+.network-node.is-focus {
+  stroke: var(--teal);
+  stroke-width: 3.5;
+}
+
+.forward-step-head {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  font-weight: 850;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.forward-panel > .forward-step-head:first-child {
+  margin-top: 0;
+}
+
+.forward-activation-table .is-focus-row td {
+  background: #eef7f1;
+  color: var(--ink);
+}
+
+.forward-softmax .softmax-row.is-answer {
+  border-color: var(--green);
+  background: #eaf5ee;
+}
+
+.forward-reading {
+  margin-top: 12px;
+}
+
+.edge-key {
+  font-weight: 850;
+}
+
+.edge-key-pos {
+  color: var(--teal);
+}
+
+.edge-key-neg {
+  color: var(--coral);
+}
+
 .network-node {
   fill: #ffffff;
 }
@@ -934,6 +993,33 @@
 .network-grid .control-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-bottom: 10px;
+}
+
+/* Shape bridge moved into the grid's left column to fill the space under the diagram */
+.network-grid > .model-shape-bridge {
+  margin-top: 0;
+}
+
+@media (min-width: 1121px) {
+  .network-grid {
+    align-items: start;
+  }
+  .network-grid > .diagram-panel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .network-grid > .breakdown-panel {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+  }
+  .network-grid > .model-shape-bridge {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .network-grid > .model-shape-bridge .shape-symbol-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .model-shape-bridge {

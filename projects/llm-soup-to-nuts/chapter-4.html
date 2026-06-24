@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter4.css?v=20260622">
+  <link rel="stylesheet" href="chapter4.css?v=20260624">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -36,9 +36,10 @@
       <a href="#gradients"><span>03</span>Gradients and loss</a>
       <a href="#softmax"><span>04</span>Softmax and blame</a>
       <a href="#neural-networks"><span>05</span>Build the forward pass</a>
-      <a href="#warmup-lab"><span>06</span>Watch a network learn</a>
-      <a href="#train-lab"><span>07</span>Train a next-word model</a>
-      <a href="#references"><span>08</span>References</a>
+      <a href="#backpropagation"><span>06</span>Backpropagation</a>
+      <a href="#warmup-lab"><span>07</span>Watch a network learn</a>
+      <a href="#train-lab"><span>08</span>Train a next-word model</a>
+      <a href="#references"><span>09</span>References</a>
     </nav>
   </aside>
 
@@ -664,6 +665,8 @@
       </div>
     </section>
 
+
+
     <section id="softmax" class="band band-muted" aria-labelledby="softmax-title">
       <div class="section-shell">
         <div class="section-heading">
@@ -673,35 +676,45 @@
             Here is an awkward gap. The network, once we build it, will not naturally
             hand us neat percentages. It will hand us a raw score for every word it
             could predict - a number called a
-            <strong>logit</strong>. But a logit can be 4.2 or -1.1 or anything at all,
-            and we promised the model would output <em>probabilities</em>: numbers
-            between 0 and 1 that add up to 1. So how do we get from a pile of
-            any-old-numbers to a clean distribution?
+            <strong>logit</strong>. But a logit can be 4.2 or -1.1 or anything at all. If we have negative logits, the math breaks. We promised the model would output <em>probabilities</em>: positive numbers between 0 and 1 that add up to 1.
+          </p>
+          <p>
             <a href="https://en.wikipedia.org/wiki/Softmax_function" target="_blank" rel="noreferrer">Softmax</a>
-            is the little bridge in the middle, and it is a two-step trick:
-            exponentiate every score (which
-            makes it positive and stretches the gaps), then divide each by the running
-            total so the whole set sums to 1. <strong>Temperature</strong> is the dial
-            that stretches or sharpens the result - the very same knob you turned to make
-            Chapter 1's generator bold or cautious.
+            is the elegant bridge that gets us from any-old-numbers to a clean distribution. It relies on a two-step trick: first, it <em>exponentiates</em> every score. This instantly turns every number (even negative ones) positive, and it violently stretches the gaps between close numbers so a clear winner emerges. Second, it divides each by the running total so the whole set perfectly sums to 1. <strong>Temperature</strong> is the dial
+            that controls that stretching. Chapter 1 gave you a coarse version of this same
+            choice - <em>top-pick</em> (always take the strongest word) versus <em>sampling</em>
+            (weighted random) - and temperature is the smooth knob between them. Turn it up,
+            and differences shrink toward a flat tie (bold and adventurous); turn it down,
+            and the highest score blows up to dominate the rest (cautious, like top-pick).
+            Why does one dial do both? Because temperature acts <em>before</em> the
+            exponential: every score is divided by <code>T</code> first. Make <code>T</code>
+            large and you squash all the scores toward zero, so after exponentiating they
+            land near <code>e<sup>0</sup> = 1</code> - nearly equal, a flat tie where even
+            long-shot words get a real chance. Make <code>T</code> small and you stretch the
+            gaps between scores wide open, so the exponential of the biggest one towers over
+            the rest and runs away with almost all the probability. Push <code>T</code> all
+            the way down toward zero and the single largest score wins outright - which is
+            exactly Chapter 1's top-pick, now recovered as one end of a continuous dial.
           </p>
           <p>
             Now the satisfying part: assigning blame. With probabilities in hand,
-            cross-entropy reads off how much the model put on the word that actually
-            came next - little there means a lot of surprise, a high loss. (A quick
-            units note: we counted surprise in <em>bits</em> earlier, using log base 2;
-            the live loss here uses the natural log instead, so it is measured in
-            <em>nats</em> - the same quantity on a different base, which is why
-            perplexity later reads as <code>e^loss</code> rather than
-            <code>2^loss</code>.) To fix it,
-            <a href="https://en.wikipedia.org/wiki/Backpropagation" target="_blank" rel="noreferrer">backpropagation</a>
-            hands each word its share of the blame: "you, the word it wrongly favored -
-            too high, push down; you, the true word - too low, push up." And here is the
-            small miracle that makes the whole machine practical: for softmax paired with
-            cross-entropy, that blame collapses to one of the simplest expressions in all
-            of deep learning - <code>probability &minus; target</code>. Predicted minus
-            wanted. Move the raw scores below and watch that one difference become the
-            error signal every weight will follow.
+            cross-entropy builds on that to measure how much confidence the model put on the word that actually
+            came next - little there means a lot of surprise, a high loss. To fix it, the model must hand each word its share of the blame. And here is the small miracle that makes the whole machine practical: for softmax paired with cross-entropy, that blame collapses to one of the simplest expressions in all of deep learning - <code>probability &minus; target</code>. Predicted minus wanted. If the model predicts <code>0.99</code> for the true word (target <code>1.0</code>), the blame is <code>-0.01</code>: just a tiny nudge. But if it predicts <code>0.01</code>, the blame is <code>-0.99</code>: a massive correction.
+          </p>
+          <p>
+            Why does it land on something so clean? Because the two halves are built from
+            opposite operations that undo each other. Softmax turns a raw score into a
+            probability with an exponential (<code>e</code> to the score), and cross-entropy
+            measures the loss with that exponential's exact mirror image, the natural log
+            (<code>ln</code>). When we ask calculus how the loss shifts as one score moves, the
+            <code>e</code> and the <code>ln</code> cancel and the messy middle terms fall away,
+            leaving nothing but the gap between what the model gave and what we wanted. There
+            is also a tidy intuition for the leftover: the loss only ever wants the true word's
+            probability to climb toward 1 and every other word's to sink toward 0, so the
+            steepest fix is simply <em>how far each probability still sits from its goal</em> -
+            which is exactly <code>probability &minus; target</code>. (The full line-by-line
+            cancellation is worked out in the symbols panel below.) Move the raw scores below
+            and watch that one difference become the exact error signal every weight will follow.
           </p>
         </div>
 
@@ -762,16 +775,19 @@
             results sum to 1:
           </p>
           <div class="formula-stack">
-            <code>e^1.70 = 5.47, e^0.80 = 2.23, e^-1.10 = 0.33, total = 8.03</code>
-            <code>softmax: sat = 5.47/8.03 = 0.681, ran = 2.23/8.03 = 0.277, slept = 0.33/8.03 = 0.041</code>
-            <code>if sat is the true word: loss = -ln(0.681) ≈ 0.38 nats</code>
-            <code>blame = probability − target: sat 0.681−1 = −0.32, ran +0.28, slept +0.04</code>
+            <span>\(e^{1.70} \approx 5.47,\ e^{0.80} \approx 2.23,\ e^{-1.10} \approx 0.33 \quad (\text{total: } 8.03)\)</span>
+            <span>\(\text{softmax: sat} = \tfrac{5.47}{8.03} \approx 0.681,\ \text{ran} = \tfrac{2.23}{8.03} \approx 0.277,\ \text{slept} = \tfrac{0.33}{8.03} \approx 0.041\)</span>
+            <span>\(\text{if \textbf{sat} is true: loss} = -\ln(0.681) \approx 0.38 \text{ nats}\)</span>
+            <span>\(\text{blame } (q_i - y_i)\text{: sat } 0.681-1 = -0.319,\ \text{ran } +0.277,\ \text{slept } +0.041\)</span>
           </div>
           <p class="microcopy">
             The live panel recomputes these as you drag the scores. The blame on the
             true word is negative (its score gets pushed up) while the others are
             positive (pushed down): that single <code>probability − target</code>
-            vector is the error signal every weight will follow.
+            vector is the exact starting error signal for the entire network.
+          </p>
+          <p class="microcopy">
+            <em>Units note:</em> we counted surprise in <em>bits</em> earlier, using \(\log_2\); the live loss here uses the natural log \(\ln\), so it is measured in <em>nats</em> - the exact same concept, which is why perplexity later reads as \(e^{\text{loss}}\) instead of \(2^{\text{loss}}\).
           </p>
         </div>
 
@@ -785,28 +801,39 @@
             each score collapses to one clean difference:
           </p>
           $$q_i = \frac{e^{z_i}}{\sum_{j} e^{z_j}} \qquad q_i^{(T)} = \frac{e^{z_i / T}}{\sum_{j} e^{z_j / T}}$$
-          $$L = -\sum_i y_i \log q_i = -\log q_{\text{true}} \qquad \frac{\partial L}{\partial z_i} = q_i - y_i$$
+          $$L = -\sum_i y_i \ln q_i = -\ln q_{\text{true}} \qquad \frac{\partial L}{\partial z_i} = q_i - y_i$$
           <ul class="symbol-glossary">
             <li>\(z_i\): the raw score (logit) for word \(i\); \(q_i\): its softmax probability.</li>
             <li>\(y_i\): the target, 1 for the true next word and 0 for every other word.</li>
             <li>\(T\): temperature; \(T{=}1\) leaves the scores unchanged.</li>
             <li>\(\frac{\partial L}{\partial z_i} = q_i - y_i\): the blame, "probability minus target."</li>
           </ul>
-          <p class="microcopy">
-            With \(z = (1.70,\ 0.80,\ -1.10)\): \(q = (0.68,\ 0.28,\ 0.04)\). If
-            <code>sat</code> is the true word, \(L = -\ln(0.68) \approx 0.38\) nats, and the
-            blame is \((0.68{-}1,\ 0.28,\ 0.04) = (-0.32,\ +0.28,\ +0.04)\): push the true
-            word's score up, the others down.
-          </p>
+
+          <h3>Why does the blame collapse to that?</h3>
           <p>
-            <strong>And backpropagation?</strong> That blame vector is the starting point.
-            To reach a weight buried deeper in the network, backprop multiplies the local
-            sensitivities step by step along the path back to that weight. That
-            multiply-as-you-go bookkeeping is just the
-            <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">chain rule</a>
-            from calculus, applied layer by layer, and it hands every weight its own
-            \(\frac{\partial L}{\partial w}\) for the update rule from the last section. The
-            visual walk-throughs in the references trace it gradient by gradient.
+            It looks too clean to be an accident, and it is not one: the \(\ln\) in
+            cross-entropy and the \(e\) in softmax are near-inverses, so they cancel each
+            other's mess. Start from the loss for the true word \(c\), substitute the
+            softmax definition, and split the fraction with \(\ln\tfrac{a}{b} = \ln a - \ln b\):
+          </p>
+          $$L = -\ln q_c = -\ln \frac{e^{z_c}}{\sum_j e^{z_j}} = -z_c + \ln\sum_j e^{z_j}$$
+          <p>
+            Now take the derivative with respect to any single score \(z_i\). Each of the
+            two pieces has a tidy, intuitive job:
+          </p>
+          <ul class="symbol-glossary">
+            <li>\(\dfrac{\partial}{\partial z_i}\big(-z_c\big) = -y_i\): the \(-z_c\) term touches only the <em>true</em> word, pushing its score up. It contributes \(-1\) for the true word and \(0\) for every other.</li>
+            <li>\(\dfrac{\partial}{\partial z_i}\ln\sum_j e^{z_j} = \dfrac{e^{z_i}}{\sum_j e^{z_j}} = q_i\): the derivative of that running total is <em>the softmax all over again</em>, which pushes every word's score down in proportion to the probability it currently holds.</li>
+          </ul>
+          <p>
+            Add the two together and the whole gradient is just \(q_i - y_i\). In plain
+            words: <strong>lift the true word's score, and shave a little off every word
+            in proportion to how much probability it is currently hogging.</strong> The
+            size is self-correcting, too: the blame on the true word is \(q_c - 1\), a
+            feather-light nudge when the model is already confident (\(q_c \approx 1\)) but
+            a full \(-1\) shove when it is badly wrong (\(q_c \approx 0\)). Once the model
+            is perfect, every \(q_i - y_i = 0\) and the blame vanishes, which is exactly
+            when learning should stop.
           </p>
         </div>
 
@@ -840,7 +867,10 @@
           <p>
             We now have five tools on the bench - probability, vectors, the dot product,
             softmax, and the gradient nudge. This is the moment they click together
-            into a machine. The smallest part is a <strong>neuron</strong>: it
+            into a machine. Think of a neural network as a massive plumbing system. The input data (our context words) is the water flowing through the pipes, and the <strong>weights</strong> are the adjustable valves. The water always flows forward, but the valves decide how much pressure makes it to each possible next-word output.
+          </p>
+          <p>
+            The smallest valve intersection is a <strong>neuron</strong>: it
             multiplies its inputs by weights, adds a <strong>bias</strong>, and runs
             the result through an
             <a href="https://en.wikipedia.org/wiki/Activation_function" target="_blank" rel="noreferrer">activation function</a>.
@@ -849,8 +879,17 @@
             bias), and then decides how strongly to speak up.
             Why bother with the activation? Because without that little bend - a
             <a href="https://en.wikipedia.org/wiki/Rectifier_(neural_networks)" target="_blank" rel="noreferrer">ReLU</a>,
-            a tanh, a sigmoid - a stack of layers can only ever draw a straight line, no
-            matter how tall you build it. The bend is what lets it curve. Line up several
+            a \(\tanh\), a sigmoid - a stack of layers can only ever draw a straight line, no
+            matter how tall you build it. The bend is what lets it curve and learn complex patterns.
+            Here is the reason, and it is pure algebra: stacking two plain multiply-and-add
+            steps just gives you another multiply-and-add. Push <code>x</code> through one
+            layer to get <code>w<sub>1</sub>x + b<sub>1</sub></code>, feed that into a second,
+            and you land on <code>w<sub>2</sub>(w<sub>1</sub>x + b<sub>1</sub>) + b<sub>2</sub></code>
+            - which tidies up into <code>(w<sub>2</sub>w<sub>1</sub>)x + (w<sub>2</sub>b<sub>1</sub> + b<sub>2</sub>)</code>,
+            a single weight and a single bias all over again. A hundred such layers collapse
+            back into one straight line. The activation's little bend is exactly what breaks
+            that collapse: once each layer can curve, stacking them lets the network trace
+            shapes a straight line never could. Line up several
             neurons and you have a layer; stack the layers and you have a
             <a href="https://en.wikipedia.org/wiki/Multilayer_perceptron" target="_blank" rel="noreferrer">multilayer perceptron</a>,
             or MLP.
@@ -861,13 +900,12 @@
             join the rows, push them through a hidden layer with an activation, and
             finish with softmax over the candidate words. Context words in, a next-word
             distribution out. Change the context or the activation below and watch the
-            prediction shift. These weights are fixed and illustrative for now; in the
-            very next section the model learns its own.
+            prediction shift. These weights are fixed and illustrative for now; soon the model will learn its own.
           </p>
         </div>
 
         <div class="network-grid">
-          <div class="panel">
+          <div class="panel diagram-panel">
             <div class="section-title-row">
               <h3>One forward pass</h3>
               <span id="forwardSummary" class="pill">MLP</span>
@@ -903,17 +941,25 @@
               </label>
             </div>
             <svg id="networkSvg" class="network-svg" viewBox="0 0 560 300" role="img" aria-label="Tiny next-word network forward pass"></svg>
+            <p class="microcopy">
+              Edge <strong>color</strong> shows the sign of that connection's push
+              (<span class="edge-key edge-key-pos">teal positive</span>,
+              <span class="edge-key edge-key-neg">coral negative</span>); edge
+              <strong>thickness</strong> shows how hard it pushes for this input. The ringed
+              hidden neuron is the one traced step by step on the right - <strong>click any
+              neuron</strong> to trace a different one.
+            </p>
           </div>
 
-          <div class="panel">
+          <div class="panel breakdown-panel">
             <div class="section-title-row">
               <h3>Inside the pass</h3>
               <span class="pill">embeddings → softmax</span>
             </div>
             <p class="microcopy">
-              Each context word is an index into the embedding table; its row is a
-              parameter the network can tune. Read the steps top to bottom: two lookups,
-              one activated hidden layer, raw logits, then softmax probabilities.
+              Every number below is computed live from the two context words and the
+              activation you picked. Follow the five steps top to bottom and watch the
+              real multiply-and-add that turns two word vectors into a next-word guess.
             </p>
             <div id="forwardPanel" class="forward-panel" aria-live="polite"></div>
             <p class="insight-note">
@@ -923,9 +969,8 @@
               pass, and update.
             </p>
           </div>
-        </div>
 
-        <div class="model-shape-bridge" aria-label="Bridge from toy network dimensions to Transformer model-card symbols">
+          <div class="model-shape-bridge" aria-label="Bridge from toy network dimensions to Transformer model-card symbols">
           <div>
             <p class="eyebrow">Shape bridge</p>
             <h3>The same math grows into model-card numbers.</h3>
@@ -970,6 +1015,7 @@
             still starts with token IDs, looks up vectors, produces logits over \(V\),
             and trains by lowering cross-entropy.
           </p>
+          </div>
         </div>
 
         <div class="math-formal" aria-label="Forward pass in symbols">
@@ -993,27 +1039,76 @@
             <li>\(W_2, b_2\): the output weights and bias that turn the hidden layer into logits \(z\).</li>
             <li>\(p\): the next-word probability for every word in the vocabulary.</li>
           </ul>
-          <p class="microcopy">
-            This is exactly the network in the lab two sections down. Training learns
-            \(E\), \(W_1\), \(W_2\), \(b_1\), and \(b_2\) by running this forward pass,
-            scoring it with cross-entropy, and applying \(w \leftarrow w - \eta\,\frac{\partial L}{\partial w}\)
-            to every weight at once.
-          </p>
         </div>
       </div>
     </section>
 
-    <section id="warmup-lab" class="band band-muted" aria-labelledby="warmup-title">
+    <section id="backpropagation" class="band band-muted" aria-labelledby="backprop-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">6. Watch a network learn</p>
+          <p class="eyebrow">6. Backpropagation</p>
+          <h2 id="backprop-title">Flow the blame backward to fix the weights.</h2>
+          <p>
+            We know our final error—that "probability minus target" small miracle we found in Section 4. But that only tells us how wrong the final scores are. How do we fix the weights buried deep in the <strong>hidden layers</strong>? Imagine a factory assembly line: the boss at the end yells, "This car is ruined!" The final assembler says, "Don't just blame me, the chassis arrived crooked from the previous station!" To fix the factory, the blame must be passed backward down the line, proportioned by who caused the most error.
+          </p>
+          <p>
+            This backward flow of blame is <a href="https://en.wikipedia.org/wiki/Backpropagation" target="_blank" rel="noreferrer">Backpropagation</a>. Instead of guessing how to tweak each hidden weight, we use the <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a> from calculus to multiply the sensitivities backward. The error at the output tells the hidden layer how it should have behaved, and the hidden layer tells its weights how they need to adjust. This mathematical chain reaction allows the network to efficiently calculate the perfect downhill gradient for <em>every single weight</em> in one graceful sweep.
+          </p>
+        </div>
+        
+        <div class="worked-example" aria-label="Backprop by hand">
+          <h3>Passing blame backward, by hand</h3>
+          <p>
+            Suppose our output gradient (the blame) says the final score \(z\) needs to drop by \(0.5\) (so \(\frac{\partial L}{\partial z} = 0.5\)). That score was created by multiplying a hidden neuron's output \(h\) (say, \(0.8\)) by an output weight \(W_{\text{out}}\) (say, \(2.0\)).
+          </p>
+          <div class="formula-stack">
+            <span>\(\text{Output blame: } \frac{\partial L}{\partial z} = 0.5\)</span>
+            <span>\(\text{How much did the weight contribute? } \frac{\partial z}{\partial W_{\text{out}}} = h = 0.8\)</span>
+            <span>\(\text{Chain rule for the weight: } \frac{\partial L}{\partial W_{\text{out}}} = (0.5) \times (0.8) = 0.4\)</span>
+            <span>\(\text{How much did the hidden neuron contribute? } \frac{\partial z}{\partial h} = W_{\text{out}} = 2.0\)</span>
+            <span>\(\text{Chain rule for the neuron: } \frac{\partial L}{\partial h} = (0.5) \times (2.0) = 1.0\)</span>
+          </div>
+          <p class="microcopy">
+            The weight gets updated downhill by its gradient (\(0.4\)). The neuron's gradient (\(1.0\)) becomes the new "blame" passed backward to the layer before it. It multiplies as it goes.
+          </p>
+        </div>
+
+        <div class="math-formal" aria-label="Backpropagation in symbols">
+          <h3>The backward pass, in symbols</h3>
+          <p>
+            Backpropagation is just the chain rule applied repeatedly. To find how the loss \(L\) changes when we tweak a hidden weight \(w\), we multiply the gradients of every step between them.
+          </p>
+          $$\frac{\partial L}{\partial w} = \frac{\partial L}{\partial z} \cdot \frac{\partial z}{\partial h} \cdot \frac{\partial h}{\partial w}$$
+          <ul class="symbol-glossary">
+            <li>\(\frac{\partial L}{\partial z}\): The blame at the output layer (our clean \(q_i - y_i\)).</li>
+            <li>\(\frac{\partial z}{\partial h}\): How the output changes if the hidden neuron changes (typically the output weight).</li>
+            <li>\(\frac{\partial h}{\partial w}\): How the hidden neuron changes if its incoming weight changes (typically the activated input data).</li>
+          </ul>
+          <p class="microcopy">
+            <em><strong>Deep Dive:</strong> If you want to visualize exactly how these gradients flow through the network's operations, Christopher Olah's classic <a href="https://colah.github.io/posts/2015-08-Backprop/" target="_blank" rel="noreferrer">Calculus on Computational Graphs</a> is the gold standard explanation.</em>
+          </p>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="By calculating the error at the end and flowing it backward, we can find the exact gradient for every single weight in the network in just one sweep. Going forward would require tweaking every weight individually to see what happens.">
+          <p class="quiz-prompt">Quick check: Why do we pass the error <em>backward</em> through the network to calculate gradients, rather than just adjusting weights and running it forward to check the result?</p>
+          <div class="quiz-options" role="group" aria-label="Why backprop is efficient">
+            <button class="quiz-option" type="button" data-feedback="The math works either way, but guessing forward is impossibly slow for millions of weights.">It's the only mathematically valid way to use calculus.</button>
+            <button class="quiz-option" type="button" data-correct="true">Efficiency: One backward sweep finds the exact gradient for every weight at once.</button>
+            <button class="quiz-option" type="button" data-feedback="Backprop specifically applies to the hidden layers and embeddings too, not just the output.">It only updates the final output layer.</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="warmup-lab" class="band" aria-labelledby="warmup-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">7. Watch a network learn</p>
           <h2 id="warmup-title">Warm-up: see the four-beat loop succeed where you can watch it.</h2>
           <p>
-            Before we point the loop at language, let's build trust on a task where the
-            answer is something you can literally see: a boundary between two colors of
-            dots. This is a real two-layer network with random starting weights. Each
-            epoch runs the same four beats, a forward pass, cross-entropy loss, a
-            backward pass, then a parameter update, just like the word model will.
+            Before we unleash our loop on 100-dimensional word vectors, let's build trust on a task where the answer is something you can literally see: a boundary between two colors of dots on a 2D map. This is a real two-layer network with random starting weights. Each
+            epoch runs the same four beats we've covered: a forward pass, cross-entropy loss, a backward pass (backpropagation), then a parameter update (gradient descent).
           </p>
           <p>
             The dots are split into training and test sets. <strong>Training
@@ -1021,9 +1116,8 @@
             <strong>Test accuracy</strong> is the generalization check: did it learn
             the pattern, or just memorize? A big gap between them is the classic sign
             of <a href="https://en.wikipedia.org/wiki/Overfitting" target="_blank" rel="noreferrer">overfitting</a>
-            - the difference between a student who truly understood the lesson and one
-            who just memorized last year's answer key, then freezes the moment the
-            question changes.
+            - the difference between a student who truly understood the underlying lesson and one
+            who just memorized the training flashcards, failing the moment a new question appears.
           </p>
         </div>
 
@@ -1142,25 +1236,27 @@ return {
       </div>
     </section>
 
-    <section id="train-lab" class="band" aria-labelledby="train-title">
+    <section id="train-lab" class="band band-muted" aria-labelledby="train-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">7. Train a next-word model</p>
+          <p class="eyebrow">8. Train a next-word model</p>
           <h2 id="train-title">Now train the real thing: a tiny neural language model.</h2>
           <p>
             This is the payoff. Not a fake diagram, not a pretend model: everything
             above becomes one small network that predicts the next word, trained right
-            here on a tiny corpus. It is a miniature of the
+            here on a tiny corpus. When you click "Train", you are executing exactly what you just learned: <strong>Embeddings \(\rightarrow\) Forward Pass \(\rightarrow\) Softmax \(\rightarrow\) Cross-Entropy Loss \(\rightarrow\) Backprop \(\rightarrow\) Gradient Descent</strong>. 
+          </p>
+          <p>
+            It is a miniature of the
             <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">neural language model Bengio and colleagues introduced in 2003</a>:
-            each context word is looked up in an <strong>embedding</strong>
-            table, the rows are joined and pushed through a hidden layer with a tanh
-            activation, and <strong>softmax</strong> produces a probability for every
-            word in the vocabulary. <strong>Cross-entropy</strong> scores each guess
-            and <strong>backprop</strong> nudges every weight, including the embedding
+            each context word is looked up in an embedding table, the rows are joined and pushed through a hidden layer with a tanh
+            activation, and softmax produces a probability for every
+            word in the vocabulary. Cross-entropy scores each guess
+            and backprop nudges every weight, including the embedding
             rows themselves.
           </p>
           <p>
-            Press <em>Train</em> and watch three things move together: the loss falls,
+            Press <em>Train next-word model</em> and watch three things move together: the loss falls,
             <strong>perplexity</strong> drops from "torn between many words" toward "a
             confident handful," and the prediction bars for a context like
             <code>the cat</code> sharpen onto the words that really follow it. Then
@@ -1327,10 +1423,12 @@ return {
       </div>
     </section>
 
+
+
     <section id="references" class="band" aria-labelledby="references-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">8. Going deeper</p>
+          <p class="eyebrow">9. Going deeper</p>
           <h2 id="references-title">Further reading.</h2>
           <p>
             If the live examples now feel comfortable, I would go deeper in this order:
@@ -1391,7 +1489,7 @@ return {
     </section>
   </main>
 
-  <script src="chapter4.js"></script>
+  <script src="chapter4.js?v=20260624"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>
