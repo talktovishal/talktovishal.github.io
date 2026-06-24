@@ -77,6 +77,19 @@ const dom = {
   networkSvg: document.getElementById("networkSvg"),
   forwardSummary: document.getElementById("forwardSummary"),
   forwardPanel: document.getElementById("forwardPanel"),
+  backpropCtxA: document.getElementById("backpropCtxA"),
+  backpropCtxB: document.getElementById("backpropCtxB"),
+  backpropTrueWord: document.getElementById("backpropTrueWord"),
+  backpropActivation: document.getElementById("backpropActivation"),
+  backpropRateSlider: document.getElementById("backpropRateSlider"),
+  backpropRateLabel: document.getElementById("backpropRateLabel"),
+  backpropStepButton: document.getElementById("backpropStepButton"),
+  backpropResetButton: document.getElementById("backpropResetButton"),
+  backpropSvg: document.getElementById("backpropSvg"),
+  backpropSummary: document.getElementById("backpropSummary"),
+  backpropMetrics: document.getElementById("backpropMetrics"),
+  backpropLossSpark: document.getElementById("backpropLossSpark"),
+  backpropTracePanel: document.getElementById("backpropTracePanel"),
   datasetSelect: document.getElementById("datasetSelect"),
   hiddenUnitsSlider: document.getElementById("hiddenUnitsSlider"),
   hiddenUnitsLabel: document.getElementById("hiddenUnitsLabel"),
@@ -170,7 +183,8 @@ const state = {
   hasExploredProbability: false,
   hasExploredGradient: false,
   hasTrainedNetwork: false,
-  forwardFocus: null
+  forwardFocus: null,
+  backprop: null
 };
 
 function formatNumber(value, digits = 3) {
@@ -1043,6 +1057,335 @@ function renderNetworkSvg(contextWords, hidden, candidates, probs, opts = {}) {
   outputNodes.forEach((node) => drawNode(node, "is-output"));
 }
 
+/* ---- Backpropagation lab (reuses the Section 5 forward-pass network) ---- */
+function signedFixed(value, digits = 2) {
+  if (!Number.isFinite(value)) return "n/a";
+  return (value < 0 ? "-" : "+") + Math.abs(value).toFixed(digits);
+}
+
+function activationDerivative(name, z) {
+  if (name === "relu") return z > 0 ? 1 : 0;
+  if (name === "sigmoid") {
+    const s = 1 / (1 + Math.exp(-z));
+    return s * (1 - s);
+  }
+  const t = Math.tanh(z);
+  return 1 - t * t;
+}
+
+function cloneForwardWeights() {
+  return {
+    w1: forwardW1.map((row) => row.slice()),
+    b1: forwardB1.slice(),
+    w2: forwardW2.map((row) => row.slice()),
+    b2: forwardB2.slice()
+  };
+}
+
+function initBackpropLab() {
+  state.backprop = { weights: cloneForwardWeights(), focus: null, steps: 0, lossHistory: [], pTrueHistory: [] };
+  restartBackpropRun();
+}
+
+function computeBackpropPass() {
+  const { w1, b1, w2, b2 } = state.backprop.weights;
+  const wordA = dom.backpropCtxA.value;
+  const wordB = dom.backpropCtxB.value;
+  const trueWord = dom.backpropTrueWord.value;
+  const name = dom.backpropActivation.value;
+  const trueIndex = forwardCandidates.indexOf(trueWord);
+  const embA = forwardEmbeddings[wordA];
+  const embB = forwardEmbeddings[wordB];
+  const input = [embA[0], embA[1], embB[0], embB[1]];
+  const inputLabels = [`${wordA}.x`, `${wordA}.y`, `${wordB}.x`, `${wordB}.y`];
+  const z1 = b1.map((bias, j) => bias + input.reduce((sum, value, i) => sum + value * w1[i][j], 0));
+  const hidden = z1.map((value) => activation(name, value));
+  const logits = b2.map((bias, k) => bias + hidden.reduce((sum, value, j) => sum + value * w2[j][k], 0));
+  const q = softmax(logits);
+  const loss = -Math.log(Math.max(q[trueIndex], 1e-9));
+  const dz2 = q.map((qi, k) => qi - (k === trueIndex ? 1 : 0));
+  const gradW2 = hidden.map((hj) => dz2.map((dk) => hj * dk));
+  const gradB2 = dz2.slice();
+  const dh = hidden.map((_, j) => dz2.reduce((sum, dk, k) => sum + dk * w2[j][k], 0));
+  const dz1 = dh.map((dhj, j) => dhj * activationDerivative(name, z1[j]));
+  const gradW1 = input.map((vi) => dz1.map((dj) => vi * dj));
+  const gradB1 = dz1.slice();
+  return { wordA, wordB, trueWord, name, trueIndex, input, inputLabels, z1, hidden, logits, q, loss, dz2, gradW2, gradB2, dh, dz1, gradW1, gradB1 };
+}
+
+function restartBackpropRun() {
+  const bp = state.backprop;
+  bp.weights = cloneForwardWeights();
+  bp.steps = 0;
+  bp.focus = null;
+  const pass = computeBackpropPass();
+  bp.lossHistory = [pass.loss];
+  bp.pTrueHistory = [pass.q[pass.trueIndex]];
+  renderBackprop();
+}
+
+function backpropStep() {
+  const bp = state.backprop;
+  const pass = computeBackpropPass();
+  const lr = Number(dom.backpropRateSlider.value) / 100;
+  const { w1, b1, w2, b2 } = bp.weights;
+  pass.gradW1.forEach((row, i) => row.forEach((g, j) => { w1[i][j] -= lr * g; }));
+  pass.gradB1.forEach((g, j) => { b1[j] -= lr * g; });
+  pass.gradW2.forEach((row, j) => row.forEach((g, k) => { w2[j][k] -= lr * g; }));
+  pass.gradB2.forEach((g, k) => { b2[k] -= lr * g; });
+  bp.steps += 1;
+  const after = computeBackpropPass();
+  bp.lossHistory.push(after.loss);
+  bp.pTrueHistory.push(after.q[after.trueIndex]);
+  if (bp.lossHistory.length > 24) { bp.lossHistory.shift(); bp.pTrueHistory.shift(); }
+  renderBackprop();
+}
+
+function renderBackprop() {
+  const bp = state.backprop;
+  dom.backpropRateLabel.textContent = formatNumber(Number(dom.backpropRateSlider.value) / 100, 2);
+  const pass = computeBackpropPass();
+  let focus = bp.focus;
+  if (focus === null || focus === undefined) {
+    const mags = pass.dz1.map(Math.abs);
+    focus = mags.indexOf(Math.max(...mags));
+  }
+  focus = clamp(focus, 0, pass.hidden.length - 1);
+  dom.backpropSummary.textContent = bp.steps === 0 ? "before training" : `${bp.steps} step${bp.steps === 1 ? "" : "s"}`;
+  renderBackpropSvg(pass, focus);
+  renderBackpropMetrics(pass);
+  renderBackpropSpark();
+  dom.backpropTracePanel.replaceChildren(...buildBackpropBreakdown(pass, focus));
+}
+
+function renderBackpropMetrics(pass) {
+  const bp = state.backprop;
+  const pTrue = pass.q[pass.trueIndex];
+  const n = bp.lossHistory.length;
+  const lossDelta = n >= 2 ? bp.lossHistory[n - 1] - bp.lossHistory[n - 2] : null;
+  const pDelta = n >= 2 ? bp.pTrueHistory[n - 1] - bp.pTrueHistory[n - 2] : null;
+  renderMetricCards(dom.backpropMetrics, [
+    {
+      value: formatNumber(pass.loss, 3),
+      label: "loss (nats)",
+      note: lossDelta === null ? "press Step" : (lossDelta <= 0 ? `down ${formatNumber(Math.abs(lossDelta), 3)}` : `up ${formatNumber(lossDelta, 3)}`)
+    },
+    {
+      value: formatPercent(pTrue),
+      label: `P("${pass.trueWord}")`,
+      note: pDelta === null ? "goal: 100%" : (pDelta >= 0 ? `up ${formatNumber(pDelta * 100, 1)} pts` : `down ${formatNumber(Math.abs(pDelta) * 100, 1)} pts`)
+    },
+    { value: `${bp.steps}`, label: "gradient steps" }
+  ]);
+}
+
+function renderBackpropSpark() {
+  const svg = dom.backpropLossSpark;
+  svg.replaceChildren();
+  const hist = state.backprop.lossHistory;
+  const W = 320;
+  const H = 72;
+  const pad = 10;
+  if (hist.length < 2) {
+    const text = createSvgElement("text", { x: W / 2, y: H / 2 + 4, "text-anchor": "middle" });
+    text.textContent = "the loss curve appears as you take steps";
+    svg.append(text);
+    return;
+  }
+  const maxL = Math.max(...hist);
+  const minL = Math.min(...hist);
+  const span = Math.max(maxL - minL, 1e-6);
+  const x = (i) => pad + (i / (hist.length - 1)) * (W - 2 * pad);
+  const y = (l) => pad + (1 - (l - minL) / span) * (H - 2 * pad);
+  const d = hist.map((l, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(l).toFixed(1)}`).join(" ");
+  svg.append(createSvgElement("path", { d, class: "spark-line" }));
+  svg.append(createSvgElement("circle", { cx: x(0).toFixed(1), cy: y(hist[0]).toFixed(1), r: 3, class: "spark-dot-start" }));
+  svg.append(createSvgElement("circle", { cx: x(hist.length - 1).toFixed(1), cy: y(hist[hist.length - 1]).toFixed(1), r: 3.6, class: "spark-dot-end" }));
+}
+
+function renderBackpropSvg(pass, focus) {
+  const svg = dom.backpropSvg;
+  svg.replaceChildren();
+  const { hidden, dz1, dz2, trueIndex, input } = pass;
+  const { w2 } = state.backprop.weights;
+  const inputNodes = [pass.wordA, pass.wordB].map((word, index) => ({
+    x: 88, y: 95 + index * 110, label: word, value: index === 0 ? "context 1" : "context 2", isWord: true
+  }));
+  const hiddenNodes = hidden.map((_, index) => ({
+    x: 280, y: 60 + index * 90, label: `h${index + 1}`, value: signedFixed(dz1[index]), index
+  }));
+  const outputNodes = forwardCandidates.map((word, index) => ({
+    x: 474, y: 60 + index * 90, label: word, value: signedFixed(dz2[index]), isWord: true, isTrue: index === trueIndex
+  }));
+  const edgeWidth = (magnitude) => clamp(1 + magnitude * 4, 1, 6).toFixed(2);
+  const addEdge = (x1, y1, x2, y2, signed, focused) => {
+    const sign = signed >= 0 ? "is-pos" : "is-neg";
+    svg.append(createSvgElement("line", {
+      class: focused ? `network-edge ${sign} is-focus` : "network-edge is-muted",
+      x1, y1, x2, y2, "stroke-width": focused ? edgeWidth(Math.abs(signed)) : 1.4
+    }));
+    if (focused) {
+      const flow = createSvgElement("line", { class: "backprop-flow", x1, y1, x2, y2 });
+      flow.append(createSvgElement("animate", {
+        attributeName: "stroke-dashoffset", from: "0", to: "14", dur: "0.7s", repeatCount: "indefinite"
+      }));
+      svg.append(flow);
+    }
+  };
+  inputNodes.forEach((source, i) => {
+    hiddenNodes.forEach((target, j) => {
+      addEdge(source.x + 40, source.y, target.x - 24, target.y, dz1[j], j === focus);
+    });
+  });
+  hiddenNodes.forEach((source, j) => {
+    outputNodes.forEach((target, k) => {
+      addEdge(source.x + 24, source.y, target.x - 40, target.y, dz2[k] * w2[j][k], j === focus);
+    });
+  });
+  const drawNode = (node, kind) => {
+    const group = createSvgElement("g");
+    const isFocusNode = kind === "is-hidden" && node.index === focus;
+    if (node.isWord) {
+      group.append(createSvgElement("rect", {
+        class: `network-node ${kind}${node.isTrue ? " is-best" : ""}`,
+        x: node.x - 40, y: node.y - 21, width: 80, height: 42, rx: 11
+      }));
+    } else {
+      group.append(createSvgElement("circle", {
+        class: `network-node ${kind}${isFocusNode ? " is-focus" : ""}`, cx: node.x, cy: node.y, r: 25
+      }));
+    }
+    const label = createSvgElement("text", { class: "network-label", x: node.x, y: node.y - 2 });
+    label.textContent = node.label;
+    const value = createSvgElement("text", { class: "network-value", x: node.x, y: node.y + 15 });
+    value.textContent = node.value;
+    group.append(label, value);
+    if (kind === "is-hidden") {
+      group.style.cursor = "pointer";
+      group.addEventListener("click", () => { state.backprop.focus = node.index; renderBackprop(); });
+    }
+    svg.append(group);
+  };
+  inputNodes.forEach((node) => drawNode(node, "is-input"));
+  hiddenNodes.forEach((node) => drawNode(node, "is-hidden"));
+  outputNodes.forEach((node) => drawNode(node, "is-output"));
+}
+
+function backpropGateNote(name, deriv) {
+  let text;
+  if (name === "relu") {
+    text = deriv === 0
+      ? "ReLU's gate is shut here (its input was <= 0), so the derivative is 0 - no blame reaches this neuron's weights at all."
+      : "ReLU's gate is open here (its input was > 0), so the derivative is 1 - the blame passes straight through.";
+  } else if (name === "sigmoid") {
+    text = "Sigmoid's slope is gentle (at most 0.25), so it always shrinks the blame on the way back.";
+  } else {
+    text = "tanh's slope is at most 1 and falls toward 0 as the neuron saturates, easing the blame as it passes.";
+  }
+  return createElement("p", "step-lead", text);
+}
+
+function buildBackpropBreakdown(pass, focus) {
+  const { q, dz2, trueIndex, trueWord, name, z1, hidden, dh, dz1, input, inputLabels } = pass;
+  const lr = Number(dom.backpropRateSlider.value) / 100;
+  const { w1, w2 } = state.backprop.weights;
+  const nodes = [];
+
+  nodes.push(forwardStepHead("1 - The starting error: probability minus target"));
+  const errWrap = createElement("div", "deriv-table-wrap");
+  const errTable = createElement("table", "deriv-table forward-activation-table");
+  const errHead = createElement("thead");
+  const errHeadRow = createElement("tr");
+  ["word", "q (pred)", "y (target)", "blame q - y"].forEach((title) => errHeadRow.append(createElement("th", "", title)));
+  errHead.append(errHeadRow);
+  const errBody = createElement("tbody");
+  forwardCandidates.forEach((word, k) => {
+    const row = createElement("tr", k === trueIndex ? "is-focus-row" : "");
+    row.append(
+      createElement("td", "row-label", word),
+      createElement("td", "", formatNumber(q[k], 3)),
+      createElement("td", "", k === trueIndex ? "1" : "0"),
+      createElement("td", "", signedFixed(dz2[k], 3))
+    );
+    errBody.append(row);
+  });
+  errTable.append(errHead, errBody);
+  errWrap.append(errTable);
+  nodes.push(errWrap);
+
+  nodes.push(forwardStepHead(`2 - Hand the blame back to hidden neuron h${focus + 1}`));
+  const blameStack = createElement("div", "formula-stack");
+  const blameTerms = dz2.map((dk, k) => signedProduct(dk, w2[focus][k])).join(" + ");
+  blameStack.append(
+    createElement("code", "", "dL/dh = sum(output blame x W2)"),
+    createElement("code", "", `dL/dh = ${blameTerms}`),
+    createElement("code", "", `dL/dh = ${signedFixed(dh[focus], 3)}`)
+  );
+  nodes.push(blameStack);
+
+  nodes.push(forwardStepHead(`3 - Shrink it through the ${name} gate`));
+  const deriv = activationDerivative(name, z1[focus]);
+  const gateStack = createElement("div", "formula-stack");
+  gateStack.append(
+    createElement("code", "", `${name}'(z) at z = ${formatNumber(z1[focus], 2)}  =  ${formatNumber(deriv, 3)}`),
+    createElement("code", "", `dL/dz = dL/dh x ${name}'(z) = ${signedFixed(dh[focus], 3)} x ${formatNumber(deriv, 3)} = ${signedFixed(dz1[focus], 3)}`)
+  );
+  nodes.push(gateStack);
+  nodes.push(backpropGateNote(name, deriv));
+
+  nodes.push(forwardStepHead("4 - Turn that into weight gradients"));
+  const gradW2ft = hidden[focus] * dz2[trueIndex];
+  const gradW1ft = input[0] * dz1[focus];
+  const gradStack = createElement("div", "formula-stack");
+  gradStack.append(
+    createElement("code", "", `grad W2[h${focus + 1} -> ${trueWord}] = h x blame = ${signedProduct(hidden[focus], dz2[trueIndex])} = ${signedFixed(gradW2ft, 3)}`),
+    createElement("code", "", `grad W1[${inputLabels[0]} -> h${focus + 1}] = input x dL/dz = ${signedProduct(input[0], dz1[focus])} = ${signedFixed(gradW1ft, 3)}`)
+  );
+  nodes.push(gradStack);
+
+  nodes.push(forwardStepHead("5 - The update: each weight steps against its gradient"));
+  const updWrap = createElement("div", "deriv-table-wrap");
+  const updTable = createElement("table", "deriv-table");
+  const updHead = createElement("thead");
+  const updHeadRow = createElement("tr");
+  ["weight", "old", "- lr x grad", "new"].forEach((title) => updHeadRow.append(createElement("th", "", title)));
+  updHead.append(updHeadRow);
+  const updBody = createElement("tbody");
+  const updateRow = (labelText, old, grad) => {
+    const step = -lr * grad;
+    const row = createElement("tr");
+    row.append(
+      createElement("td", "row-label", labelText),
+      createElement("td", "", formatNumber(old, 3)),
+      createElement("td", "", signedFixed(step, 3)),
+      createElement("td", "", formatNumber(old + step, 3))
+    );
+    return row;
+  };
+  updBody.append(
+    updateRow(`W2 h${focus + 1}->${trueWord}`, w2[focus][trueIndex], gradW2ft),
+    updateRow(`W1 ${inputLabels[0]}->h${focus + 1}`, w1[0][focus], gradW1ft)
+  );
+  updTable.append(updHead, updBody);
+  updWrap.append(updTable);
+  nodes.push(updWrap);
+
+  nodes.push(backpropReading(pass));
+  return nodes;
+}
+
+function backpropReading(pass) {
+  const bp = state.backprop;
+  const pTrue = pass.q[pass.trueIndex];
+  const note = createElement("p", "insight-note forward-reading");
+  if (bp.steps === 0) {
+    note.textContent = `Right now the model gives "${pass.trueWord}" only ${formatPercent(pTrue)}. Press Take a gradient step to push every weight a little against its gradient, then watch this same number climb and the loss fall.`;
+  } else {
+    note.textContent = `After ${bp.steps} step${bp.steps === 1 ? "" : "s"}, "${pass.trueWord}" is up to ${formatPercent(pTrue)} and the loss is down to ${formatNumber(pass.loss, 3)}. Keep stepping to drive this one example toward a confident, low-loss prediction.`;
+  }
+  return note;
+}
+
 function mulberry32(seed) {
   return function nextRandom() {
     let t = seed += 0x6D2B79F5;
@@ -1327,17 +1670,17 @@ function renderNetworkLab() {
     {
       label: "train accuracy",
       value: formatPercent(summary.trainAccuracy),
-      note: "examples used for updates"
+      note: "solid dots it got right"
     },
     {
       label: "test accuracy",
       value: formatPercent(summary.testAccuracy),
-      note: "held-out examples"
+      note: "haloed dots it never saw"
     },
     {
       label: "gap",
       value: formatPercent(summary.generalizationGap),
-      note: "train minus test"
+      note: "train minus test = overfitting"
     },
     {
       label: "parameters",
@@ -1413,9 +1756,10 @@ function drawDecisionMap() {
     for (let x = 0; x < width; x += step) {
       const point = { x: fromCanvasX(x + step / 2), y: fromCanvasY(y + step / 2), label: 0 };
       const p1 = forwardNet(state.network, point).probs[1];
-      const red = Math.round(238 * (1 - p1) + 39 * p1);
-      const green = Math.round(244 * (1 - p1) + 102 * p1);
-      const blue = Math.round(214 * (1 - p1) + 74 * p1);
+      // soft coral where it predicts group A, blending to soft teal where it predicts group B
+      const red = Math.round(248 * (1 - p1) + 205 * p1);
+      const green = Math.round(224 * (1 - p1) + 232 * p1);
+      const blue = Math.round(209 * (1 - p1) + 229 * p1);
       context.fillStyle = `rgb(${red}, ${green}, ${blue})`;
       context.fillRect(x, y, step + 1, step + 1);
     }
@@ -1430,32 +1774,37 @@ function drawDecisionMap() {
   context.stroke();
   drawPoints(context, state.data.test, toCanvasX, toCanvasY, true);
   drawPoints(context, state.data.train, toCanvasX, toCanvasY, false);
-  drawCanvasLegend(context);
 }
 
 function drawPoints(context, points, toX, toY, isTest) {
   points.forEach((point) => {
     const x = toX(point.x);
     const y = toY(point.y);
-    context.beginPath();
-    context.arc(x, y, isTest ? 4.4 : 5.4, 0, Math.PI * 2);
-    context.fillStyle = point.label === 0 ? "#c65f1e" : "#27664a";
-    context.strokeStyle = isTest ? "#ffffff" : "#111111";
-    context.lineWidth = isTest ? 2 : 1.2;
-    if (!isTest) context.fill();
-    context.stroke();
+    const color = point.label === 0 ? "#c65f1e" : "#15756c";
+    if (isTest) {
+      // held-out dots get a white halo so they pop on any shade
+      context.beginPath();
+      context.arc(x, y, 6.8, 0, Math.PI * 2);
+      context.strokeStyle = "#ffffff";
+      context.lineWidth = 3;
+      context.stroke();
+      context.beginPath();
+      context.arc(x, y, 4.6, 0, Math.PI * 2);
+      context.fillStyle = color;
+      context.fill();
+      context.strokeStyle = "rgba(17, 17, 17, 0.55)";
+      context.lineWidth = 1;
+      context.stroke();
+    } else {
+      context.beginPath();
+      context.arc(x, y, 5.2, 0, Math.PI * 2);
+      context.fillStyle = color;
+      context.fill();
+      context.strokeStyle = "rgba(17, 17, 17, 0.45)";
+      context.lineWidth = 1;
+      context.stroke();
+    }
   });
-}
-
-function drawCanvasLegend(context) {
-  context.fillStyle = "rgba(255, 255, 255, 0.88)";
-  context.fillRect(14, 14, 190, 56);
-  context.strokeStyle = "rgba(17, 17, 17, 0.16)";
-  context.strokeRect(14, 14, 190, 56);
-  context.fillStyle = "#111111";
-  context.font = "700 15px system-ui, sans-serif";
-  context.fillText("filled: train", 28, 38);
-  context.fillText("rings: test", 28, 59);
 }
 
 // ---------- Tiny neural next-word model (a miniature fixed-window language model) ----------
@@ -1936,6 +2285,12 @@ function wireEvents() {
     select.addEventListener("change", renderForwardPass);
   });
   dom.activationSelect.addEventListener("change", renderForwardPass);
+  [dom.backpropCtxA, dom.backpropCtxB, dom.backpropTrueWord, dom.backpropActivation].forEach((select) => {
+    select.addEventListener("change", restartBackpropRun);
+  });
+  dom.backpropRateSlider.addEventListener("input", renderBackprop);
+  dom.backpropStepButton.addEventListener("click", backpropStep);
+  dom.backpropResetButton.addEventListener("click", restartBackpropRun);
   dom.datasetSelect.addEventListener("change", () => resetNetwork({ newData: true }));
   dom.hiddenUnitsSlider.addEventListener("input", () => resetNetwork());
   dom.networkRateSlider.addEventListener("input", renderNetworkControls);
@@ -1987,6 +2342,7 @@ function init() {
   renderGradient();
   renderSoftmax();
   renderForwardPass();
+  initBackpropLab();
   resetNetwork();
   populateContextSelects();
   resetNextWord();

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter4.css?v=20260624">
+  <link rel="stylesheet" href="chapter4.css?v=20260625">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -37,7 +37,7 @@
       <a href="#softmax"><span>04</span>Softmax and blame</a>
       <a href="#neural-networks"><span>05</span>Build the forward pass</a>
       <a href="#backpropagation"><span>06</span>Backpropagation</a>
-      <a href="#warmup-lab"><span>07</span>Watch a network learn</a>
+      <a href="#warmup-lab"><span>07</span>Watch it learn &amp; overfit</a>
       <a href="#train-lab"><span>08</span>Train a next-word model</a>
       <a href="#references"><span>09</span>References</a>
     </nav>
@@ -1073,19 +1073,214 @@
           </p>
         </div>
 
+        <div class="network-grid backprop-grid">
+          <div class="panel backprop-visual-panel">
+            <div class="section-title-row">
+              <h3>Watch the error flow backward</h3>
+              <span id="backpropSummary" class="pill">before training</span>
+            </div>
+            <div class="backprop-control-grid">
+              <label class="select-row" for="backpropCtxA">
+                <span>Context 1</span>
+                <select id="backpropCtxA" class="control-input">
+                  <option value="the" selected>the</option>
+                  <option value="cat">cat</option>
+                  <option value="dog">dog</option>
+                  <option value="sat">sat</option>
+                  <option value="ran">ran</option>
+                </select>
+              </label>
+              <label class="select-row" for="backpropCtxB">
+                <span>Context 2</span>
+                <select id="backpropCtxB" class="control-input">
+                  <option value="the">the</option>
+                  <option value="cat" selected>cat</option>
+                  <option value="dog">dog</option>
+                  <option value="sat">sat</option>
+                  <option value="ran">ran</option>
+                </select>
+              </label>
+              <label class="select-row" for="backpropTrueWord">
+                <span>True next word</span>
+                <select id="backpropTrueWord" class="control-input">
+                  <option value="sat" selected>sat</option>
+                  <option value="ran">ran</option>
+                  <option value="slept">slept</option>
+                </select>
+              </label>
+              <label class="select-row" for="backpropActivation">
+                <span>Activation</span>
+                <select id="backpropActivation" class="control-input">
+                  <option value="relu">ReLU</option>
+                  <option value="tanh" selected>tanh</option>
+                  <option value="sigmoid">sigmoid</option>
+                </select>
+              </label>
+            </div>
+            <svg id="backpropSvg" class="network-svg" viewBox="0 0 560 300" role="img" aria-label="Error flowing backward through the tiny network"></svg>
+            <p class="microcopy">
+              The orange dashes flow <strong>right to left</strong> - that is the error
+              travelling backward. Each output word shows its <strong>blame</strong>
+              (<code>probability &minus; target</code>); each hidden neuron shows the
+              gradient that will nudge its weights. <strong>Click a hidden neuron</strong>
+              to trace its chain rule on the right.
+            </p>
+            <label class="range-row math-range backprop-rate-row" for="backpropRateSlider">
+              <span>Learning rate</span>
+              <input id="backpropRateSlider" type="range" min="5" max="100" value="30">
+              <output id="backpropRateLabel" for="backpropRateSlider">0.30</output>
+            </label>
+            <div class="stepper-row backprop-buttons">
+              <button id="backpropStepButton" class="primary-button" type="button">Take a gradient step</button>
+              <button id="backpropResetButton" class="ghost-button" type="button">Reset weights</button>
+            </div>
+            <div id="backpropMetrics" class="metric-card-grid" aria-live="polite"></div>
+            <svg id="backpropLossSpark" class="backprop-spark" viewBox="0 0 320 72" role="img" aria-label="Loss falling as you take gradient steps"></svg>
+          </div>
+
+          <div class="panel backprop-breakdown-panel">
+            <div class="section-title-row">
+              <h3>The chain rule, step by step</h3>
+              <span class="pill">blame &rarr; update</span>
+            </div>
+            <p class="microcopy">
+              Every number is the real gradient for the network on the left, for the
+              example you chose. Follow how the output blame is handed back, shrunk by the
+              activation gate, and finally turned into an actual weight change.
+            </p>
+            <div id="backpropTracePanel" class="forward-panel" aria-live="polite"></div>
+            <p class="insight-note">
+              Press <em>Take a gradient step</em> and every weight moves a little against
+              its gradient. Watch the loss fall and the true word's probability climb -
+              repeat it and this one example is slowly memorised, which is exactly what
+              training does, only across millions of examples at once.
+            </p>
+          </div>
+        </div>
+
         <div class="math-formal" aria-label="Backpropagation in symbols">
           <h3>The backward pass, in symbols</h3>
           <p>
-            Backpropagation is just the chain rule applied repeatedly. To find how the loss \(L\) changes when we tweak a hidden weight \(w\), we multiply the gradients of every step between them.
+            Backpropagation is the <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">chain rule</a>
+            run in reverse across the whole network. Start with the simplest case - a single hidden
+            weight \(w\) buried two steps below the loss. To learn how nudging it changes \(L\), you
+            multiply the local sensitivity of every step between them:
           </p>
           $$\frac{\partial L}{\partial w} = \frac{\partial L}{\partial z} \cdot \frac{\partial z}{\partial h} \cdot \frac{\partial h}{\partial w}$$
+          <p>
+            That is the entire idea, and it scales: every layer receives an <em>incoming gradient</em>
+            (the blame handed down from above), multiplies it by its own <strong>local derivative</strong>, and
+            passes the result on as the blame for the layer below. Sweep that rule from the loss back to
+            the very first weight and you get, in one pass, the gradient of \(L\) with respect to
+            <em>every</em> parameter at once.
+          </p>
+
+          <h3>First, the forward pass we are differentiating</h3>
+          <p>
+            Keep these lines from Section 5 in view - the backward pass simply unwinds them one at a
+            time, last line first:
+          </p>
+          $$e = [\,E_{w_1};E_{w_2}\,] \qquad z^{(1)} = W_1 e + b_1$$
+          $$h = f(z^{(1)}) \qquad z = W_2 h + b_2$$
+          $$q = \text{softmax}(z) \qquad L = -\ln q_c$$
           <ul class="symbol-glossary">
-            <li>\(\frac{\partial L}{\partial z}\): The blame at the output layer (our clean \(q_i - y_i\)).</li>
-            <li>\(\frac{\partial z}{\partial h}\): How the output changes if the hidden neuron changes (typically the output weight).</li>
-            <li>\(\frac{\partial h}{\partial w}\): How the hidden neuron changes if its incoming weight changes (typically the activated input data).</li>
+            <li>\(e\): the two context-word embeddings joined into one input vector.</li>
+            <li>\(z^{(1)}, h\): the hidden layer's pre-activation and its activation through \(f\) (ReLU, tanh, sigmoid).</li>
+            <li>\(z, q\): the output logits and the softmax probabilities.</li>
+            <li>\(y\): the one-hot target (a \(1\) at the true word \(c\), \(0\) everywhere else); \(L = -\ln q_c\) is the cross-entropy loss.</li>
           </ul>
+
+          <h3>The one move, repeated: blame in, local slope, blame out</h3>
+          <p>
+            Write \(\delta\) for the gradient of the loss with respect to a layer's pre-activation - the
+            "blame" arriving at that layer. The whole algorithm is just two rules applied over and over.
+            To push blame <em>down</em> to the previous layer, multiply by the <strong>transpose of the weights</strong>
+            (\(W^{\top}\)) you used on the way up. To turn blame into a <strong>weight gradient</strong>, multiply the
+            incoming blame by the signal that flowed <em>out</em> of that weight on the forward pass.
+          </p>
+
+          <h3>Layer by layer, for our network</h3>
+          <p>
+            <strong>Output layer.</strong> Section 4 already did the hardest part: softmax paired with
+            cross-entropy collapses the output blame to one clean difference,
+          </p>
+          $$\delta = \frac{\partial L}{\partial z} = q - y$$
+          <p>and from that single vector the output weights and bias fall straight out:</p>
+          $$\frac{\partial L}{\partial W_2} = \delta\,h^{\top} \qquad \frac{\partial L}{\partial b_2} = \delta$$
           <p class="microcopy">
-            <em><strong>Deep Dive:</strong> If you want to visualize exactly how these gradients flow through the network's operations, Christopher Olah's classic <a href="https://colah.github.io/posts/2015-08-Backprop/" target="_blank" rel="noreferrer">Calculus on Computational Graphs</a> is the gold standard explanation.</em>
+            Read \(\delta\,h^{\top}\) as one sentence: a weight's gradient is <em>how wrong its output was</em>
+            (\(\delta\)) times <em>how active the neuron feeding it was</em> (\(h\)). A weight earns a big update
+            only when both are large - a confident mistake riding on a strongly-firing neuron.
+          </p>
+
+          <p>
+            <strong>Hand the blame back to the hidden layer.</strong> Each hidden neuron is guilty in
+            proportion to the output errors it fed and the weights it used to feed them:
+          </p>
+          $$\frac{\partial L}{\partial h} = W_2^{\top}\,\delta$$
+          <p>
+            <strong>Through the activation gate.</strong> Multiply element-wise by the local slope of the
+            activation to get the hidden layer's own blame \(\delta^{(1)}\):
+          </p>
+          $$\delta^{(1)} = \frac{\partial L}{\partial z^{(1)}} = \big(W_2^{\top}\delta\big)\odot f'(z^{(1)})$$
+          <p class="microcopy">
+            The \(\odot\) is element-wise multiplication, and \(f'(z^{(1)})\) is the <strong>gate</strong>: where a
+            neuron was saturated or clipped its slope is near zero, so almost no blame passes through. ReLU's
+            gate is fully shut at \(0\) and wide open (slope \(1\)) above it; tanh and sigmoid are always at
+            least partly closed - exactly the behaviour the lab's step 3 reports.
+          </p>
+          <p>
+            <strong>Input weights, the same shape all over again.</strong> Blame times the signal that flowed
+            out - here the input \(e\):
+          </p>
+          $$\frac{\partial L}{\partial W_1} = \delta^{(1)} e^{\top} \qquad \frac{\partial L}{\partial b_1} = \delta^{(1)}$$
+          $$\frac{\partial L}{\partial e} = W_1^{\top}\delta^{(1)}$$
+          <p class="microcopy">
+            That last term, \(\partial L/\partial e\), is the blame that keeps travelling into the
+            embedding rows themselves - which is precisely how the word vectors get trained in the full
+            model at the end of the chapter.
+          </p>
+
+          <h3>The update rule ties it back to Section 3</h3>
+          <p>
+            Every parameter then takes the same small downhill step we met with gradient descent, each
+            using its own gradient:
+          </p>
+          $$\theta \leftarrow \theta - \eta\,\nabla_\theta L \qquad \theta \in \{W_1, b_1, W_2, b_2\}$$
+          <p class="microcopy">
+            \(\eta\) is the learning rate (the slider in the lab above), and \(\nabla_\theta L\) is shorthand
+            for "all the partial derivatives we just collected for \(\theta\)." The lab computes
+            <em>exactly</em> these quantities for your chosen example - press <em>Take a gradient step</em> and
+            watch \(\delta = q - y\) shrink toward zero as \(q\) slides onto the true word.
+          </p>
+
+          <h3>Why backward, and why it is cheap</h3>
+          <p>
+            Look at how the same forward quantities - \(h\), \(z^{(1)}\), \(e\) - reappear inside the
+            gradients. That is the whole efficiency trick: one <strong>forward pass</strong> caches those
+            activations, and one <strong>backward pass</strong> reuses them to produce the gradient of <em>every</em>
+            weight at once. The total cost is about two forward passes, no matter whether the network has a
+            dozen parameters or a hundred billion. Estimating each gradient the naive way - nudge one
+            weight, rerun the whole network, see how the loss moved - would cost a full pass <em>per weight</em>,
+            which is hopeless at scale. This reverse sweep is what people mean by
+            <a href="https://en.wikipedia.org/wiki/Automatic_differentiation" target="_blank" rel="noreferrer">reverse-mode automatic differentiation</a>,
+            the engine inside PyTorch and TensorFlow.
+          </p>
+
+          <h3>One warning the formulas predict</h3>
+          <p>
+            Because blame is multiplied by a weight transpose <em>and</em> an activation slope at every layer,
+            a deep stack chains many such factors together. If those factors mostly sit below one (sigmoid's
+            slope never exceeds \(0.25\)), the signal shrinks toward nothing on the way back - the
+            <a href="https://en.wikipedia.org/wiki/Vanishing_gradient_problem" target="_blank" rel="noreferrer">vanishing gradient</a>
+            problem - and if they mostly sit above one, it explodes. That single observation, visible right
+            here in the math, is why later architectures lean on ReLU-like activations, normalization, and the
+            residual "skip" connections we will meet in Chapter 5.
+          </p>
+
+          <p class="microcopy">
+            <em><strong>Deep Dive:</strong> If you want to watch these gradients flow through the network's
+            operations one node at a time, Christopher Olah's classic <u><a href="https://colah.github.io/posts/2015-08-Backprop/" target="_blank" rel="noreferrer">Calculus on Computational Graphs</a></u> is the gold-standard explanation.</em>
           </p>
         </div>
 
@@ -1104,21 +1299,91 @@
     <section id="warmup-lab" class="band" aria-labelledby="warmup-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">7. Watch a network learn</p>
-          <h2 id="warmup-title">Warm-up: see the four-beat loop succeed where you can watch it.</h2>
+          <p class="eyebrow">7. The final build, in two acts</p>
+          <h2 id="warmup-title">Act 1: watch a network learn - and watch it overfit.</h2>
           <p>
-            Before we unleash our loop on 100-dimensional word vectors, let's build trust on a task where the answer is something you can literally see: a boundary between two colors of dots on a 2D map. This is a real two-layer network with random starting weights. Each
-            epoch runs the same four beats we've covered: a forward pass, cross-entropy loss, a backward pass (backpropagation), then a parameter update (gradient descent).
+            You have now assembled every beat of the loop and even watched single gradient
+            steps move the loss in Section 6. This last stretch runs the <em>whole</em> loop to
+            completion, twice. First, here in Act 1, on a task whose answer is a picture you can
+            read at a glance - a boundary between two colours of dots - so you can literally see
+            learning happen and meet the one genuinely new idea: <strong>generalization</strong>.
+            Then, in Act 2 just below, on the real next-word task that is the whole point of the chapter.
           </p>
           <p>
-            The dots are split into training and test sets. <strong>Training
-            accuracy</strong> shows how well the network fits dots it learned from.
-            <strong>Test accuracy</strong> is the generalization check: did it learn
-            the pattern, or just memorize? A big gap between them is the classic sign
-            of <a href="https://en.wikipedia.org/wiki/Overfitting" target="_blank" rel="noreferrer">overfitting</a>
-            - the difference between a student who truly understood the underlying lesson and one
-            who just memorized the training flashcards, failing the moment a new question appears.
+            This is a real two-layer network with random starting weights, and each epoch runs the
+            same four beats: a forward pass, cross-entropy loss, a backward pass, then a weight update.
+            The dots are split into a <strong>training</strong> set it learns from and a held-out
+            <strong>test</strong> set it never sees. Training accuracy shows how well it fits what it
+            studied; test accuracy is the honest check - did it learn the <em>pattern</em>, or just
+            memorize the flashcards? A wide gap between them is the classic sign of
+            <a href="https://en.wikipedia.org/wiki/Overfitting" target="_blank" rel="noreferrer">overfitting</a>.
           </p>
+          <p class="example-note">
+            <em>See it for yourself:</em> pick the <strong>Noisy ring</strong>, push <strong>Hidden</strong>
+            up to its maximum, and train for many epochs. The boundary turns wiggly as it chases individual
+            noisy dots - training accuracy keeps climbing while test accuracy stalls or even slips. That gap
+            is overfitting, and it is the very same trap the real model falls into on a tiny corpus in Act 2.
+          </p>
+        </div>
+
+        <div class="build-network-explainer">
+          <div class="build-network-copy">
+            <p class="eyebrow">What you are training</p>
+            <h3>A tiny multilayer perceptron - the very same shape as Section 5.</h3>
+            <p>
+              There is no mystery box here. Every dot on the map is just <strong>two numbers</strong>:
+              its <code>x</code> and <code>y</code> position. Those two inputs feed a <strong>hidden
+              layer</strong> of a handful of neurons (the <em>Hidden</em> slider sets how many) with a
+              <code>tanh</code> bend, and the hidden layer produces <strong>two output scores</strong>
+              that <a href="#softmax">softmax</a> turns into "how sure am I this dot is group A versus
+              group B." That is the whole network.
+            </p>
+            <p>
+              It is the exact same architecture as the next-word network you built in Section 5 - only the
+              input is two coordinates instead of two word vectors, and there are two output classes
+              instead of a whole vocabulary. With <code>N</code> hidden neurons it carries
+              <code>5N + 2</code> weights and biases, which is precisely the <strong>parameters</strong>
+              count in the readout (6 hidden neurons &rarr; 32 parameters).
+            </p>
+          </div>
+          <figure class="build-network-figure">
+            <svg class="mlp-svg" viewBox="0 0 540 250" role="img" aria-labelledby="mlp-t mlp-d">
+              <title id="mlp-t">The 2D classifier network</title>
+              <desc id="mlp-d">Two inputs, x and y, feed a hidden layer of tanh neurons, which feed two softmax outputs labelled group A and group B.</desc>
+              <line class="network-edge" x1="102" y1="88" x2="248" y2="44"></line>
+              <line class="network-edge" x1="102" y1="88" x2="248" y2="100"></line>
+              <line class="network-edge" x1="102" y1="88" x2="248" y2="156"></line>
+              <line class="network-edge" x1="102" y1="88" x2="248" y2="212"></line>
+              <line class="network-edge" x1="102" y1="170" x2="248" y2="44"></line>
+              <line class="network-edge" x1="102" y1="170" x2="248" y2="100"></line>
+              <line class="network-edge" x1="102" y1="170" x2="248" y2="156"></line>
+              <line class="network-edge" x1="102" y1="170" x2="248" y2="212"></line>
+              <line class="network-edge" x1="282" y1="44" x2="420" y2="89"></line>
+              <line class="network-edge" x1="282" y1="100" x2="420" y2="89"></line>
+              <line class="network-edge" x1="282" y1="156" x2="420" y2="89"></line>
+              <line class="network-edge" x1="282" y1="212" x2="420" y2="89"></line>
+              <line class="network-edge" x1="282" y1="44" x2="420" y2="171"></line>
+              <line class="network-edge" x1="282" y1="100" x2="420" y2="171"></line>
+              <line class="network-edge" x1="282" y1="156" x2="420" y2="171"></line>
+              <line class="network-edge" x1="282" y1="212" x2="420" y2="171"></line>
+              <circle class="network-node is-input" cx="78" cy="88" r="24"></circle>
+              <text class="network-label" x="78" y="93">x</text>
+              <circle class="network-node is-input" cx="78" cy="170" r="24"></circle>
+              <text class="network-label" x="78" y="175">y</text>
+              <circle class="network-node is-hidden" cx="265" cy="44" r="17"></circle>
+              <circle class="network-node is-hidden" cx="265" cy="100" r="17"></circle>
+              <circle class="network-node is-hidden" cx="265" cy="156" r="17"></circle>
+              <circle class="network-node is-hidden" cx="265" cy="212" r="17"></circle>
+              <rect class="network-node is-output" x="420" y="66" width="104" height="46" rx="11"></rect>
+              <text class="network-label" x="472" y="93">group A</text>
+              <rect class="network-node is-output" x="420" y="148" width="104" height="46" rx="11"></rect>
+              <text class="network-label" x="472" y="175">group B</text>
+              <text class="mlp-axis" x="78" y="232">2 inputs: x, y</text>
+              <text class="mlp-axis" x="265" y="244">hidden layer &middot; tanh</text>
+              <text class="mlp-axis" x="472" y="232">softmax &rarr; 2 classes</text>
+            </svg>
+            <figcaption>Two inputs &rarr; one hidden layer (tanh) &rarr; two softmax outputs. The <em>Hidden</em> slider adds or removes the middle neurons.</figcaption>
+          </figure>
         </div>
 
         <section class="trainer nn-trainer" aria-label="Tiny neural network training controls">
@@ -1179,6 +1444,21 @@
                 <span id="networkStatus" class="pill">untrained</span>
               </div>
               <canvas id="decisionCanvas" class="decision-canvas" width="720" height="480" aria-label="Decision boundary and data points"></canvas>
+              <div class="decision-legend" aria-hidden="true">
+                <span class="legend-item"><span class="swatch swatch-a"></span>group A</span>
+                <span class="legend-item"><span class="swatch swatch-b"></span>group B</span>
+                <span class="legend-item"><span class="dot-key dot-train"></span>solid = training dots</span>
+                <span class="legend-item"><span class="dot-key dot-test"></span>haloed = held-out test dots</span>
+              </div>
+              <p class="microcopy decision-help">
+                The <strong>shaded background is the model's guess</strong> for every point on the
+                map - coral where it bets group A, teal where it bets group B. The dots are the
+                actual data; a dot sitting on the <em>wrong</em> shade is a mistake. So
+                <strong>train accuracy</strong> is the share of solid dots on the right shade, and
+                <strong>test accuracy</strong> is the share of haloed dots (which it never trained on)
+                on the right shade. When the boundary hugs the solid dots but misses the haloed ones,
+                that gap is overfitting.
+              </p>
             </div>
             <div class="panel">
               <div class="section-title-row">
@@ -1191,60 +1471,24 @@
             </div>
           </div>
 
-          <article class="code-cell chapter4-code-cell">
-            <div class="cell-head">
-              <h3>Run the training loop from code</h3>
-              <button class="run-button" type="button">Run</button>
-            </div>
-            <div class="code-quiz" data-quiz-type="predict" data-explain="Training is the process of lowering the error. As the network sees the data over more epochs, its loss generally falls and the decision boundary fits the points better.">
-              <p class="quiz-prompt">Predict first: this runs the training loop for several epochs. As it trains, the network's <strong>loss</strong> (its error) should usually&hellip;</p>
-              <div class="quiz-options" role="group" aria-label="Predict what happens to the loss">
-                <button class="quiz-option" type="button">Go up</button>
-                <button class="quiz-option" type="button">Stay flat</button>
-                <button class="quiz-option" type="button" data-correct="true">Go down</button>
-              </div>
-              <p class="quiz-feedback" aria-live="polite" hidden></p>
-              <button class="quiz-skip" type="button">Just show me the code</button>
-            </div>
-            <textarea class="code-input" spellcheck="false">// One epoch = one pass over all the training dots. For each dot the
-// network runs the four beats from this chapter: a forward pass, the
-// cross-entropy loss, a backward pass for the gradients, then a small
-// step downhill (the weight update).
-const epochs = 40;
-
-const lossPerEpoch = [];
-for (let epoch = 1; epoch <= epochs; epoch++) {
-  trainOneEpoch();                  // the four beats, over every dot
-  lossPerEpoch.push(networkLoss()); // average loss after this epoch
-}
-
-// Loss should fall as the boundary fits the dots. Edit epochs, re-run.
-return {
-  epochs: epochs,
-  startLoss: lossPerEpoch[0],
-  endLoss: lossPerEpoch[epochs - 1],
-  trainAccuracy: networkAccuracy()
-};</textarea>
-            <div class="code-output is-empty" aria-live="polite">
-              <div class="output-message">
-                <strong>Ready to run</strong>
-                <span>This is the real per-epoch training loop the buttons use. Edit <code>epochs</code>, then press Run to watch the loss fall.</span>
-              </div>
-            </div>
-          </article>
         </section>
-      </div>
-    </section>
 
-    <section id="train-lab" class="band band-muted" aria-labelledby="train-title">
-      <div class="section-shell">
-        <div class="section-heading">
-          <p class="eyebrow">8. Train a next-word model</p>
-          <h2 id="train-title">Now train the real thing: a tiny neural language model.</h2>
+        <p class="insight-note build-bridge">
+          That was the entire loop running to completion, and <strong>generalization</strong> - the gap
+          between fitting and truly learning - is the one new idea that earned Act 1 its place. The dots
+          were easy to picture; now we run the exact same four beats on the real task of the chapter,
+          where the input is words and the output is a probability over the whole vocabulary. Watch for
+          the same overfitting: on a corpus this small, the model will happily <em>memorise</em> it.
+        </p>
+
+        <div class="section-heading" id="train-lab">
+          <p class="eyebrow">Act 2: now the real thing</p>
+          <h2 id="train-title">The same loop on real words: a tiny next-word model.</h2>
           <p>
-            This is the payoff. Not a fake diagram, not a pretend model: everything
-            above becomes one small network that predicts the next word, trained right
-            here on a tiny corpus. When you click "Train", you are executing exactly what you just learned: <strong>Embeddings \(\rightarrow\) Forward Pass \(\rightarrow\) Softmax \(\rightarrow\) Cross-Entropy Loss \(\rightarrow\) Backprop \(\rightarrow\) Gradient Descent</strong>. 
+            This is the payoff, and it runs the exact same four beats you just watched on the dots -
+            only now the dots are words. Not a fake diagram, not a pretend model: everything above
+            becomes one small network that predicts the next word, trained right here on a tiny corpus.
+            When you click "Train", you are executing exactly what you just learned: <strong>Embeddings \(\rightarrow\) Forward Pass \(\rightarrow\) Softmax \(\rightarrow\) Cross-Entropy Loss \(\rightarrow\) Backprop \(\rightarrow\) Gradient Descent</strong>.
           </p>
           <p>
             It is a miniature of the
@@ -1413,7 +1657,10 @@ return {
         <p class="insight-note chapter-bridge-note">
           Take a moment to appreciate what just happened. With nothing but
           probability, vectors, a dot product, softmax, and a gradient nudge, a pile
-          of numbers taught itself to finish sentences. That is the whole engine of a
+          of numbers taught itself to finish sentences. (Push the epochs slider high and
+          watch its training perplexity dive toward 1 as it simply <em>memorises</em> these
+          twelve sentences - the very overfitting you forced on the ring back in Act 1.)
+          That is the whole engine of a
           modern LLM, only tiny. It still has one real limit, though: it reads a fixed
           two-word window and learns every context on its own, much like the n-grams
           back in Chapter 1. We already pinned down the raw text-to-token step in
@@ -1489,7 +1736,7 @@ return {
     </section>
   </main>
 
-  <script src="chapter4.js?v=20260624"></script>
+  <script src="chapter4.js?v=20260625"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>

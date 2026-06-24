@@ -727,6 +727,66 @@
   color: var(--coral);
 }
 
+/* ---- Backpropagation lab ---- */
+.backprop-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.backprop-rate-row {
+  margin-top: 6px;
+}
+
+.backprop-buttons {
+  margin: 12px 0;
+}
+
+.backprop-spark {
+  width: 100%;
+  height: 72px;
+  margin-top: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.backprop-spark text {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.spark-line {
+  stroke: var(--teal);
+  stroke-width: 2.5;
+  fill: none;
+}
+
+.spark-dot-start {
+  fill: var(--muted);
+}
+
+.spark-dot-end {
+  fill: var(--green);
+}
+
+.backprop-flow {
+  stroke: var(--gold);
+  stroke-width: 2.6;
+  stroke-dasharray: 5 9;
+  stroke-linecap: round;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .backprop-control-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .network-node {
   fill: #ffffff;
 }
@@ -866,6 +926,106 @@
   border: 1px dashed var(--line);
   border-radius: 8px;
   background: #ffffff;
+}
+
+.decision-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 10px;
+}
+
+.decision-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.decision-legend .swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(17, 17, 17, 0.15);
+}
+
+.decision-legend .swatch-a {
+  background: #c65f1e;
+}
+
+.decision-legend .swatch-b {
+  background: #15756c;
+}
+
+.decision-legend .dot-key {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #5a5a5a;
+}
+
+.decision-legend .dot-key.dot-train {
+  border: 1px solid rgba(17, 17, 17, 0.45);
+}
+
+.decision-legend .dot-key.dot-test {
+  box-shadow: 0 0 0 2.5px #ffffff, 0 0 0 3.5px rgba(17, 17, 17, 0.35);
+}
+
+.decision-help {
+  margin-top: 10px;
+}
+
+.build-network-explainer {
+  margin: 16px 0 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: 10px;
+  background: #f6fbfb;
+}
+
+.build-network-copy h3 {
+  margin: 4px 0 8px;
+}
+
+.build-network-copy p {
+  margin: 0 0 10px;
+}
+
+.build-network-copy p:last-child {
+  margin-bottom: 0;
+}
+
+.build-network-figure {
+  margin: 14px 0 0;
+}
+
+.mlp-svg {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  margin: 0 auto;
+  background: #fffefa;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+
+.mlp-axis {
+  fill: var(--muted);
+  font-size: 12.5px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+.build-network-figure figcaption {
+  margin-top: 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 .loss-history {
