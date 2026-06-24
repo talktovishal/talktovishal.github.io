@@ -421,7 +421,10 @@
           </p>
           <p>
             Below is a fixed next-token distribution, the kind the LM head might produce
-            after <code>Write an email apologizing to</code>. Choose a strategy, press
+            after <code>Write an email apologizing to</code>. These particular numbers are
+            hand-made so we can focus on the <em>choosing</em> rule itself, not on any one
+            model - you will watch a real model's live probabilities later in the
+            <a href="#realmodel">real Transformer</a> section. Choose a strategy, press
             <em>Pick a token</em> a bunch of times, and watch the candidate set change.
             Greedy keeps one token. Top-k keeps a fixed count. Top-p keeps however many
             tokens are needed to reach the probability mass you choose.
@@ -643,6 +646,12 @@
               <li>\(\alpha_{ij}\): token \(j\)'s share of the blend for token \(i\).</li>
               <li>\(j \le i\): in a causal model, token \(i\) can see itself and the past.</li>
             </ul>
+            <p class="microcopy">
+              We left one thing deliberately vague: where does \(\operatorname{score}(x_i, x_j)\) come
+              from? That is exactly what <strong>query, key, and value</strong> vectors answer next -
+              they are how the model <em>computes</em> these weights from the tokens themselves,
+              instead of us hand-picking them.
+            </p>
           </div>
         </div>
 
@@ -847,7 +856,9 @@
             Answer: the dot product is <code>0.10*0 + 0*0 + 0.30*0 + 1.80*1.80 = 3.24</code>.
             Dividing by 2 gives a scaled score of <code>1.62</code>. That is much larger
             than the other scaled scores, so after softmax <code>cat</code> gets about
-            46% of the attention weight.
+            46% of the attention weight. That 46% comes from these hand-picked vectors,
+            though - a real model learns its own query, key, and value vectors, so it could
+            settle on a completely different pattern.
           </p>
         </details>
       </div>
@@ -1382,7 +1393,10 @@
             82-million-parameter Transformer, and runs it entirely in your browser with the
             <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noreferrer">transformers.js</a>
             library. Nothing is sent anywhere: the weights download once, then your typing
-            is processed on your own machine.
+            is processed on your own machine. It is a distilled, slimmed-down version of
+            GPT-2 (trained on a web corpus called OpenWebText, with a 1024-token context),
+            far smaller than today's frontier models - but it runs the exact same machinery
+            you just built by hand, which is the whole point.
           </p>
           <p>
             When it is ready, type a prompt and ask for the next-token probabilities. You

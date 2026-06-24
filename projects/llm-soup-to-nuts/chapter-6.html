@@ -384,6 +384,13 @@
               <code>same C with 10B parameters gives D = C / (6N) = 2B tokens</code>
               <code>tokens per parameter: 2B / 10B = 0.2, far below a Chinchilla-style balance</code>
             </div>
+            <p class="microcopy">
+              <strong>Chinchilla's rule of thumb:</strong> for a dense model, compute-optimal
+              training spends roughly <strong>20 tokens per parameter</strong> - so that 10B model
+              really wants about 200B tokens, not 2B. Several early giant models were badly
+              <em>undertrained</em>: too many parameters fed too little text, which is exactly the
+              imbalance the slider lets you feel below.
+            </p>
           </div>
           <div class="math-formal" aria-label="Scaling equations">
             <h3>The scaling pressure, in symbols</h3>
@@ -605,6 +612,26 @@
             response, the model should assign a high probability to the preference. If the
             scores are close, the preference is uncertain.
           </p>
+          <div class="worked-example" aria-label="Preference by hand">
+            <h3>Preference by hand</h3>
+            <p>
+              Say a reward model scores the chosen answer <code>8.0</code> and the rejected
+              one <code>5.0</code>. The only thing that matters is the <strong>gap</strong> -
+              here <code>8.0 - 5.0 = 3.0</code>. Squeeze that gap through the sigmoid and you
+              get the probability that a person prefers the chosen answer:
+            </p>
+            <div class="formula-stack">
+              <code>gap = r(chosen) - r(rejected) = 8.0 - 5.0 = 3.0</code>
+              <code>P(prefer chosen) = sigmoid(3.0) = 1 / (1 + e^-3.0) ~= 0.95</code>
+            </div>
+            <p class="microcopy">
+              That is the whole reason a sigmoid shows up: a big positive gap means "almost
+              certainly the better answer" (near 1), a gap of zero means "a coin flip" (0.5),
+              and a negative gap means the scores are backwards (below 0.5). Training just
+              pushes the gap on real preference pairs to be positive. Drag the
+              <em>reward gap</em> slider below and watch this same curve move.
+            </p>
+          </div>
           <div class="math-formal" aria-label="Preference alignment equations">
             <h3>Preference math, in symbols</h3>
             <p>
@@ -623,6 +650,15 @@
               <li>\(\pi_{\text{ref}}\): the reference model we do not want to drift too far from.</li>
               <li>\(\beta\): the strength of the stay-close penalty.</li>
             </ul>
+            <p class="microcopy">
+              Read these four lines as one story. The first scores a preference (the sigmoid
+              of the reward gap you just computed by hand). The second <em>trains</em> a reward
+              model to predict those preferences. The third is the RLHF goal: tune the policy to
+              chase high reward while the \(\beta\) term penalises drifting away from the
+              reference model. The last, <strong>DPO</strong>, is the clever shortcut - it reaches
+              the same goal directly from the preference pairs, with no separate reward model to
+              train at all.
+            </p>
           </div>
         </div>
 
