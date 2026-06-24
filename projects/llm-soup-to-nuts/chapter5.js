@@ -781,6 +781,91 @@ function setCausal(value) {
   if (dom.causalToggleHeatmap) dom.causalToggleHeatmap.checked = value;
 }
 
+// ---------------------------------------------------------------------------
+// Runnable code cells: real attention + softmax math the learner can run
+// ---------------------------------------------------------------------------
+
+function ce(tag, cls, text) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+function renderChapter5CodeResult(output, result) {
+  const data = result && typeof result === "object" ? result : { value: result };
+  const status = ce("div", "output-status");
+  status.append(ce("strong", "", "Ran successfully"), ce("span", "", "real browser computation"));
+  const visual = ce("div", "output-visual");
+
+  if (Array.isArray(data.bars)) {
+    const list = ce("div", "code-bar-list");
+    const maxVal = Math.max(...data.bars.map((b) => Number(b.value) || 0), 1e-9);
+    data.bars.forEach((b) => {
+      const value = Number(b.value) || 0;
+      const row = ce("div", "code-bar-row");
+      const track = ce("span", "code-bar-track");
+      const fill = ce("span", "code-bar-fill");
+      fill.style.width = `${clamp((value / maxVal) * 100, 0, 100)}%`;
+      track.append(fill);
+      row.append(
+        ce("span", "code-bar-label", String(b.label)),
+        track,
+        ce("span", "code-bar-value", `${(value * 100).toFixed(1)}%`)
+      );
+      list.append(row);
+    });
+    visual.append(list);
+  }
+
+  const entries = Object.entries(data).filter(([key]) => key !== "bars");
+  const scalarEntries = entries.filter(([, value]) => typeof value === "number" || typeof value === "string");
+  if (scalarEntries.length) {
+    const metrics = ce("div", "output-metrics");
+    scalarEntries.slice(0, 6).forEach(([key, value]) => {
+      const shown = typeof value === "number" && !Number.isInteger(value) ? value.toFixed(3) : String(value);
+      const item = ce("div", "output-metric");
+      item.append(ce("strong", "", shown), ce("span", "", key));
+      metrics.append(item);
+    });
+    visual.append(metrics);
+  }
+
+  const raw = ce("details", "output-raw");
+  raw.append(ce("summary", "", "Raw result object"));
+  const pre = ce("pre");
+  pre.textContent = JSON.stringify(result, null, 2);
+  raw.append(pre);
+  visual.append(raw);
+
+  output.replaceChildren(status, visual);
+}
+
+function runChapter5CodeCell(cell) {
+  const input = cell.querySelector(".code-input");
+  const output = cell.querySelector(".code-output");
+  output.className = "code-output is-running";
+  output.textContent = "Running...";
+  try {
+    const api = {
+      softmax,
+      dot,
+      DIM,
+      tokens: TOKENS.map((t) => ({ word: t.word, q: t.q.slice(), k: t.k.slice(), v: t.v.slice() }))
+    };
+    const runner = new Function(
+      "api",
+      `"use strict"; const { softmax, dot, DIM, tokens } = api; return (() => { ${input.value} })();`
+    );
+    const result = runner(api);
+    output.className = "code-output is-success";
+    renderChapter5CodeResult(output, result);
+  } catch (error) {
+    output.className = "code-output is-error";
+    output.textContent = `${error.name}: ${error.message}`;
+  }
+}
+
 function wireEvents() {
   // Generation loop
   dom.genNextBtn.addEventListener("click", () => {
@@ -837,6 +922,11 @@ function wireEvents() {
   dom.loadModelButton.addEventListener("click", () => loadModel());
   dom.predictButton.addEventListener("click", () => predictNextTokens());
   dom.generateButton.addEventListener("click", () => generateContinuation());
+
+  // Runnable code cells
+  document.querySelectorAll(".chapter5-code-cell .run-button").forEach((button) => {
+    button.addEventListener("click", () => runChapter5CodeCell(button.closest(".chapter5-code-cell")));
+  });
 }
 
 function setupSectionSpy() {

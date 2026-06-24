@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Training and Alignment - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter6.css?v=20260622">
+  <link rel="stylesheet" href="chapter6.css?v=20260701">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -283,6 +283,13 @@
           <p class="eyebrow">3. Training data</p>
           <h2 id="data-title">The corpus is a curriculum, whether we admit it or not.</h2>
           <p>
+            Let me start with the part that took me a while to really accept: a model never
+            meets the world. It only ever meets the text we hand it. So the corpus is not
+            just fuel - it is the entire curriculum, and whatever shows up often in that text
+            quietly becomes the model's idea of what is normal. Keep that in mind as we look
+            at where the text actually comes from.
+          </p>
+          <p>
             Large language models are trained on web crawls plus curated sources such as
             books, Wikipedia, academic papers, code, and dialogue. The source lecture names
             open corpora like Common Crawl derivatives, C4, The Pile, and Dolma to make
@@ -352,6 +359,11 @@
         <div class="section-heading">
           <p class="eyebrow">4. Scaling and systems</p>
           <h2 id="scaling-title">Spend a fixed compute budget without starving the model.</h2>
+          <p>
+            Imagine someone hands you a fixed pile of compute and says, "build the best
+            model you can with this." Your first instinct is probably "make it as big as
+            possible." Hold that thought - it is exactly the trap this section is about.
+          </p>
           <p>
             Scaling laws say that loss falls predictably as we add parameters, data, and
             compute. The trap is that training compute is roughly \(C \approx 6ND\), where
@@ -430,7 +442,12 @@
               <span class="pill">lower is better</span>
             </div>
             <div id="scalingChart" class="scaling-chart" aria-live="polite"></div>
-            <p class="microcopy">The large dot is your choice; the vertical line marks the compute-optimal model size.</p>
+            <div class="scaling-legend" aria-hidden="true">
+              <span class="legend-item"><span class="legend-swatch swatch-curve"></span>predicted loss</span>
+              <span class="legend-item"><span class="legend-swatch swatch-optimal"></span>compute-optimal size</span>
+              <span class="legend-item"><span class="legend-dot dot-choice"></span>your choice</span>
+            </div>
+            <p class="microcopy">Every point on the teal curve is a different way to split the same compute budget between model size (x-axis, in parameters) and training tokens. The curve dips to its lowest loss (y-axis) at the compute-optimal size, marked by the gold line; your coral dot is wherever the sliders put you.</p>
           </div>
           <div class="panel">
             <div class="section-title-row">
@@ -567,6 +584,25 @@
             parameter-efficient alternative: freeze a large matrix \(W\), train two small
             matrices \(A\) and \(B\), and add their low-rank product into the forward pass.
           </p>
+          <div class="worked-example" aria-label="LoRA savings by hand">
+            <h3>LoRA by the numbers</h3>
+            <p>
+              Take one weight matrix inside a Transformer - say a 768 by 768 projection.
+              Fine-tuning it the full way means moving every single entry:
+            </p>
+            <div class="formula-stack">
+              <code>full matrix: 768 * 768 = 589,824 trainable parameters</code>
+              <code>LoRA rank r = 8: A is 768 x 8, B is 8 x 768</code>
+              <code>LoRA params: 768*8 + 8*768 = 6,144 + 6,144 = 12,288</code>
+              <code>ratio: 12,288 / 589,824 ~= 2.1%  (about 48x fewer to train)</code>
+            </div>
+            <p class="microcopy">
+              The frozen matrix still does the heavy lifting; LoRA only learns a small
+              low-rank nudge on top of it. That is why you can fine-tune a large model on one
+              GPU and ship the change as a few megabytes instead of a whole new copy of the
+              weights.
+            </p>
+          </div>
           <div class="math-formal" aria-label="SFT and LoRA equations">
             <h3>Same loss, smaller update</h3>
             <p>
@@ -721,6 +757,30 @@
             response should be long. It is that inference-time work is another lever, after
             the weights are already trained.
           </p>
+          <p>
+            Here is the intuition in one image. Ask a model "what is 17 x 24?" and force it
+            to answer in a single token, and it has to guess the whole product at once. Give
+            it room to write "17 x 24 = 17 x 20 + 17 x 4 = 340 + 68 = 408" and each line
+            becomes an easy next-token prediction that leans on the line above. Same weights,
+            same model - the extra tokens are just scratch paper.
+          </p>
+          <div class="worked-example" aria-label="Test-time budget by hand">
+            <h3>Scratch paper by hand</h3>
+            <p>
+              Suppose an answer-only reply costs about 18 tokens, and each reasoning step
+              adds roughly 14 more. Three steps of "show your work" therefore cost:
+            </p>
+            <div class="formula-stack">
+              <code>answer only: 18 tokens</code>
+              <code>3 reasoning steps: 3 * 14 = 42 tokens</code>
+              <code>total: 18 + 42 = 60 tokens (about 3.3x the work)</code>
+            </div>
+            <p class="microcopy">
+              You pay for every one of those tokens in latency and money, so the lever is not
+              "always reason longer" - it is "spend more thinking only when the task is hard
+              enough to earn it." Slide the steps below and watch the budget grow.
+            </p>
+          </div>
         </div>
 
         <div class="control-grid section-controls" aria-label="Test-time compute controls">
@@ -736,6 +796,16 @@
             <span class="pill">extra inference tokens</span>
           </div>
           <div id="testTimePanel" class="testtime-panel" aria-live="polite"></div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Test-time compute spends extra work during inference and changes no weights. Chain-of-thought is the classic example: the model writes intermediate steps before committing to a final answer.">
+          <p class="quiz-prompt">Quick check: what makes chain-of-thought a <em>test-time</em> technique rather than a training one?</p>
+          <div class="quiz-options" role="group" aria-label="Why chain-of-thought is test-time">
+            <button class="quiz-option" type="button" data-feedback="That describes SFT or preference tuning, which both change parameters. Chain-of-thought leaves the weights untouched.">It updates the model's weights on reasoning examples</button>
+            <button class="quiz-option" type="button" data-correct="true">It changes nothing in the weights; it just spends extra tokens while answering</button>
+            <button class="quiz-option" type="button" data-feedback="Tokenization is fixed before training and has nothing to do with spending inference compute.">It retrains the tokenizer to add reasoning tokens</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
       </div>
     </section>
@@ -820,7 +890,7 @@
     </section>
   </main>
 
-  <script src="chapter6.js?v=20260621a"></script>
+  <script src="chapter6.js?v=20260701"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>

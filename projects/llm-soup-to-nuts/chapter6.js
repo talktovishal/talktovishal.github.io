@@ -60,7 +60,11 @@ const state = {
   dpoBeta: 0.1,
   reasoningSteps: 3,
   hasScaled: false,
-  hasMemory: false
+  hasMemory: false,
+  hasTeacher: false,
+  hasEvaluated: false,
+  hasPreference: false,
+  hasTestTime: false
 };
 
 const dom = {};
@@ -124,6 +128,10 @@ function renderTeacher() {
   const step = Number(dom.teacherStepSlider.value);
   state.teacherStep = step;
   dom.teacherStepLabel.textContent = `position ${step + 1}`;
+  if (!state.hasTeacher) {
+    dom.teacherTrace.replaceChildren(notice("Drag the position slider to walk through one training row: the true prefix, the target token, and the loss the model pays right there."));
+    return;
+  }
   const prefix = TRAIN_TOKENS.slice(0, step + 1);
   const target = TRAIN_TOKENS[step + 1];
   const probability = TRAIN_PROBS[step];
@@ -216,7 +224,7 @@ function renderScaling() {
   const padT = 18;
   const padB = 42;
   const xOf = (logN) => padL + ((logN - logNmin) / (logNmax - logNmin)) * (W - padL - padR);
-  const yOf = (loss) => padT + ((loss - minLoss) / Math.max(1e-6, maxLoss - minLoss)) * (H - padT - padB);
+  const yOf = (loss) => padT + ((maxLoss - loss) / Math.max(1e-6, maxLoss - minLoss)) * (H - padT - padB);
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -228,6 +236,23 @@ function renderScaling() {
   axis.setAttribute("d", `M${padL},${padT} V${H - padB} H${W - padR}`);
   axis.setAttribute("class", "scaling-axis");
   svg.append(axis);
+
+  const addTick = (x, y, text, anchor) => {
+    const t = document.createElementNS(svgNS, "text");
+    t.setAttribute("x", x);
+    t.setAttribute("y", y);
+    t.setAttribute("class", "scaling-tick");
+    t.setAttribute("text-anchor", anchor);
+    t.textContent = text;
+    svg.append(t);
+  };
+  [0, 0.5, 1].forEach((frac) => {
+    const logN = logNmin + frac * (logNmax - logNmin);
+    addTick(xOf(logN), H - padB + 16, formatBig(Math.pow(10, logN)), "middle");
+  });
+  [maxLoss, (minLoss + maxLoss) / 2, minLoss].forEach((lossVal) => {
+    addTick(padL - 6, yOf(lossVal) + 3, lossVal.toFixed(2), "end");
+  });
 
   const path = document.createElementNS(svgNS, "path");
   path.setAttribute("d", points.map((p, i) => `${i ? "L" : "M"}${xOf(p.logN).toFixed(1)},${yOf(p.loss).toFixed(1)}`).join(" "));
@@ -344,6 +369,11 @@ function renderEvaluation() {
   state.evalLoss = loss;
   const ppl = Math.exp(loss);
   dom.evalLossLabel.textContent = loss.toFixed(1);
+  if (!state.hasEvaluated) {
+    dom.evalPanel.replaceChildren(notice("Move the loss slider to turn a cross-entropy loss into perplexity."));
+    dom.evalNarrative.textContent = "";
+    return;
+  }
   dom.evalPanel.replaceChildren();
   [
     ["Average loss", `${loss.toFixed(2)} nats`],
@@ -373,6 +403,11 @@ function renderPreference() {
   state.dpoBeta = beta;
   dom.rewardDiffLabel.textContent = diff.toFixed(1);
   dom.dpoBetaLabel.textContent = beta.toFixed(2);
+  if (!state.hasPreference) {
+    dom.preferencePanel.replaceChildren(notice("Drag the reward-gap slider to turn a score difference into a preference probability."));
+    dom.dpoPanel.replaceChildren();
+    return;
+  }
   const p = sigmoid(diff);
   const scaled = sigmoid(beta * diff);
 
@@ -413,6 +448,10 @@ function renderTestTime() {
   const steps = Number(dom.reasoningStepsSlider.value);
   state.reasoningSteps = steps;
   dom.reasoningStepsLabel.textContent = String(steps);
+  if (!state.hasTestTime) {
+    dom.testTimePanel.replaceChildren(notice("Slide the number of reasoning steps to compare answer-only generation with step-by-step generation."));
+    return;
+  }
   const answerOnly = 18;
   const stepTokens = steps * 14;
   const total = answerOnly + stepTokens;
@@ -451,15 +490,15 @@ function wireEvents() {
     });
   });
 
-  dom.teacherStepSlider.addEventListener("input", () => renderTeacher());
+  dom.teacherStepSlider.addEventListener("input", () => { state.hasTeacher = true; renderTeacher(); });
   dom.computeSlider.addEventListener("input", () => { state.hasScaled = true; renderScaling(); });
   dom.sizeSlider.addEventListener("input", () => { state.hasScaled = true; renderScaling(); });
   dom.memSlider.addEventListener("input", () => { state.hasMemory = true; renderMemory(); });
   dom.shardSlider.addEventListener("input", () => { state.hasMemory = true; renderMemory(); });
-  dom.evalLossSlider.addEventListener("input", () => renderEvaluation());
-  dom.rewardDiffSlider.addEventListener("input", () => renderPreference());
-  dom.dpoBetaSlider.addEventListener("input", () => renderPreference());
-  dom.reasoningStepsSlider.addEventListener("input", () => renderTestTime());
+  dom.evalLossSlider.addEventListener("input", () => { state.hasEvaluated = true; renderEvaluation(); });
+  dom.rewardDiffSlider.addEventListener("input", () => { state.hasPreference = true; renderPreference(); });
+  dom.dpoBetaSlider.addEventListener("input", () => { state.hasPreference = true; renderPreference(); });
+  dom.reasoningStepsSlider.addEventListener("input", () => { state.hasTestTime = true; renderTestTime(); });
 }
 
 function setupSectionSpy() {

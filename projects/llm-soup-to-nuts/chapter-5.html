@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Transformers and Attention - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter5.css?v=20260622">
+  <link rel="stylesheet" href="chapter5.css?v=20260701">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -499,6 +499,40 @@
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
+        <article class="code-cell chapter5-code-cell">
+          <div class="cell-head">
+            <h3>Softmax, in code</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <div class="code-quiz" data-quiz-type="predict" data-explain="Softmax exponentiates each score and divides by the total, so every output lands between 0 and 1 and the whole set sums to exactly 1. That is what makes them usable as probabilities.">
+            <p class="quiz-prompt">Predict first: this turns four raw scores into next-token probabilities with <strong>softmax</strong>. What will the four probabilities add up to?</p>
+            <div class="quiz-options" role="group" aria-label="What softmax outputs sum to">
+              <button class="quiz-option" type="button" data-correct="true">Exactly 1: they are a probability distribution</button>
+              <button class="quiz-option" type="button" data-feedback="Softmax always normalises by the total, so the outputs sum to 1 no matter what the raw scores were.">Whatever the raw scores summed to</button>
+              <button class="quiz-option" type="button" data-feedback="Each output is between 0 and 1, but together they sum to 1, not 4.">4, one per token</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+            <button class="quiz-skip" type="button">Just show me the code</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">// softmax turns raw scores (logits) into probabilities.
+// It exponentiates each score, then divides by the total.
+const words  = ["cat", "dog", "table", "and"];
+const scores = [2.0, 1.0, 0.1, -0.5];
+
+const probs = softmax(scores);
+
+return {
+  bars: words.map((w, i) =&gt; ({ label: w, value: probs[i] })),
+  sumsTo: probs.reduce((a, b) =&gt; a + b, 0)
+};</textarea>
+          <div class="code-output is-empty" aria-live="polite">
+            <div class="output-message">
+              <strong>Ready to run</strong>
+              <span>This calls the same <code>softmax</code> the demos use. Edit the scores, press Run, and watch the probability bars and their sum.</span>
+            </div>
+          </div>
+        </article>
+
         <details class="exercise-card">
           <summary>Exercise: compare two decoders</summary>
           <p>
@@ -843,6 +877,43 @@
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
+
+        <article class="code-cell chapter5-code-cell">
+          <div class="cell-head">
+            <h3>The attention scores, in code</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
+          <div class="code-quiz" data-quiz-type="predict" data-explain="The pronoun 'it' is looking for something animate to refer to, and 'cat' is the animate token. Its key lines up best with the query for 'it', so it wins the largest share of attention.">
+            <p class="quiz-prompt">Predict first: this runs the real attention math for the query <code>it</code> - score every key with <code>(q &middot; k) / &radic;d</code>, then softmax. Which token gets the <strong>most</strong> attention?</p>
+            <div class="quiz-options" role="group" aria-label="Which token it attends to most">
+              <button class="quiz-option" type="button" data-correct="true">cat - the animate thing the pronoun refers to</button>
+              <button class="quiz-option" type="button" data-feedback="'the' is a function word; the query for 'it' leans on the animate channel, which 'cat' matches best.">the</button>
+              <button class="quiz-option" type="button" data-feedback="'Sarah' is the subject, but the pronoun's query is hunting for an animate referent, and 'cat' matches that channel more strongly here.">Sarah</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+            <button class="quiz-skip" type="button">Just show me the code</button>
+          </div>
+          <textarea class="code-input" spellcheck="false">// The real attention math on our toy sentence.
+// Query = "it"; score every token's key, scale by sqrt(d), then softmax.
+const it    = tokens.find(t =&gt; t.word === "it");
+const query = it.q;
+
+const scores  = tokens.map(t =&gt; dot(query, t.k) / Math.sqrt(DIM));
+const weights = softmax(scores);
+
+const top = tokens[weights.indexOf(Math.max(...weights))].word;
+
+return {
+  bars: tokens.map((t, i) =&gt; ({ label: t.word, value: weights[i] })),
+  attendsMostTo: top
+};</textarea>
+          <div class="code-output is-empty" aria-live="polite">
+            <div class="output-message">
+              <strong>Ready to run</strong>
+              <span>This is the exact calculation behind the bars above. Press Run and confirm which token <code>it</code> attends to most.</span>
+            </div>
+          </div>
+        </article>
 
         <details class="exercise-card">
           <summary>Exercise: calculate the winning score</summary>
@@ -1722,7 +1793,7 @@
     </section>
   </main>
 
-  <script src="chapter5.js?v=20260621"></script>
+  <script src="chapter5.js?v=20260701"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>
@@ -1739,6 +1810,8 @@
     });
   </script>
   <script defer src="code-quiz.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script defer src="code-highlight.js"></script>
   <script src="site.js" defer></script>
 </body>
 </html>

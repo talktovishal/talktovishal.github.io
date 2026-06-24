@@ -698,3 +698,49 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* ---- Runnable code-cell result bars ---- */
+.code-bar-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.code-bar-row {
+  display: grid;
+  grid-template-columns: minmax(70px, 96px) 1fr 56px;
+  align-items: center;
+  gap: 10px;
+}
+
+.code-bar-label {
+  font-weight: 800;
+  font-size: 0.86rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.code-bar-track {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: #e8e1d7;
+  overflow: hidden;
+}
+
+.code-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--teal);
+}
+
+.code-bar-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: right;
+}
