@@ -555,6 +555,49 @@
           <figcaption>The gradient tells you the local uphill direction. Gradient descent subtracts it, so the parameters take a small downhill step.</figcaption>
         </figure>
 
+        <div class="math-formal" aria-label="Learning in symbols">
+          <h3>Loss, gradient, and the update rule, in symbols</h3>
+          <p>
+            The loss is the average squared gap between the line's prediction \(\hat{y}\)
+            and the true value \(y\). To fix a bad prediction, we need to know how tweaking our knobs affects that loss. In machine learning, we group all adjustable knobs (like our slope and our intercept) under the universal label of <strong>weights</strong>, represented by the letter \(w\). Think of \(w\) as a generic blank space: the update rule at the bottom is a template. You run the template once substituting \(w\) for the slope, and then you run it again substituting \(w\) for the intercept.
+          </p>
+          <p>
+            The <strong>gradient</strong> \(\frac{\partial L}{\partial w}\) reads as "how fast does the loss \(L\) change if I nudge just this one specific weight \(w\), holding the rest perfectly still." That is all the partial derivative \(\partial\) symbol means: isolating one knob at a time.
+          </p>
+          <p class="microcopy">
+            <em><strong>Calculus Refreshers:</strong> If the \(\partial\) symbol looks unfamiliar, Wikipedia has excellent, visual primers on <u><a href="https://en.wikipedia.org/wiki/Partial_derivative" target="_blank" rel="noreferrer">Partial derivatives</a></u> and the <u><a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a></u>.</em>
+          </p>
+          <p>
+            How do we calculate that exact gradient number? We use the Chain Rule. Working from the outside in: the \(2\) from the squared error drops down to the front, and then we multiply by the inner variable attached to our knob. Because our prediction is \((\text{slope} \cdot x + \text{intercept})\), the variable attached to the slope is \(x\). The variable attached to the intercept is just \(1\).
+          </p>
+
+          $$L = \frac{1}{N}\sum_{i=1}^{N}\big(\hat{y}_i - y_i\big)^2 \qquad (\text{where } \hat{y} = \text{slope} \cdot x + \text{intercept})$$
+          $$\frac{\partial L}{\partial\,\text{slope}} = 2(\hat{y}-y)\,x \qquad \frac{\partial L}{\partial\,\text{intercept}} = 2(\hat{y}-y)$$
+          $$w \leftarrow w - \eta\,\frac{\partial L}{\partial w}$$
+
+          <ul class="symbol-glossary">
+            <li>\(\hat{y}\): the line's prediction; \(y\): the true value in the data.</li>
+            <li>\(N\): how many points we average the loss over.</li>
+            <li>\(w\): a generic "weight"&mdash;a placeholder. You swap in either "slope" or "intercept" when applying the math.</li>
+            <li>\(\frac{\partial L}{\partial w}\): the gradient, representing the uphill slope of the loss for that specific weight \(w\).</li>
+            <li>\(\eta\) (eta): the <strong>learning rate</strong> or step size (the same slider used in the lab).</li>
+            <li>\(\leftarrow\): "becomes" (we replace the old weight with its newly nudged value).</li>
+          </ul>
+          <p class="microcopy">
+            <strong>Walking through one step for the slope:</strong> For a single data point \((x{=}1,\ y{=}1)\) and a starting \(\text{slope}{=}0\), our prediction is \(\hat{y}=0\). The error is \(\hat{y}-y = -1\).
+            <br><br>
+            The gradient for the slope is \(2(-1)(1) = -2\). Now we use the update rule template, swapping \(w\) for the slope: \(\text{slope} \leftarrow 0 - 0.1(-2) = +0.2\). Subtracting the gradient ensures we step <em>downhill</em>, and \(\eta\) (set to \(0.1\) here) scales how big that step is.
+          </p>
+          <p class="microcopy">
+            <strong>Now make it move.</strong> That is the whole recipe - a loss, a gradient,
+            and the one update rule. The exercise just below lets you run it yourself: drag the
+            <code>slope</code>, <code>intercept</code>, and <code>step size</code>, press
+            <em>Step descent</em>, and watch this exact loss, gradient, and update step
+            recompute live on real numbers, one nudge at a time. With the math fresh in mind,
+            the numbers in the lab should now read like old friends.
+          </p>
+        </div>        
+
         <div class="gradient-grid">
           <div class="panel">
             <div class="section-title-row">
@@ -608,41 +651,6 @@
           </div>
         </div>
 
-        <div class="math-formal" aria-label="Learning in symbols">
-          <h3>Loss, gradient, and the update rule, in symbols</h3>
-          <p>
-            The loss is the average squared gap between the line's prediction \(\hat{y}\)
-            and the true value \(y\). To fix a bad prediction, we need to know how tweaking our knobs affects that loss. In machine learning, we group all adjustable knobs (like our slope and our intercept) under the universal label of <strong>weights</strong>, represented by the letter \(w\). Think of \(w\) as a generic blank space: the update rule at the bottom is a template. You run the template once substituting \(w\) for the slope, and then you run it again substituting \(w\) for the intercept.
-          </p>
-          <p>
-            The <strong>gradient</strong> \(\frac{\partial L}{\partial w}\) reads as "how fast does the loss \(L\) change if I nudge just this one specific weight \(w\), holding the rest perfectly still." That is all the partial derivative \(\partial\) symbol means: isolating one knob at a time.
-          </p>
-          <p class="microcopy">
-            <em><strong>Calculus Refreshers:</strong> If the \(\partial\) symbol looks unfamiliar, Wikipedia has excellent, visual primers on <u><a href="https://en.wikipedia.org/wiki/Partial_derivative" target="_blank" rel="noreferrer">Partial derivatives</a></u> and the <u><a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a></u>.</em>
-          </p>
-          <p>
-            How do we calculate that exact gradient number? We use the Chain Rule. Working from the outside in: the \(2\) from the squared error drops down to the front, and then we multiply by the inner variable attached to our knob. Because our prediction is \((\text{slope} \cdot x + \text{intercept})\), the variable attached to the slope is \(x\). The variable attached to the intercept is just \(1\).
-          </p>
-
-          $$L = \frac{1}{N}\sum_{i=1}^{N}\big(\hat{y}_i - y_i\big)^2 \qquad (\text{where } \hat{y} = \text{slope} \cdot x + \text{intercept})$$
-          $$\frac{\partial L}{\partial\,\text{slope}} = 2(\hat{y}-y)\,x \qquad \frac{\partial L}{\partial\,\text{intercept}} = 2(\hat{y}-y)$$
-          $$w \leftarrow w - \eta\,\frac{\partial L}{\partial w}$$
-
-          <ul class="symbol-glossary">
-            <li>\(\hat{y}\): the line's prediction; \(y\): the true value in the data.</li>
-            <li>\(N\): how many points we average the loss over.</li>
-            <li>\(w\): a generic "weight"&mdash;a placeholder. You swap in either "slope" or "intercept" when applying the math.</li>
-            <li>\(\frac{\partial L}{\partial w}\): the gradient, representing the uphill slope of the loss for that specific weight \(w\).</li>
-            <li>\(\eta\) (eta): the <strong>learning rate</strong> or step size (the same slider used in the lab).</li>
-            <li>\(\leftarrow\): "becomes" (we replace the old weight with its newly nudged value).</li>
-          </ul>
-          <p class="microcopy">
-            <strong>Walking through one step for the slope:</strong> For a single data point \((x{=}1,\ y{=}1)\) and a starting \(\text{slope}{=}0\), our prediction is \(\hat{y}=0\). The error is \(\hat{y}-y = -1\).
-            <br><br>
-            The gradient for the slope is \(2(-1)(1) = -2\). Now we use the update rule template, swapping \(w\) for the slope: \(\text{slope} \leftarrow 0 - 0.1(-2) = +0.2\). Subtracting the gradient ensures we step <em>downhill</em>, and \(\eta\) (set to \(0.1\) here) scales how big that step is.
-          </p>
-        </div>        
-
         <div class="code-quiz" data-quiz-type="predict" data-explain="The gradient points uphill (toward larger loss), so gradient descent subtracts it - a step in the opposite, downhill direction. That one subtraction is repeated for every weight in the network.">
           <p class="quiz-prompt">Quick check: the gradient of the loss points the way that makes the loss <em>larger</em>. To make the loss smaller, gradient descent steps&hellip;</p>
           <div class="quiz-options" role="group" aria-label="Which way gradient descent steps">
@@ -673,20 +681,17 @@
           <p class="eyebrow">4. Softmax and assigning blame</p>
           <h2 id="softmax-title">Turn raw word scores into next-word probabilities.</h2>
           <p>
-            Here is an awkward gap. The network, once we build it, will not naturally
-            hand us neat percentages. It will hand us a raw score for every word it
+            Once we run the network to get its output, it will not naturally
+            hand us neat percentages for the list of possible words. It will hand us a raw score for every word it
             could predict - a number called a
             <strong>logit</strong>. But a logit can be 4.2 or -1.1 or anything at all. If we have negative logits, the math breaks. We promised the model would output <em>probabilities</em>: positive numbers between 0 and 1 that add up to 1.
           </p>
           <p>
             <a href="https://en.wikipedia.org/wiki/Softmax_function" target="_blank" rel="noreferrer">Softmax</a>
-            is the elegant bridge that gets us from any-old-numbers to a clean distribution. It relies on a two-step trick: first, it <em>exponentiates</em> every score. This instantly turns every number (even negative ones) positive, and it violently stretches the gaps between close numbers so a clear winner emerges. Second, it divides each by the running total so the whole set perfectly sums to 1. <strong>Temperature</strong> is the dial
+            is the elegant bridge that gets us from any-old-numbers to a clean distribution. It relies on a two-step trick: first, it <em>exponentiates</em> every score. This instantly turns every number (even negative ones) positive, and it stretches the gaps between close numbers so a clear winner emerges. Second, it divides each by the running total so the whole set perfectly sums to 1. <strong>Temperature</strong> is the dial
             that controls that stretching. Chapter 1 gave you a coarse version of this same
             choice - <em>top-pick</em> (always take the strongest word) versus <em>sampling</em>
-            (weighted random) - and temperature is the smooth knob between them. Turn it up,
-            and differences shrink toward a flat tie (bold and adventurous); turn it down,
-            and the highest score blows up to dominate the rest (cautious, like top-pick).
-            Why does one dial do both? Because temperature acts <em>before</em> the
+            (weighted random).Why does one dial do both? Because temperature acts <em>before</em> the
             exponential: every score is divided by <code>T</code> first. Make <code>T</code>
             large and you squash all the scores toward zero, so after exponentiating they
             land near <code>e<sup>0</sup> = 1</code> - nearly equal, a flat tie where even
@@ -697,7 +702,7 @@
             exactly Chapter 1's top-pick, now recovered as one end of a continuous dial.
           </p>
           <p>
-            Now the satisfying part: assigning blame. With probabilities in hand,
+            Now the satisfying part: assigning blame aka error calculation. Remember cross-entropy? Its the measure of the difference between the model's predicted probabilities and the actual outcomes. With probabilities in hand,
             cross-entropy builds on that to measure how much confidence the model put on the word that actually
             came next - little there means a lot of surprise, a high loss. To fix it, the model must hand each word its share of the blame. And here is the small miracle that makes the whole machine practical: for softmax paired with cross-entropy, that blame collapses to one of the simplest expressions in all of deep learning - <code>probability &minus; target</code>. Predicted minus wanted. If the model predicts <code>0.99</code> for the true word (target <code>1.0</code>), the blame is <code>-0.01</code>: just a tiny nudge. But if it predicts <code>0.01</code>, the blame is <code>-0.99</code>: a massive correction.
           </p>
@@ -787,7 +792,12 @@
             vector is the exact starting error signal for the entire network.
           </p>
           <p class="microcopy">
-            <em>Units note:</em> we counted surprise in <em>bits</em> earlier, using \(\log_2\); the live loss here uses the natural log \(\ln\), so it is measured in <em>nats</em> - the exact same concept, which is why perplexity later reads as \(e^{\text{loss}}\) instead of \(2^{\text{loss}}\).
+            <em>Units note:</em> a <em>nat</em> is just a unit of surprise - the very same
+            idea as a <em>bit</em>, only measured with the natural log (\(\ln\), base \(e\))
+            instead of base 2, so \(1\) nat \(\approx 1.44\) bits. We counted surprise in
+            bits earlier, using \(\log_2\); the live loss here uses the natural log \(\ln\),
+            so it is measured in <em>nats</em> - the exact same concept, which is why
+            perplexity later reads as \(e^{\text{loss}}\) instead of \(2^{\text{loss}}\).
           </p>
         </div>
 
@@ -865,9 +875,8 @@
           <p class="eyebrow">5. Build the forward pass</p>
           <h2 id="nn-title">Stack the pieces into a tiny network we can inspect.</h2>
           <p>
-            We now have five tools on the bench - probability, vectors, the dot product,
-            softmax, and the gradient nudge. This is the moment they click together
-            into a machine. Think of a neural network as a massive plumbing system. The input data (our context words) is the water flowing through the pipes, and the <strong>weights</strong> are the adjustable valves. The water always flows forward, but the valves decide how much pressure makes it to each possible next-word output.
+            We now have learnt about five tools - probability, vectors, the dot product,
+            softmax, and the gradient. Think of a neural network as a pipeline. The input data (our context words) is the water flowing through the pipes, and the <strong>weights</strong> are the adjustable valves. The water always flows forward, but the valves decide how much pressure makes it to each possible next-word output.
           </p>
           <p>
             The smallest valve intersection is a <strong>neuron</strong>: it
@@ -875,19 +884,19 @@
             the result through an
             <a href="https://en.wikipedia.org/wiki/Activation_function" target="_blank" rel="noreferrer">activation function</a>.
             Picture it as a tiny opinion-maker: it listens to a few numbers, weighs
-            each one by how much it trusts that input, adds its own standing lean (the
+            each one by how much it trusts that input, adds its own standing belief (the
             bias), and then decides how strongly to speak up.
             Why bother with the activation? Because without that little bend - a
             <a href="https://en.wikipedia.org/wiki/Rectifier_(neural_networks)" target="_blank" rel="noreferrer">ReLU</a>,
             a \(\tanh\), a sigmoid - a stack of layers can only ever draw a straight line, no
-            matter how tall you build it. The bend is what lets it curve and learn complex patterns.
-            Here is the reason, and it is pure algebra: stacking two plain multiply-and-add
+            matter how tall you build it. The bend or non-linearity is what lets it curve and learn complex patterns.
+            To understand this, consider: stacking two plain multiply-and-add
             steps just gives you another multiply-and-add. Push <code>x</code> through one
             layer to get <code>w<sub>1</sub>x + b<sub>1</sub></code>, feed that into a second,
             and you land on <code>w<sub>2</sub>(w<sub>1</sub>x + b<sub>1</sub>) + b<sub>2</sub></code>
             - which tidies up into <code>(w<sub>2</sub>w<sub>1</sub>)x + (w<sub>2</sub>b<sub>1</sub> + b<sub>2</sub>)</code>,
             a single weight and a single bias all over again. A hundred such layers collapse
-            back into one straight line. The activation's little bend is exactly what breaks
+            back into one straight line. The activation's non-linearity is exactly what breaks
             that collapse: once each layer can curve, stacking them lets the network trace
             shapes a straight line never could. Line up several
             neurons and you have a layer; stack the layers and you have a
@@ -895,12 +904,11 @@
             or MLP.
           </p>
           <p>
-            Read the whole forward pass once, top to bottom - it is shorter than it
-            sounds: look up an <strong>embedding</strong> row for each context word,
+            Thus, the forward pass is the following: look up an <strong>embedding</strong> row for each context word,
             join the rows, push them through a hidden layer with an activation, and
             finish with softmax over the candidate words. Context words in, a next-word
-            distribution out. Change the context or the activation below and watch the
-            prediction shift. These weights are fixed and illustrative for now; soon the model will learn its own.
+            distribution out. Try it out by changing the context or the activation below and watch the
+            prediction shift. These weights are fixed and illustrative for now; we will learn to adjust them later.
           </p>
         </div>
 
