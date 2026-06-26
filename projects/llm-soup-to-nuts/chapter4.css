@@ -1403,3 +1403,76 @@
   margin-top: 20px;
   line-height: 1.6;
 }
+
+/* ---- Watched predictions (next-word climax) ---- */
+.nw-watch-card {
+  margin-bottom: 14px;
+}
+
+.watch-panel {
+  display: grid;
+  gap: 8px;
+  min-height: 60px;
+}
+
+.watch-row {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.9fr) minmax(56px, 0.8fr) minmax(0, 1.4fr) 50px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.watch-context {
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.86rem;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  white-space: nowrap;
+}
+
+.watch-word {
+  color: var(--ink);
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watch-track {
+  height: 12px;
+  border-radius: 999px;
+  background: #e8e1d7;
+  overflow: hidden;
+}
+
+.watch-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--teal);
+  transition: width 120ms linear;
+}
+
+.watch-pct {
+  color: var(--muted);
+  font-weight: 850;
+  font-size: 0.82rem;
+  font-style: normal;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+  .watch-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .watch-track,
+  .watch-pct {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}

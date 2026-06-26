@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter4.css?v=20260625">
+  <link rel="stylesheet" href="chapter4.css?v=20260626">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -33,9 +33,9 @@
       <a href="#overview"><span>00</span>Overview</a>
       <a href="#math-toolkit"><span>01</span>Surprise and the next word</a>
       <a href="#vectors"><span>02</span>Words as vectors</a>
-      <a href="#gradients"><span>03</span>Gradients and loss</a>
+      <a href="#neural-networks"><span>03</span>Build the forward pass</a>
       <a href="#softmax"><span>04</span>Softmax and blame</a>
-      <a href="#neural-networks"><span>05</span>Build the forward pass</a>
+      <a href="#gradients"><span>05</span>Gradients and loss</a>
       <a href="#backpropagation"><span>06</span>Backpropagation</a>
       <a href="#warmup-lab"><span>07</span>Watch it learn &amp; overfit</a>
       <a href="#train-lab"><span>08</span>Train a next-word model</a>
@@ -523,152 +523,185 @@
       </div>
     </section>
 
-    <section id="gradients" class="band" aria-labelledby="gradients-title">
+    <section id="neural-networks" class="band" aria-labelledby="nn-title">
       <div class="section-shell">
         <div class="section-heading">
-
-          <p class="eyebrow">3. Gradients, gradient descent, and loss</p>
-          <h2 id="gradients-title">When the guess is wrong, which way do we nudge?</h2>
+          <p class="eyebrow">3. Build the forward pass</p>
+          <h2 id="nn-title">Stack the pieces into a tiny network we can inspect.</h2>
           <p>
-            We can now measure surprise and compare words - but measuring a mistake is
-            not the same as fixing it. Here is the question that actually
-            does the learning: when a guess is wrong, which way, and how far, should we
-            move the numbers? Let's start simple, we will shrink
-            the model to the simplest thing that can possibly learn - a straight line
-            with two knobs, a <code>slope</code> and an <code>intercept</code> - and
-            ask it to pass through a cloud of dots. The <strong>loss</strong> is just
-            the average squared gap between the line and the dots: one number that
-            answers "how wrong are we right now?". (Our word model will later swap in
-            cross-entropy loss, but the nudging idea is exactly the same.)
+            We have three ingredients so far - probability, word vectors, and the dot
+            product. Time to assemble them into a machine that makes a guess - one that
+            ends in a <strong>softmax</strong> step we unpack in the next section. Think of a neural network as a pipeline. The input data (our context words) is the water flowing through the pipes, and the <strong>weights</strong> are the adjustable valves. The water always flows forward, but the valves decide how much pressure makes it to each possible next-word output.
           </p>
           <p>
-            Now the move that does all the work. Imagine you are standing blindfolded on the side of a hilly valley, trying to reach the absolute bottom (where your loss is zero). Because you can't see the whole landscape, you just feel the angle of the ground directly under your feet. The <strong>gradient</strong> is the math calculating that slope. It answers "if I jiggle this one knob, does the loss climb or fall, and how steeply?" By mathematical definition, a gradient always points toward the direction of steepest <em>increase</em>—straight uphill. So, to head downhill toward our goal, we take that exact measurement and deliberately step in the opposite direction.
+            The smallest valve intersection is a <strong>neuron</strong>: it
+            multiplies its inputs by weights, adds a <strong>bias</strong>, and runs
+            the result through an
+            <a href="https://en.wikipedia.org/wiki/Activation_function" target="_blank" rel="noreferrer">activation function</a>.
+            Picture it as a tiny opinion-maker: it listens to a few numbers, weighs
+            each one by how much it trusts that input, adds its own standing belief (the
+            bias), and then decides how strongly to speak up.
+            Why bother with the activation? Because without that little bend - a
+            <a href="https://en.wikipedia.org/wiki/Rectifier_(neural_networks)" target="_blank" rel="noreferrer">ReLU</a>,
+            a \(\tanh\), a sigmoid - a stack of layers can only ever draw a straight line, no
+            matter how tall you build it. The bend or non-linearity is what lets it curve and learn complex patterns.
+            To understand this, consider: stacking two plain multiply-and-add
+            steps just gives you another multiply-and-add. Push <code>x</code> through one
+            layer to get <code>w<sub>1</sub>x + b<sub>1</sub></code>, feed that into a second,
+            and you land on <code>w<sub>2</sub>(w<sub>1</sub>x + b<sub>1</sub>) + b<sub>2</sub></code>
+            - which tidies up into <code>(w<sub>2</sub>w<sub>1</sub>)x + (w<sub>2</sub>b<sub>1</sub> + b<sub>2</sub>)</code>,
+            a single weight and a single bias all over again. A hundred such layers collapse
+            back into one straight line. The activation's non-linearity is exactly what breaks
+            that collapse: once each layer can curve, stacking them lets the network trace
+            shapes a straight line never could. Line up several
+            neurons and you have a layer; stack the layers and you have a
+            <a href="https://en.wikipedia.org/wiki/Multilayer_perceptron" target="_blank" rel="noreferrer">multilayer perceptron</a>,
+            or MLP.
           </p>
           <p>
-            <a href="https://en.wikipedia.org/wiki/Gradient_descent" target="_blank" rel="noreferrer">Gradient descent</a>
-            is nothing grander than repeating that one blindfolded move: measure the slope, take a downhill step, repeat, until the line settles perfectly into the dots. This is where the <code>step size</code> (often called the <em>learning rate</em>) becomes incredibly delicate. If your step size is too tiny, you merely crawl, taking an eternity to reach the bottom. But if your step size is too massive, you leap clean over the bottom of the valley, landing even higher up on the opposite wall and making your mistake <em>worse</em>. Press <em>Step descent</em> below and watch the line walk toward the dots, one calculated nudge at a time.
-          </p>          
+            Thus, the forward pass is the following: look up an <strong>embedding</strong> row for each context word,
+            join the rows, push them through a hidden layer with an activation, and
+            finish with softmax over the candidate words. Context words in, a next-word
+            distribution out. Try it out by changing the context or the activation below and watch the
+            prediction shift. These weights are fixed and illustrative for now; we will learn to adjust them later.
+          </p>
         </div>
 
-        <figure class="intuition-figure">
-          <img src="assets/figures/chapter4-gradient-descent.gif" width="720" height="360" alt="Animated point moving downhill on a loss curve, with one arrow showing the local gradient and another arrow showing the update step." decoding="async">
-          <figcaption>The gradient tells you the local uphill direction. Gradient descent subtracts it, so the parameters take a small downhill step.</figcaption>
-        </figure>
+        <div class="network-grid">
+          <div class="panel diagram-panel">
+            <div class="section-title-row">
+              <h3>One forward pass</h3>
+              <span id="forwardSummary" class="pill">MLP</span>
+            </div>
+            <div class="control-grid compact-controls">
+              <label class="select-row activation-row" for="forwardCtxA">
+                <span>Context 1</span>
+                <select id="forwardCtxA" class="control-input">
+                  <option value="the" selected>the</option>
+                  <option value="cat">cat</option>
+                  <option value="dog">dog</option>
+                  <option value="sat">sat</option>
+                  <option value="ran">ran</option>
+                </select>
+              </label>
+              <label class="select-row activation-row" for="forwardCtxB">
+                <span>Context 2</span>
+                <select id="forwardCtxB" class="control-input">
+                  <option value="the">the</option>
+                  <option value="cat" selected>cat</option>
+                  <option value="dog">dog</option>
+                  <option value="sat">sat</option>
+                  <option value="ran">ran</option>
+                </select>
+              </label>
+              <label class="select-row activation-row" for="activationSelect">
+                <span>Activation</span>
+                <select id="activationSelect" class="control-input">
+                  <option value="relu">ReLU</option>
+                  <option value="tanh">tanh</option>
+                  <option value="sigmoid">sigmoid</option>
+                </select>
+              </label>
+            </div>
+            <svg id="networkSvg" class="network-svg" viewBox="0 0 560 300" role="img" aria-label="Tiny next-word network forward pass"></svg>
+            <p class="microcopy">
+              Edge <strong>color</strong> shows the sign of that connection's push
+              (<span class="edge-key edge-key-pos">teal positive</span>,
+              <span class="edge-key edge-key-neg">coral negative</span>); edge
+              <strong>thickness</strong> shows how hard it pushes for this input. The ringed
+              hidden neuron is the one traced step by step on the right - <strong>click any
+              neuron</strong> to trace a different one.
+            </p>
+          </div>
 
-        <div class="math-formal" aria-label="Learning in symbols">
-          <h3>Loss, gradient, and the update rule, in symbols</h3>
-          <p>
-            The loss is the average squared gap between the line's prediction \(\hat{y}\)
-            and the true value \(y\). To fix a bad prediction, we need to know how tweaking our knobs affects that loss. In machine learning, we group all adjustable knobs (like our slope and our intercept) under the universal label of <strong>weights</strong>, represented by the letter \(w\). Think of \(w\) as a generic blank space: the update rule at the bottom is a template. You run the template once substituting \(w\) for the slope, and then you run it again substituting \(w\) for the intercept.
-          </p>
-          <p>
-            The <strong>gradient</strong> \(\frac{\partial L}{\partial w}\) reads as "how fast does the loss \(L\) change if I nudge just this one specific weight \(w\), holding the rest perfectly still." That is all the partial derivative \(\partial\) symbol means: isolating one knob at a time.
-          </p>
-          <p class="microcopy">
-            <em><strong>Calculus Refreshers:</strong> If the \(\partial\) symbol looks unfamiliar, Wikipedia has excellent, visual primers on <u><a href="https://en.wikipedia.org/wiki/Partial_derivative" target="_blank" rel="noreferrer">Partial derivatives</a></u> and the <u><a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a></u>.</em>
-          </p>
-          <p>
-            How do we calculate that exact gradient number? We use the Chain Rule. Working from the outside in: the \(2\) from the squared error drops down to the front, and then we multiply by the inner variable attached to our knob. Because our prediction is \((\text{slope} \cdot x + \text{intercept})\), the variable attached to the slope is \(x\). The variable attached to the intercept is just \(1\).
-          </p>
+          <div class="panel breakdown-panel">
+            <div class="section-title-row">
+              <h3>Inside the pass</h3>
+              <span class="pill">embeddings → softmax</span>
+            </div>
+            <p class="microcopy">
+              Every number below is computed live from the two context words and the
+              activation you picked. Follow the five steps top to bottom and watch the
+              real multiply-and-add that turns two word vectors into a next-word guess.
+            </p>
+            <div id="forwardPanel" class="forward-panel" aria-live="polite"></div>
+            <p class="insight-note">
+              This is exactly the shape of the model you are about to train: context
+              words in, a next-word distribution out. The only thing missing is
+              learning, which is the four-beat loop of forward pass, loss, backward
+              pass, and update.
+            </p>
+          </div>
 
-          $$L = \frac{1}{N}\sum_{i=1}^{N}\big(\hat{y}_i - y_i\big)^2 \qquad (\text{where } \hat{y} = \text{slope} \cdot x + \text{intercept})$$
-          $$\frac{\partial L}{\partial\,\text{slope}} = 2(\hat{y}-y)\,x \qquad \frac{\partial L}{\partial\,\text{intercept}} = 2(\hat{y}-y)$$
-          $$w \leftarrow w - \eta\,\frac{\partial L}{\partial w}$$
+          <div class="model-shape-bridge" aria-label="Bridge from toy network dimensions to Transformer model-card symbols">
+          <div>
+            <p class="eyebrow">Shape bridge</p>
+            <h3>The same math grows into model-card numbers.</h3>
+            <p>
+              This toy network is deliberately tiny, but the knobs already have the same
+              jobs as a real language model. From here on, papers and model cards mostly
+              talk in shapes: how many tokens fit in the context, how many vocabulary
+              rows exist, how wide each vector is, and how many layers repeat the same
+              pattern.
+            </p>
+          </div>
+          <div class="shape-symbol-grid">
+            <div class="shape-symbol-card">
+              <strong>\(T\)</strong>
+              <span>tokens in the current context window</span>
+              <em>toy: 2 context words</em>
+            </div>
+            <div class="shape-symbol-card">
+              <strong>\(V\)</strong>
+              <span>vocabulary rows and output choices</span>
+              <em>toy: 5 words</em>
+            </div>
+            <div class="shape-symbol-card">
+              <strong>\(d\)</strong>
+              <span>width of each learned vector</span>
+              <em>real LLMs: thousands</em>
+            </div>
+            <div class="shape-symbol-card">
+              <strong>\(L\)</strong>
+              <span>repeated layers or blocks</span>
+              <em>real LLMs: dozens or more</em>
+            </div>
+            <div class="shape-symbol-card">
+              <strong>\(H\)</strong>
+              <span>attention heads in a Transformer block</span>
+              <em>toy: not used yet</em>
+            </div>
+          </div>
+          <p class="insight-note">
+            Keep this map in your pocket for Chapter 5: a Transformer mostly replaces
+            the tiny hidden layer with repeated attention and feed-forward blocks, but it
+            still starts with token IDs, looks up vectors, produces logits over \(V\),
+            and trains by lowering cross-entropy.
+          </p>
+          </div>
+        </div>
 
+        <div class="math-formal" aria-label="Forward pass in symbols">
+          <h3>The whole forward pass, in symbols</h3>
+          <p>
+            A single neuron takes its inputs \(x\), weights them, adds a bias, and runs
+            the result through an activation \(f\):
+          </p>
+          $$a = f(w \cdot x + b)$$
+          <p>
+            Stack those into the tiny next-word network. Look up an embedding row for
+            each of the two context words and join them, pass through one hidden layer
+            with a \(\tanh\) activation, produce one raw score per vocabulary word, and
+            finish with softmax:
+          </p>
+          $$e = \big[\,E_{w_1}\,;\,E_{w_2}\,\big] \qquad h = \tanh(W_1 e + b_1)$$
+          $$z = W_2 h + b_2 \qquad p = \text{softmax}(z)$$
           <ul class="symbol-glossary">
-            <li>\(\hat{y}\): the line's prediction; \(y\): the true value in the data.</li>
-            <li>\(N\): how many points we average the loss over.</li>
-            <li>\(w\): a generic "weight"&mdash;a placeholder. You swap in either "slope" or "intercept" when applying the math.</li>
-            <li>\(\frac{\partial L}{\partial w}\): the gradient, representing the uphill slope of the loss for that specific weight \(w\).</li>
-            <li>\(\eta\) (eta): the <strong>learning rate</strong> or step size (the same slider used in the lab).</li>
-            <li>\(\leftarrow\): "becomes" (we replace the old weight with its newly nudged value).</li>
+            <li>\(E_{w}\): the embedding row looked up for word \(w\); \(e\): the two rows joined.</li>
+            <li>\(W_1, b_1\): the hidden layer's weights and bias; \(\tanh\): its activation \(f\).</li>
+            <li>\(W_2, b_2\): the output weights and bias that turn the hidden layer into logits \(z\).</li>
+            <li>\(p\): the next-word probability for every word in the vocabulary.</li>
           </ul>
-          <p class="microcopy">
-            <strong>Walking through one step for the slope:</strong> For a single data point \((x{=}1,\ y{=}1)\) and a starting \(\text{slope}{=}0\), our prediction is \(\hat{y}=0\). The error is \(\hat{y}-y = -1\).
-            <br><br>
-            The gradient for the slope is \(2(-1)(1) = -2\). Now we use the update rule template, swapping \(w\) for the slope: \(\text{slope} \leftarrow 0 - 0.1(-2) = +0.2\). Subtracting the gradient ensures we step <em>downhill</em>, and \(\eta\) (set to \(0.1\) here) scales how big that step is.
-          </p>
-          <p class="microcopy">
-            <strong>Now make it move.</strong> That is the whole recipe - a loss, a gradient,
-            and the one update rule. The exercise just below lets you run it yourself: drag the
-            <code>slope</code>, <code>intercept</code>, and <code>step size</code>, press
-            <em>Step descent</em>, and watch this exact loss, gradient, and update step
-            recompute live on real numbers, one nudge at a time. With the math fresh in mind,
-            the numbers in the lab should now read like old friends.
-          </p>
-        </div>        
-
-        <div class="gradient-grid">
-          <div class="panel">
-            <div class="section-title-row">
-              <h3>Fit a line by nudging parameters</h3>
-              <span id="gradientStatus" class="pill">ready</span>
-            </div>
-            <div class="slider-stack">
-              <label class="range-row math-range" for="slopeSlider">
-                <span>Slope</span>
-                <input id="slopeSlider" type="range" min="-200" max="200" value="-40">
-                <output id="slopeLabel" for="slopeSlider">-0.40</output>
-              </label>
-              <label class="range-row math-range" for="interceptSlider">
-                <span>Intercept</span>
-                <input id="interceptSlider" type="range" min="-100" max="100" value="20">
-                <output id="interceptLabel" for="interceptSlider">0.20</output>
-              </label>
-              <label class="range-row math-range" for="lineRateSlider">
-                <span>Step size</span>
-                <input id="lineRateSlider" type="range" min="1" max="30" value="8">
-                <output id="lineRateLabel" for="lineRateSlider">0.08</output>
-              </label>
-            </div>
-            <p class="microcopy">
-              That <strong>step size</strong> (<code>0.08</code>) is the
-              <strong>learning rate</strong>: each Step moves a knob by this fraction of its
-              gradient. Small keeps training stable; larger takes bigger, riskier leaps.
-            </p>
-            <div class="stepper-row gradient-buttons">
-              <button id="gradientStepButton" class="primary-button" type="button">Step descent</button>
-              <button id="gradientAutoButton" class="ghost-button" type="button">Auto train</button>
-              <button id="gradientResetButton" class="ghost-button" type="button">Reset</button>
-            </div>
-            <svg id="lineFitSvg" class="line-fit-svg" viewBox="0 0 560 360" role="img" aria-label="Line fit and training points"></svg>
-            <p class="microcopy">
-              The sloped line is the model's current guess: its <strong>tilt</strong> is the
-              <code>slope</code> and its <strong>height</strong> where it crosses the centre
-              (marked <em>intercept</em>) is the <code>intercept</code>. Each dot is a data
-              point, and the short vertical gaps between the line and the dots are the
-              <strong>errors</strong> that the loss squares and averages.
-            </p>
-          </div>
-
-          <div class="panel">
-            <div class="section-title-row">
-              <h3>The exact math, live</h3>
-              <span id="lossLabel" class="pill">recomputed each Step</span>
-            </div>
-            <div id="gradientMetrics" class="metric-card-grid" aria-live="polite"></div>
-            <div id="gradientExplanation" class="gradient-explanation" aria-live="polite"></div>
-          </div>
-        </div>
-
-        <div class="code-quiz" data-quiz-type="predict" data-explain="The gradient points uphill (toward larger loss), so gradient descent subtracts it - a step in the opposite, downhill direction. That one subtraction is repeated for every weight in the network.">
-          <p class="quiz-prompt">Quick check: the gradient of the loss points the way that makes the loss <em>larger</em>. To make the loss smaller, gradient descent steps&hellip;</p>
-          <div class="quiz-options" role="group" aria-label="Which way gradient descent steps">
-            <button class="quiz-option" type="button" data-correct="true">The opposite way - it subtracts the gradient</button>
-            <button class="quiz-option" type="button" data-feedback="Stepping along the gradient climbs toward higher loss - the wrong direction.">Along the gradient, the same way</button>
-            <button class="quiz-option" type="button" data-feedback="The gradient gives a definite downhill direction; the step is not a guess.">In a random direction each time</button>
-          </div>
-          <p class="quiz-feedback" aria-live="polite" hidden></p>
-        </div>
-
-        <div class="code-quiz" data-quiz-type="predict" data-explain="Each step moves the weights by eta times the gradient. Too large a step jumps past the bottom of the loss curve, so the loss oscillates or blows up instead of converging.">
-          <p class="quiz-prompt">Quick check: you set the learning rate <code>eta</code> very large. What is the most likely result during training?</p>
-          <div class="quiz-options" role="group" aria-label="Effect of a very large learning rate">
-            <button class="quiz-option" type="button" data-feedback="A single giant step almost never lands on the minimum; it usually flies past it.">The loss reaches its minimum in a single step</button>
-            <button class="quiz-option" type="button" data-feedback="The learning rate scales every update, so it very much changes what training does.">Nothing changes; the rate only affects how weights are stored</button>
-            <button class="quiz-option" type="button" data-correct="true">The updates overshoot the minimum, so the loss bounces or diverges instead of settling</button>
-          </div>
-          <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
       </div>
     </section>
@@ -869,184 +902,152 @@
       </div>
     </section>
 
-    <section id="neural-networks" class="band" aria-labelledby="nn-title">
+    <section id="gradients" class="band" aria-labelledby="gradients-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">5. Build the forward pass</p>
-          <h2 id="nn-title">Stack the pieces into a tiny network we can inspect.</h2>
+
+          <p class="eyebrow">5. Gradients, gradient descent, and loss</p>
+          <h2 id="gradients-title">When the guess is wrong, which way do we nudge?</h2>
           <p>
-            We now have learnt about five tools - probability, vectors, the dot product,
-            softmax, and the gradient. Think of a neural network as a pipeline. The input data (our context words) is the water flowing through the pipes, and the <strong>weights</strong> are the adjustable valves. The water always flows forward, but the valves decide how much pressure makes it to each possible next-word output.
+            We can now measure surprise and compare words - but measuring a mistake is
+            not the same as fixing it. Here is the question that actually
+            does the learning: when a guess is wrong, which way, and how far, should we
+            move the numbers? Let's start simple, we will shrink
+            the model to the simplest thing that can possibly learn - a straight line
+            with two knobs, a <code>slope</code> and an <code>intercept</code> - and
+            ask it to pass through a cloud of dots. The <strong>loss</strong> is just
+            the average squared gap between the line and the dots: one number that
+            answers "how wrong are we right now?". (Our word model will later swap in
+            cross-entropy loss, but the nudging idea is exactly the same.)
           </p>
           <p>
-            The smallest valve intersection is a <strong>neuron</strong>: it
-            multiplies its inputs by weights, adds a <strong>bias</strong>, and runs
-            the result through an
-            <a href="https://en.wikipedia.org/wiki/Activation_function" target="_blank" rel="noreferrer">activation function</a>.
-            Picture it as a tiny opinion-maker: it listens to a few numbers, weighs
-            each one by how much it trusts that input, adds its own standing belief (the
-            bias), and then decides how strongly to speak up.
-            Why bother with the activation? Because without that little bend - a
-            <a href="https://en.wikipedia.org/wiki/Rectifier_(neural_networks)" target="_blank" rel="noreferrer">ReLU</a>,
-            a \(\tanh\), a sigmoid - a stack of layers can only ever draw a straight line, no
-            matter how tall you build it. The bend or non-linearity is what lets it curve and learn complex patterns.
-            To understand this, consider: stacking two plain multiply-and-add
-            steps just gives you another multiply-and-add. Push <code>x</code> through one
-            layer to get <code>w<sub>1</sub>x + b<sub>1</sub></code>, feed that into a second,
-            and you land on <code>w<sub>2</sub>(w<sub>1</sub>x + b<sub>1</sub>) + b<sub>2</sub></code>
-            - which tidies up into <code>(w<sub>2</sub>w<sub>1</sub>)x + (w<sub>2</sub>b<sub>1</sub> + b<sub>2</sub>)</code>,
-            a single weight and a single bias all over again. A hundred such layers collapse
-            back into one straight line. The activation's non-linearity is exactly what breaks
-            that collapse: once each layer can curve, stacking them lets the network trace
-            shapes a straight line never could. Line up several
-            neurons and you have a layer; stack the layers and you have a
-            <a href="https://en.wikipedia.org/wiki/Multilayer_perceptron" target="_blank" rel="noreferrer">multilayer perceptron</a>,
-            or MLP.
+            Now the move that does all the work. Imagine you are standing blindfolded on the side of a hilly valley, trying to reach the absolute bottom (where your loss is zero). Because you can't see the whole landscape, you just feel the angle of the ground directly under your feet. The <strong>gradient</strong> is the math calculating that slope. It answers "if I jiggle this one knob, does the loss climb or fall, and how steeply?" By mathematical definition, a gradient always points toward the direction of steepest <em>increase</em>—straight uphill. So, to head downhill toward our goal, we take that exact measurement and deliberately step in the opposite direction.
           </p>
           <p>
-            Thus, the forward pass is the following: look up an <strong>embedding</strong> row for each context word,
-            join the rows, push them through a hidden layer with an activation, and
-            finish with softmax over the candidate words. Context words in, a next-word
-            distribution out. Try it out by changing the context or the activation below and watch the
-            prediction shift. These weights are fixed and illustrative for now; we will learn to adjust them later.
+            <a href="https://en.wikipedia.org/wiki/Gradient_descent" target="_blank" rel="noreferrer">Gradient descent</a>
+            is nothing grander than repeating that one blindfolded move: measure the slope, take a downhill step, repeat, until the line settles perfectly into the dots. This is where the <code>step size</code> (often called the <em>learning rate</em>) becomes incredibly delicate. If your step size is too tiny, you merely crawl, taking an eternity to reach the bottom. But if your step size is too massive, you leap clean over the bottom of the valley, landing even higher up on the opposite wall and making your mistake <em>worse</em>. Press <em>Step descent</em> below and watch the line walk toward the dots, one calculated nudge at a time.
           </p>
         </div>
 
-        <div class="network-grid">
-          <div class="panel diagram-panel">
-            <div class="section-title-row">
-              <h3>One forward pass</h3>
-              <span id="forwardSummary" class="pill">MLP</span>
-            </div>
-            <div class="control-grid compact-controls">
-              <label class="select-row activation-row" for="forwardCtxA">
-                <span>Context 1</span>
-                <select id="forwardCtxA" class="control-input">
-                  <option value="the" selected>the</option>
-                  <option value="cat">cat</option>
-                  <option value="dog">dog</option>
-                  <option value="sat">sat</option>
-                  <option value="ran">ran</option>
-                </select>
-              </label>
-              <label class="select-row activation-row" for="forwardCtxB">
-                <span>Context 2</span>
-                <select id="forwardCtxB" class="control-input">
-                  <option value="the">the</option>
-                  <option value="cat" selected>cat</option>
-                  <option value="dog">dog</option>
-                  <option value="sat">sat</option>
-                  <option value="ran">ran</option>
-                </select>
-              </label>
-              <label class="select-row activation-row" for="activationSelect">
-                <span>Activation</span>
-                <select id="activationSelect" class="control-input">
-                  <option value="relu">ReLU</option>
-                  <option value="tanh">tanh</option>
-                  <option value="sigmoid">sigmoid</option>
-                </select>
-              </label>
-            </div>
-            <svg id="networkSvg" class="network-svg" viewBox="0 0 560 300" role="img" aria-label="Tiny next-word network forward pass"></svg>
-            <p class="microcopy">
-              Edge <strong>color</strong> shows the sign of that connection's push
-              (<span class="edge-key edge-key-pos">teal positive</span>,
-              <span class="edge-key edge-key-neg">coral negative</span>); edge
-              <strong>thickness</strong> shows how hard it pushes for this input. The ringed
-              hidden neuron is the one traced step by step on the right - <strong>click any
-              neuron</strong> to trace a different one.
-            </p>
-          </div>
+        <figure class="intuition-figure">
+          <img src="assets/figures/chapter4-gradient-descent.gif" width="720" height="360" alt="Animated point moving downhill on a loss curve, with one arrow showing the local gradient and another arrow showing the update step." decoding="async">
+          <figcaption>The gradient tells you the local uphill direction. Gradient descent subtracts it, so the parameters take a small downhill step.</figcaption>
+        </figure>
 
-          <div class="panel breakdown-panel">
-            <div class="section-title-row">
-              <h3>Inside the pass</h3>
-              <span class="pill">embeddings → softmax</span>
-            </div>
-            <p class="microcopy">
-              Every number below is computed live from the two context words and the
-              activation you picked. Follow the five steps top to bottom and watch the
-              real multiply-and-add that turns two word vectors into a next-word guess.
-            </p>
-            <div id="forwardPanel" class="forward-panel" aria-live="polite"></div>
-            <p class="insight-note">
-              This is exactly the shape of the model you are about to train: context
-              words in, a next-word distribution out. The only thing missing is
-              learning, which is the four-beat loop of forward pass, loss, backward
-              pass, and update.
-            </p>
-          </div>
-
-          <div class="model-shape-bridge" aria-label="Bridge from toy network dimensions to Transformer model-card symbols">
-          <div>
-            <p class="eyebrow">Shape bridge</p>
-            <h3>The same math grows into model-card numbers.</h3>
-            <p>
-              This toy network is deliberately tiny, but the knobs already have the same
-              jobs as a real language model. From here on, papers and model cards mostly
-              talk in shapes: how many tokens fit in the context, how many vocabulary
-              rows exist, how wide each vector is, and how many layers repeat the same
-              pattern.
-            </p>
-          </div>
-          <div class="shape-symbol-grid">
-            <div class="shape-symbol-card">
-              <strong>\(T\)</strong>
-              <span>tokens in the current context window</span>
-              <em>toy: 2 context words</em>
-            </div>
-            <div class="shape-symbol-card">
-              <strong>\(V\)</strong>
-              <span>vocabulary rows and output choices</span>
-              <em>toy: 5 words</em>
-            </div>
-            <div class="shape-symbol-card">
-              <strong>\(d\)</strong>
-              <span>width of each learned vector</span>
-              <em>real LLMs: thousands</em>
-            </div>
-            <div class="shape-symbol-card">
-              <strong>\(L\)</strong>
-              <span>repeated layers or blocks</span>
-              <em>real LLMs: dozens or more</em>
-            </div>
-            <div class="shape-symbol-card">
-              <strong>\(H\)</strong>
-              <span>attention heads in a Transformer block</span>
-              <em>toy: not used yet</em>
-            </div>
-          </div>
-          <p class="insight-note">
-            Keep this map in your pocket for Chapter 5: a Transformer mostly replaces
-            the tiny hidden layer with repeated attention and feed-forward blocks, but it
-            still starts with token IDs, looks up vectors, produces logits over \(V\),
-            and trains by lowering cross-entropy.
-          </p>
-          </div>
-        </div>
-
-        <div class="math-formal" aria-label="Forward pass in symbols">
-          <h3>The whole forward pass, in symbols</h3>
+        <div class="math-formal" aria-label="Learning in symbols">
+          <h3>Loss, gradient, and the update rule, in symbols</h3>
           <p>
-            A single neuron takes its inputs \(x\), weights them, adds a bias, and runs
-            the result through an activation \(f\):
+            The loss is the average squared gap between the line's prediction \(\hat{y}\)
+            and the true value \(y\). To fix a bad prediction, we need to know how tweaking our knobs affects that loss. In machine learning, we group all adjustable knobs (like our slope and our intercept) under the universal label of <strong>weights</strong>, represented by the letter \(w\). Think of \(w\) as a generic blank space: the update rule at the bottom is a template. You run the template once substituting \(w\) for the slope, and then you run it again substituting \(w\) for the intercept.
           </p>
-          $$a = f(w \cdot x + b)$$
           <p>
-            Stack those into the tiny next-word network. Look up an embedding row for
-            each of the two context words and join them, pass through one hidden layer
-            with a \(\tanh\) activation, produce one raw score per vocabulary word, and
-            finish with softmax:
+            The <strong>gradient</strong> \(\frac{\partial L}{\partial w}\) reads as "how fast does the loss \(L\) change if I nudge just this one specific weight \(w\), holding the rest perfectly still." That is all the partial derivative \(\partial\) symbol means: isolating one knob at a time.
           </p>
-          $$e = \big[\,E_{w_1}\,;\,E_{w_2}\,\big] \qquad h = \tanh(W_1 e + b_1)$$
-          $$z = W_2 h + b_2 \qquad p = \text{softmax}(z)$$
+          <p class="microcopy">
+            <em><strong>Calculus Refreshers:</strong> If the \(\partial\) symbol looks unfamiliar, Wikipedia has excellent, visual primers on <u><a href="https://en.wikipedia.org/wiki/Partial_derivative" target="_blank" rel="noreferrer">Partial derivatives</a></u> and the <u><a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a></u>.</em>
+          </p>
+          <p>
+            How do we calculate that exact gradient number? We use the Chain Rule. Working from the outside in: the \(2\) from the squared error drops down to the front, and then we multiply by the inner variable attached to our knob. Because our prediction is \((\text{slope} \cdot x + \text{intercept})\), the variable attached to the slope is \(x\). The variable attached to the intercept is just \(1\).
+          </p>
+
+          $$L = \frac{1}{N}\sum_{i=1}^{N}\big(\hat{y}_i - y_i\big)^2 \qquad (\text{where } \hat{y} = \text{slope} \cdot x + \text{intercept})$$
+          $$\frac{\partial L}{\partial\,\text{slope}} = 2(\hat{y}-y)\,x \qquad \frac{\partial L}{\partial\,\text{intercept}} = 2(\hat{y}-y)$$
+          $$w \leftarrow w - \eta\,\frac{\partial L}{\partial w}$$
+
           <ul class="symbol-glossary">
-            <li>\(E_{w}\): the embedding row looked up for word \(w\); \(e\): the two rows joined.</li>
-            <li>\(W_1, b_1\): the hidden layer's weights and bias; \(\tanh\): its activation \(f\).</li>
-            <li>\(W_2, b_2\): the output weights and bias that turn the hidden layer into logits \(z\).</li>
-            <li>\(p\): the next-word probability for every word in the vocabulary.</li>
+            <li>\(\hat{y}\): the line's prediction; \(y\): the true value in the data.</li>
+            <li>\(N\): how many points we average the loss over.</li>
+            <li>\(w\): a generic "weight"&mdash;a placeholder. You swap in either "slope" or "intercept" when applying the math.</li>
+            <li>\(\frac{\partial L}{\partial w}\): the gradient, representing the uphill slope of the loss for that specific weight \(w\).</li>
+            <li>\(\eta\) (eta): the <strong>learning rate</strong> or step size (the same slider used in the lab).</li>
+            <li>\(\leftarrow\): "becomes" (we replace the old weight with its newly nudged value).</li>
           </ul>
+          <p class="microcopy">
+            <strong>Walking through one step for the slope:</strong> For a single data point \((x{=}1,\ y{=}1)\) and a starting \(\text{slope}{=}0\), our prediction is \(\hat{y}=0\). The error is \(\hat{y}-y = -1\).
+            <br><br>
+            The gradient for the slope is \(2(-1)(1) = -2\). Now we use the update rule template, swapping \(w\) for the slope: \(\text{slope} \leftarrow 0 - 0.1(-2) = +0.2\). Subtracting the gradient ensures we step <em>downhill</em>, and \(\eta\) (set to \(0.1\) here) scales how big that step is.
+          </p>
+          <p class="microcopy">
+            <strong>Now make it move.</strong> That is the whole recipe - a loss, a gradient,
+            and the one update rule. The exercise just below lets you run it yourself: drag the
+            <code>slope</code>, <code>intercept</code>, and <code>step size</code>, press
+            <em>Step descent</em>, and watch this exact loss, gradient, and update step
+            recompute live on real numbers, one nudge at a time. With the math fresh in mind,
+            the numbers in the lab should now read like old friends.
+          </p>
+        </div>
+
+        <div class="gradient-grid">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Fit a line by nudging parameters</h3>
+              <span id="gradientStatus" class="pill">ready</span>
+            </div>
+            <div class="slider-stack">
+              <label class="range-row math-range" for="slopeSlider">
+                <span>Slope</span>
+                <input id="slopeSlider" type="range" min="-200" max="200" value="-40">
+                <output id="slopeLabel" for="slopeSlider">-0.40</output>
+              </label>
+              <label class="range-row math-range" for="interceptSlider">
+                <span>Intercept</span>
+                <input id="interceptSlider" type="range" min="-100" max="100" value="20">
+                <output id="interceptLabel" for="interceptSlider">0.20</output>
+              </label>
+              <label class="range-row math-range" for="lineRateSlider">
+                <span>Step size</span>
+                <input id="lineRateSlider" type="range" min="1" max="30" value="8">
+                <output id="lineRateLabel" for="lineRateSlider">0.08</output>
+              </label>
+            </div>
+            <p class="microcopy">
+              That <strong>step size</strong> (<code>0.08</code>) is the
+              <strong>learning rate</strong>: each Step moves a knob by this fraction of its
+              gradient. Small keeps training stable; larger takes bigger, riskier leaps.
+            </p>
+            <div class="stepper-row gradient-buttons">
+              <button id="gradientStepButton" class="primary-button" type="button">Step descent</button>
+              <button id="gradientAutoButton" class="ghost-button" type="button">Auto train</button>
+              <button id="gradientResetButton" class="ghost-button" type="button">Reset</button>
+            </div>
+            <svg id="lineFitSvg" class="line-fit-svg" viewBox="0 0 560 360" role="img" aria-label="Line fit and training points"></svg>
+            <p class="microcopy">
+              The sloped line is the model's current guess: its <strong>tilt</strong> is the
+              <code>slope</code> and its <strong>height</strong> where it crosses the centre
+              (marked <em>intercept</em>) is the <code>intercept</code>. Each dot is a data
+              point, and the short vertical gaps between the line and the dots are the
+              <strong>errors</strong> that the loss squares and averages.
+            </p>
+          </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>The exact math, live</h3>
+              <span id="lossLabel" class="pill">recomputed each Step</span>
+            </div>
+            <div id="gradientMetrics" class="metric-card-grid" aria-live="polite"></div>
+            <div id="gradientExplanation" class="gradient-explanation" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="The gradient points uphill (toward larger loss), so gradient descent subtracts it - a step in the opposite, downhill direction. That one subtraction is repeated for every weight in the network.">
+          <p class="quiz-prompt">Quick check: the gradient of the loss points the way that makes the loss <em>larger</em>. To make the loss smaller, gradient descent steps&hellip;</p>
+          <div class="quiz-options" role="group" aria-label="Which way gradient descent steps">
+            <button class="quiz-option" type="button" data-correct="true">The opposite way - it subtracts the gradient</button>
+            <button class="quiz-option" type="button" data-feedback="Stepping along the gradient climbs toward higher loss - the wrong direction.">Along the gradient, the same way</button>
+            <button class="quiz-option" type="button" data-feedback="The gradient gives a definite downhill direction; the step is not a guess.">In a random direction each time</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Each step moves the weights by eta times the gradient. Too large a step jumps past the bottom of the loss curve, so the loss oscillates or blows up instead of converging.">
+          <p class="quiz-prompt">Quick check: you set the learning rate <code>eta</code> very large. What is the most likely result during training?</p>
+          <div class="quiz-options" role="group" aria-label="Effect of a very large learning rate">
+            <button class="quiz-option" type="button" data-feedback="A single giant step almost never lands on the minimum; it usually flies past it.">The loss reaches its minimum in a single step</button>
+            <button class="quiz-option" type="button" data-feedback="The learning rate scales every update, so it very much changes what training does.">Nothing changes; the rate only affects how weights are stored</button>
+            <button class="quiz-option" type="button" data-correct="true">The updates overshoot the minimum, so the loss bounces or diverges instead of settling</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
       </div>
     </section>
@@ -1064,6 +1065,136 @@
           </p>
         </div>
         
+        <div class="math-formal" aria-label="Backpropagation in symbols">
+          <h3>The backward pass, in symbols</h3>
+          <p>
+            Backpropagation is the <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">chain rule</a>
+            run in reverse across the whole network. Start with the simplest case - a single hidden
+            weight \(w\) buried two steps below the loss. To learn how nudging it changes \(L\), you
+            multiply the local sensitivity of every step between them:
+          </p>
+          $$\frac{\partial L}{\partial w} = \frac{\partial L}{\partial z} \cdot \frac{\partial z}{\partial h} \cdot \frac{\partial h}{\partial w}$$
+          <p>
+            That is the entire idea, and it scales: every layer receives an <em>incoming gradient</em>
+            (the blame handed down from above), multiplies it by its own <strong>local derivative</strong>, and
+            passes the result on as the blame for the layer below. Sweep that rule from the loss back to
+            the very first weight and you get, in one pass, the gradient of \(L\) with respect to
+            <em>every</em> parameter at once.
+          </p>
+
+          <h3>First, the forward pass we are differentiating</h3>
+          <p>
+            Keep these lines from Section 3 in view - the backward pass simply unwinds them one at a
+            time, last line first:
+          </p>
+          $$e = [\,E_{w_1};E_{w_2}\,] \qquad z^{(1)} = W_1 e + b_1$$
+          $$h = f(z^{(1)}) \qquad z = W_2 h + b_2$$
+          $$q = \text{softmax}(z) \qquad L = -\ln q_c$$
+          <ul class="symbol-glossary">
+            <li>\(e\): the two context-word embeddings joined into one input vector.</li>
+            <li>\(z^{(1)}, h\): the hidden layer's pre-activation and its activation through \(f\) (ReLU, tanh, sigmoid).</li>
+            <li>\(z, q\): the output logits and the softmax probabilities.</li>
+            <li>\(y\): the one-hot target (a \(1\) at the true word \(c\), \(0\) everywhere else); \(L = -\ln q_c\) is the cross-entropy loss.</li>
+          </ul>
+
+          <h3>The one move, repeated: blame in, local slope, blame out</h3>
+          <p>
+            Write \(\delta\) for the gradient of the loss with respect to a layer's pre-activation - the
+            "blame" arriving at that layer. The whole algorithm is just two rules applied over and over.
+            To push blame <em>down</em> to the previous layer, multiply by the <strong>transpose of the weights</strong>
+            (\(W^{\top}\)) you used on the way up. To turn blame into a <strong>weight gradient</strong>, multiply the
+            incoming blame by the signal that flowed <em>out</em> of that weight on the forward pass.
+          </p>
+
+          <h3>Layer by layer, for our network</h3>
+          <p>
+            <strong>Output layer.</strong> Section 4 already did the hardest part: softmax paired with
+            cross-entropy collapses the output blame to one clean difference,
+          </p>
+          $$\delta = \frac{\partial L}{\partial z} = q - y$$
+          <p>and from that single vector the output weights and bias fall straight out:</p>
+          $$\frac{\partial L}{\partial W_2} = \delta\,h^{\top} \qquad \frac{\partial L}{\partial b_2} = \delta$$
+          <p class="microcopy">
+            Read \(\delta\,h^{\top}\) as one sentence: a weight's gradient is <em>how wrong its output was</em>
+            (\(\delta\)) times <em>how active the neuron feeding it was</em> (\(h\)). A weight earns a big update
+            only when both are large - a confident mistake riding on a strongly-firing neuron.
+          </p>
+
+          <p>
+            <strong>Hand the blame back to the hidden layer.</strong> Each hidden neuron is guilty in
+            proportion to the output errors it fed and the weights it used to feed them:
+          </p>
+          $$\frac{\partial L}{\partial h} = W_2^{\top}\,\delta$$
+          <p>
+            <strong>Through the activation gate.</strong> Multiply element-wise by the local slope of the
+            activation to get the hidden layer's own blame \(\delta^{(1)}\):
+          </p>
+          $$\delta^{(1)} = \frac{\partial L}{\partial z^{(1)}} = \big(W_2^{\top}\delta\big)\odot f'(z^{(1)})$$
+          <p class="microcopy">
+            The \(\odot\) is element-wise multiplication, and \(f'(z^{(1)})\) is the <strong>gate</strong>: where a
+            neuron was saturated or clipped its slope is near zero, so almost no blame passes through. ReLU's
+            gate is fully shut at \(0\) and wide open (slope \(1\)) above it; tanh and sigmoid are always at
+            least partly closed - exactly the behaviour the lab's step 3 reports.
+          </p>
+          <p>
+            <strong>Input weights, the same shape all over again.</strong> Blame times the signal that flowed
+            out - here the input \(e\):
+          </p>
+          $$\frac{\partial L}{\partial W_1} = \delta^{(1)} e^{\top} \qquad \frac{\partial L}{\partial b_1} = \delta^{(1)}$$
+          $$\frac{\partial L}{\partial e} = W_1^{\top}\delta^{(1)}$$
+          <p class="microcopy">
+            That last term, \(\partial L/\partial e\), is the blame that keeps travelling into the
+            embedding rows themselves - which is precisely how the word vectors get trained in the full
+            model at the end of the chapter.
+          </p>
+
+          <h3>The update rule ties it back to Section 5</h3>
+          <p>
+            Every parameter then takes the same small downhill step we met with gradient descent, each
+            using its own gradient:
+          </p>
+          $$\theta \leftarrow \theta - \eta\,\nabla_\theta L \qquad \theta \in \{W_1, b_1, W_2, b_2\}$$
+          <p class="microcopy">
+            \(\eta\) is the learning rate (the slider in the lab below), and \(\nabla_\theta L\) is shorthand
+            for "all the partial derivatives we just collected for \(\theta\)." The lab computes
+            <em>exactly</em> these quantities for your chosen example - press <em>Take a gradient step</em> and
+            watch \(\delta = q - y\) shrink toward zero as \(q\) slides onto the true word.
+          </p>
+          <p class="microcopy">
+            One ordering note for later: in a real training step, this update runs immediately
+            <em>after</em> backprop - backprop produces the gradients, and this rule spends them.
+          </p>
+
+          <h3>Why backward, and why it is cheap</h3>
+          <p>
+            Look at how the same forward quantities - \(h\), \(z^{(1)}\), \(e\) - reappear inside the
+            gradients. That is the whole efficiency trick: one <strong>forward pass</strong> caches those
+            activations, and one <strong>backward pass</strong> reuses them to produce the gradient of <em>every</em>
+            weight at once. The total cost is about two forward passes, no matter whether the network has a
+            dozen parameters or a hundred billion. Estimating each gradient the naive way - nudge one
+            weight, rerun the whole network, see how the loss moved - would cost a full pass <em>per weight</em>,
+            which is hopeless at scale. This reverse sweep is what people mean by
+            <a href="https://en.wikipedia.org/wiki/Automatic_differentiation" target="_blank" rel="noreferrer">reverse-mode automatic differentiation</a>,
+            the engine inside PyTorch and TensorFlow.
+          </p>
+
+          <h3>One warning the formulas predict</h3>
+          <p>
+            Because blame is multiplied by a weight transpose <em>and</em> an activation slope at every layer,
+            a deep stack chains many such factors together. If those factors mostly sit below one (sigmoid's
+            slope never exceeds \(0.25\)), the signal shrinks toward nothing on the way back - the
+            <a href="https://en.wikipedia.org/wiki/Vanishing_gradient_problem" target="_blank" rel="noreferrer">vanishing gradient</a>
+            problem - and if they mostly sit above one, it explodes. That single observation, visible right
+            here in the math, is why later architectures lean on ReLU-like activations, normalization, and the
+            residual "skip" connections we will meet in Chapter 5.
+          </p>
+
+          <p class="microcopy">
+            <em><strong>Deep Dive:</strong> If you want to watch these gradients flow through the network's
+            operations one node at a time, Christopher Olah's classic <u><a href="https://colah.github.io/posts/2015-08-Backprop/" target="_blank" rel="noreferrer">Calculus on Computational Graphs</a></u> is the gold-standard explanation.</em>
+          </p>
+        </div>
+
         <div class="worked-example" aria-label="Backprop by hand">
           <h3>Passing blame backward, by hand</h3>
           <p>
@@ -1166,132 +1297,6 @@
           </div>
         </div>
 
-        <div class="math-formal" aria-label="Backpropagation in symbols">
-          <h3>The backward pass, in symbols</h3>
-          <p>
-            Backpropagation is the <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">chain rule</a>
-            run in reverse across the whole network. Start with the simplest case - a single hidden
-            weight \(w\) buried two steps below the loss. To learn how nudging it changes \(L\), you
-            multiply the local sensitivity of every step between them:
-          </p>
-          $$\frac{\partial L}{\partial w} = \frac{\partial L}{\partial z} \cdot \frac{\partial z}{\partial h} \cdot \frac{\partial h}{\partial w}$$
-          <p>
-            That is the entire idea, and it scales: every layer receives an <em>incoming gradient</em>
-            (the blame handed down from above), multiplies it by its own <strong>local derivative</strong>, and
-            passes the result on as the blame for the layer below. Sweep that rule from the loss back to
-            the very first weight and you get, in one pass, the gradient of \(L\) with respect to
-            <em>every</em> parameter at once.
-          </p>
-
-          <h3>First, the forward pass we are differentiating</h3>
-          <p>
-            Keep these lines from Section 5 in view - the backward pass simply unwinds them one at a
-            time, last line first:
-          </p>
-          $$e = [\,E_{w_1};E_{w_2}\,] \qquad z^{(1)} = W_1 e + b_1$$
-          $$h = f(z^{(1)}) \qquad z = W_2 h + b_2$$
-          $$q = \text{softmax}(z) \qquad L = -\ln q_c$$
-          <ul class="symbol-glossary">
-            <li>\(e\): the two context-word embeddings joined into one input vector.</li>
-            <li>\(z^{(1)}, h\): the hidden layer's pre-activation and its activation through \(f\) (ReLU, tanh, sigmoid).</li>
-            <li>\(z, q\): the output logits and the softmax probabilities.</li>
-            <li>\(y\): the one-hot target (a \(1\) at the true word \(c\), \(0\) everywhere else); \(L = -\ln q_c\) is the cross-entropy loss.</li>
-          </ul>
-
-          <h3>The one move, repeated: blame in, local slope, blame out</h3>
-          <p>
-            Write \(\delta\) for the gradient of the loss with respect to a layer's pre-activation - the
-            "blame" arriving at that layer. The whole algorithm is just two rules applied over and over.
-            To push blame <em>down</em> to the previous layer, multiply by the <strong>transpose of the weights</strong>
-            (\(W^{\top}\)) you used on the way up. To turn blame into a <strong>weight gradient</strong>, multiply the
-            incoming blame by the signal that flowed <em>out</em> of that weight on the forward pass.
-          </p>
-
-          <h3>Layer by layer, for our network</h3>
-          <p>
-            <strong>Output layer.</strong> Section 4 already did the hardest part: softmax paired with
-            cross-entropy collapses the output blame to one clean difference,
-          </p>
-          $$\delta = \frac{\partial L}{\partial z} = q - y$$
-          <p>and from that single vector the output weights and bias fall straight out:</p>
-          $$\frac{\partial L}{\partial W_2} = \delta\,h^{\top} \qquad \frac{\partial L}{\partial b_2} = \delta$$
-          <p class="microcopy">
-            Read \(\delta\,h^{\top}\) as one sentence: a weight's gradient is <em>how wrong its output was</em>
-            (\(\delta\)) times <em>how active the neuron feeding it was</em> (\(h\)). A weight earns a big update
-            only when both are large - a confident mistake riding on a strongly-firing neuron.
-          </p>
-
-          <p>
-            <strong>Hand the blame back to the hidden layer.</strong> Each hidden neuron is guilty in
-            proportion to the output errors it fed and the weights it used to feed them:
-          </p>
-          $$\frac{\partial L}{\partial h} = W_2^{\top}\,\delta$$
-          <p>
-            <strong>Through the activation gate.</strong> Multiply element-wise by the local slope of the
-            activation to get the hidden layer's own blame \(\delta^{(1)}\):
-          </p>
-          $$\delta^{(1)} = \frac{\partial L}{\partial z^{(1)}} = \big(W_2^{\top}\delta\big)\odot f'(z^{(1)})$$
-          <p class="microcopy">
-            The \(\odot\) is element-wise multiplication, and \(f'(z^{(1)})\) is the <strong>gate</strong>: where a
-            neuron was saturated or clipped its slope is near zero, so almost no blame passes through. ReLU's
-            gate is fully shut at \(0\) and wide open (slope \(1\)) above it; tanh and sigmoid are always at
-            least partly closed - exactly the behaviour the lab's step 3 reports.
-          </p>
-          <p>
-            <strong>Input weights, the same shape all over again.</strong> Blame times the signal that flowed
-            out - here the input \(e\):
-          </p>
-          $$\frac{\partial L}{\partial W_1} = \delta^{(1)} e^{\top} \qquad \frac{\partial L}{\partial b_1} = \delta^{(1)}$$
-          $$\frac{\partial L}{\partial e} = W_1^{\top}\delta^{(1)}$$
-          <p class="microcopy">
-            That last term, \(\partial L/\partial e\), is the blame that keeps travelling into the
-            embedding rows themselves - which is precisely how the word vectors get trained in the full
-            model at the end of the chapter.
-          </p>
-
-          <h3>The update rule ties it back to Section 3</h3>
-          <p>
-            Every parameter then takes the same small downhill step we met with gradient descent, each
-            using its own gradient:
-          </p>
-          $$\theta \leftarrow \theta - \eta\,\nabla_\theta L \qquad \theta \in \{W_1, b_1, W_2, b_2\}$$
-          <p class="microcopy">
-            \(\eta\) is the learning rate (the slider in the lab above), and \(\nabla_\theta L\) is shorthand
-            for "all the partial derivatives we just collected for \(\theta\)." The lab computes
-            <em>exactly</em> these quantities for your chosen example - press <em>Take a gradient step</em> and
-            watch \(\delta = q - y\) shrink toward zero as \(q\) slides onto the true word.
-          </p>
-
-          <h3>Why backward, and why it is cheap</h3>
-          <p>
-            Look at how the same forward quantities - \(h\), \(z^{(1)}\), \(e\) - reappear inside the
-            gradients. That is the whole efficiency trick: one <strong>forward pass</strong> caches those
-            activations, and one <strong>backward pass</strong> reuses them to produce the gradient of <em>every</em>
-            weight at once. The total cost is about two forward passes, no matter whether the network has a
-            dozen parameters or a hundred billion. Estimating each gradient the naive way - nudge one
-            weight, rerun the whole network, see how the loss moved - would cost a full pass <em>per weight</em>,
-            which is hopeless at scale. This reverse sweep is what people mean by
-            <a href="https://en.wikipedia.org/wiki/Automatic_differentiation" target="_blank" rel="noreferrer">reverse-mode automatic differentiation</a>,
-            the engine inside PyTorch and TensorFlow.
-          </p>
-
-          <h3>One warning the formulas predict</h3>
-          <p>
-            Because blame is multiplied by a weight transpose <em>and</em> an activation slope at every layer,
-            a deep stack chains many such factors together. If those factors mostly sit below one (sigmoid's
-            slope never exceeds \(0.25\)), the signal shrinks toward nothing on the way back - the
-            <a href="https://en.wikipedia.org/wiki/Vanishing_gradient_problem" target="_blank" rel="noreferrer">vanishing gradient</a>
-            problem - and if they mostly sit above one, it explodes. That single observation, visible right
-            here in the math, is why later architectures lean on ReLU-like activations, normalization, and the
-            residual "skip" connections we will meet in Chapter 5.
-          </p>
-
-          <p class="microcopy">
-            <em><strong>Deep Dive:</strong> If you want to watch these gradients flow through the network's
-            operations one node at a time, Christopher Olah's classic <u><a href="https://colah.github.io/posts/2015-08-Backprop/" target="_blank" rel="noreferrer">Calculus on Computational Graphs</a></u> is the gold-standard explanation.</em>
-          </p>
-        </div>
-
         <div class="code-quiz" data-quiz-type="predict" data-explain="By calculating the error at the end and flowing it backward, we can find the exact gradient for every single weight in the network in just one sweep. Going forward would require tweaking every weight individually to see what happens.">
           <p class="quiz-prompt">Quick check: Why do we pass the error <em>backward</em> through the network to calculate gradients, rather than just adjusting weights and running it forward to check the result?</p>
           <div class="quiz-options" role="group" aria-label="Why backprop is efficient">
@@ -1337,7 +1342,7 @@
         <div class="build-network-explainer">
           <div class="build-network-copy">
             <p class="eyebrow">What you are training</p>
-            <h3>A tiny multilayer perceptron - the very same shape as Section 5.</h3>
+            <h3>A tiny multilayer perceptron - the very same shape as Section 3.</h3>
             <p>
               There is no mystery box here. Every dot on the map is just <strong>two numbers</strong>:
               its <code>x</code> and <code>y</code> position. Those two inputs feed a <strong>hidden
@@ -1347,7 +1352,7 @@
               group B." That is the whole network.
             </p>
             <p>
-              It is the exact same architecture as the next-word network you built in Section 5 - only the
+              It is the exact same architecture as the next-word network you built in Section 3 - only the
               input is two coordinates instead of two word vectors, and there are two output classes
               instead of a whole vocabulary. With <code>N</code> hidden neurons it carries
               <code>5N + 2</code> weights and biases, which is precisely the <strong>parameters</strong>
@@ -1496,7 +1501,7 @@
             This is the payoff, and it runs the exact same four beats you just watched on the dots -
             only now the dots are words. Not a fake diagram, not a pretend model: everything above
             becomes one small network that predicts the next word, trained right here on a tiny corpus.
-            When you click "Train", you are executing exactly what you just learned: <strong>Embeddings \(\rightarrow\) Forward Pass \(\rightarrow\) Softmax \(\rightarrow\) Cross-Entropy Loss \(\rightarrow\) Backprop \(\rightarrow\) Gradient Descent</strong>.
+            When you click "Train", every example runs the full pipeline in <em>compute order</em>: <strong>Embeddings \(\rightarrow\) Forward Pass \(\rightarrow\) Softmax \(\rightarrow\) Cross-Entropy Loss \(\rightarrow\) Backprop \(\rightarrow\) Gradient Descent</strong>. Backprop lands <em>before</em> gradient descent here for a concrete reason: a step has to compute the gradients (backprop) before it can take the downhill move (gradient descent). That is the reverse of the order we taught them in, on purpose - the downhill step is the simpler idea, and backprop exists only to feed it.
           </p>
           <p>
             It is a miniature of the
@@ -1517,46 +1522,93 @@
           </p>
         </div>
 
+        <div class="build-network-explainer">
+          <div class="build-network-copy">
+            <p class="eyebrow">What you are training</p>
+            <h3>A tiny next-word network - the exact forward pass from Section 3, with learning switched on.</h3>
+            <p>
+              No mystery box here. The two context words are each looked up as a learned
+              <strong>vector</strong> (an embedding). The two vectors are joined, pushed
+              through a <strong>hidden layer</strong> of <code>tanh</code> neurons, and
+              turned into one score for every word in the vocabulary.
+              <a href="#softmax">Softmax</a> makes those scores a probability distribution:
+              "given these two words, here is how likely each possible next word is."
+            </p>
+            <p>
+              Training nudges every number along that path - the embeddings, both weight
+              layers, and the biases - using the exact backprop from Section 6. With a
+              vocabulary of <code>V</code> words, a <code>12</code>-dimensional embedding, and
+              <code>24</code> hidden units, that is a few thousand weights; the live
+              <strong>parameters</strong> readout below counts them exactly.
+            </p>
+          </div>
+          <figure class="build-network-figure">
+            <svg class="mlp-svg" viewBox="0 0 540 250" role="img" aria-labelledby="nw-mlp-t nw-mlp-d">
+              <title id="nw-mlp-t">The next-word network</title>
+              <desc id="nw-mlp-d">Two context words feed a hidden layer of tanh neurons, which feed a softmax over the whole vocabulary.</desc>
+              <line class="network-edge" x1="102" y1="88" x2="248" y2="44"></line>
+              <line class="network-edge" x1="102" y1="88" x2="248" y2="100"></line>
+              <line class="network-edge" x1="102" y1="88" x2="248" y2="156"></line>
+              <line class="network-edge" x1="102" y1="88" x2="248" y2="212"></line>
+              <line class="network-edge" x1="102" y1="170" x2="248" y2="44"></line>
+              <line class="network-edge" x1="102" y1="170" x2="248" y2="100"></line>
+              <line class="network-edge" x1="102" y1="170" x2="248" y2="156"></line>
+              <line class="network-edge" x1="102" y1="170" x2="248" y2="212"></line>
+              <line class="network-edge" x1="282" y1="44" x2="420" y2="128"></line>
+              <line class="network-edge" x1="282" y1="100" x2="420" y2="128"></line>
+              <line class="network-edge" x1="282" y1="156" x2="420" y2="128"></line>
+              <line class="network-edge" x1="282" y1="212" x2="420" y2="128"></line>
+              <circle class="network-node is-input" cx="78" cy="88" r="24"></circle>
+              <text class="network-label" x="78" y="93">word 1</text>
+              <circle class="network-node is-input" cx="78" cy="170" r="24"></circle>
+              <text class="network-label" x="78" y="175">word 2</text>
+              <circle class="network-node is-hidden" cx="265" cy="44" r="17"></circle>
+              <circle class="network-node is-hidden" cx="265" cy="100" r="17"></circle>
+              <circle class="network-node is-hidden" cx="265" cy="156" r="17"></circle>
+              <circle class="network-node is-hidden" cx="265" cy="212" r="17"></circle>
+              <rect class="network-node is-output" x="420" y="83" width="104" height="90" rx="11"></rect>
+              <text class="network-label" x="472" y="122">softmax</text>
+              <text class="network-label" x="472" y="142">over vocab</text>
+              <text class="mlp-axis" x="78" y="232">2 context words</text>
+              <text class="mlp-axis" x="265" y="244">hidden &middot; tanh</text>
+              <text class="mlp-axis" x="472" y="232">score every word</text>
+            </svg>
+            <figcaption>Two context words &rarr; embeddings &rarr; one hidden layer (tanh) &rarr; softmax over every word in the vocabulary. The <em>parameters</em> readout below is exactly these weights.</figcaption>
+          </figure>
+        </div>
+
         <div class="corpus-card panel" aria-label="Training corpus">
           <div class="section-title-row">
-            <h3>The whole training corpus</h3>
-            <span class="pill">12 sentences</span>
+            <h3>The training corpus</h3>
+            <span id="nwCorpusCount" class="pill">sentences</span>
           </div>
           <p class="microcopy">
-            Small and repetitive on purpose, so a two-word context is genuinely
-            predictive and training finishes in seconds. Every sentence gets a hidden
-            <code>start</code> marker so the first word has a context too.
+            A bigger, more varied corpus this time - dozens of short sentences about animals
+            and people in a little nature world, with a deliberately controlled vocabulary so
+            a two-word context is still genuinely predictive. Every sentence gets a hidden
+            <code>start</code> marker so the first word has a context too. Here is a sample:
           </p>
-          <div class="corpus-lines">
-            <code>the cat sat on the mat</code>
-            <code>the cat ran in the sun</code>
-            <code>the dog sat on the mat</code>
-            <code>the dog ran in the rain</code>
-            <code>a cat sat by the dog</code>
-            <code>a dog sat by the cat</code>
-            <code>the cat saw a bird</code>
-            <code>the dog saw a bird</code>
-            <code>the bird sat on the cat</code>
-            <code>the bird ran from the dog</code>
-            <code>the cat slept on the mat</code>
-            <code>the dog slept in the sun</code>
-          </div>
+          <div id="nwCorpusPreview" class="corpus-lines" aria-live="polite"></div>
+          <p class="microcopy">...and more, in the same style. The whole list trains within the budget you pick below.</p>
         </div>
 
         <section class="trainer nn-trainer" aria-label="Next-word model training controls">
           <div class="trainer-head">
             <div>
               <h3>Training controls</h3>
-              <p>Pick how many epochs to run, then train. Learning rate is fixed at 0.2 so the focus stays on watching it learn.</p>
+              <p>Pick a time budget and train. The model keeps training until it converges or the budget runs out, showing live progress. Learning rate is fixed at 0.2 so the focus stays on watching it learn.</p>
             </div>
             <button id="nwResetButton" class="ghost-button" type="button">Reset model</button>
           </div>
 
           <div class="control-grid nw-controls">
-            <label class="range-row math-range" for="nwEpochsSlider">
-              <span>Epochs</span>
-              <input id="nwEpochsSlider" type="range" min="20" max="400" step="20" value="120">
-              <output id="nwEpochsLabel" for="nwEpochsSlider">120</output>
+            <label class="select-row" for="nwBudgetSelect">
+              <span>Time budget</span>
+              <select id="nwBudgetSelect" class="control-input">
+                <option value="15000">15 seconds</option>
+                <option value="30000" selected>30 seconds</option>
+                <option value="60000">60 seconds</option>
+              </select>
             </label>
             <label class="range-row math-range" for="nwTempSlider">
               <span>Gen. temp</span>
@@ -1566,19 +1618,28 @@
           </div>
 
           <div class="stepper-row nn-button-row">
-            <button id="nwTrainStepButton" class="ghost-button" type="button">Train 10 epochs</button>
             <button id="nwTrainButton" class="primary-button" type="button">Train next-word model</button>
+            <button id="nwTrainStepButton" class="ghost-button" type="button">Train 8 more seconds</button>
             <button id="nwGenerateButton" class="ghost-button" type="button">Generate a sentence</button>
           </div>
 
           <div id="nwProgress" class="training-progress" aria-live="polite">
             <div class="training-progress-copy">
               <strong>Ready to train</strong>
-              <span id="nwProgressText">One click runs the selected epochs and updates the predictions live.</span>
+              <span id="nwProgressText">Pick a time budget and press Train - it trains until it converges or the budget runs out, showing live progress.</span>
             </div>
             <div class="training-progress-track" aria-hidden="true">
               <span id="nwProgressBar"></span>
             </div>
+          </div>
+
+          <div class="panel nw-watch-card">
+            <div class="section-title-row">
+              <h3>Watch these predictions sharpen</h3>
+              <span class="pill">top next word</span>
+            </div>
+            <p class="microcopy">Four fixed contexts. As training runs, watch each one lock onto a sensible next word and grow confident - that is the model learning the corpus's patterns, live.</p>
+            <div id="nwWatchPanel" class="watch-panel" aria-live="polite"></div>
           </div>
 
           <div class="training-output-grid">
@@ -1637,7 +1698,7 @@
 // Each example runs the same four beats: look up the two context
 // word vectors, a forward pass to next-word scores, the cross-entropy
 // loss, a backward pass, then update every weight (embeddings too).
-const epochs = 120;
+const epochs = 60;
 
 const lossPerEpoch = [];
 for (let epoch = 1; epoch <= epochs; epoch++) {
@@ -1744,7 +1805,7 @@ return {
     </section>
   </main>
 
-  <script src="chapter4.js?v=20260625"></script>
+  <script src="chapter4.js?v=20260626"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>

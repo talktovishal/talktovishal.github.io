@@ -57,7 +57,7 @@
             letters</em> directly. Not one. It sees <strong>token IDs</strong> - plain integers
             that map into its embedding table - and nothing else. Before any LLM math can
             happen, a separate program called the <strong>tokenizer</strong>
-            chops your text into known pieces and looks up their numbers. Each number represents a specific subword or token that the model has learned to recognize. For example, the word "unbelievable" might be tokenized into three tokens: "un", "believ", and "able". Remember, in Chapter 2, we learnt how a particular word get's mapped to a list of numbers aka <strong>vector</strong>. We now learn this process in detail and see modern LLMs, first break down the text into subword pieces and then use their vectors during their processing.
+            chops your text into known pieces and looks up their numbers. Each number represents a specific subword or token that the model has learned to recognize. For example, the word "unbelievable" might be tokenized into three tokens: "un", "believ", and "able". Remember, in Chapter 2, we learnt how a particular word gets mapped to a list of numbers aka <strong>vector</strong>. We now learn this process in detail and see modern LLMs, first break down the text into subword pieces and then use their vectors during their processing.
           </p>
           <figure class="diagram-figure">
             <svg class="pipeline-svg" viewBox="0 0 920 320" role="img" aria-labelledby="pipeline-title pipeline-desc">
@@ -195,23 +195,25 @@
             the four views disagree on the very same text.
           </p>
           <p>
-            I am going to break my rule and talk about Transformers - the main architecture used in modern LLMs. It's important to understand the impact of tokenization on the performance of these models. For now, the important thing to remember is during processing, each token is influenced by its context and the tokens around it. It does that by mutiplying the token's embedding with the embeddings of the surrounding tokens. Hence, if a sentence has
-            <code>T</code> tokens, a Transformer attention layer compares tokens to
-            tokens, so the attention score table has about <code>T * T</code> cells.
-            Doubling the token count does not merely double that table; it makes it
-            roughly four times larger. The tokenizer also chooses the size of the
-            embedding table: with <code>V</code> vocabulary pieces and
-            <code>d</code> numbers per vector, the first table has
-            <code>V * d</code> learned numbers. Tokenization is therefore a tradeoff:
-            a larger vocabulary can shorten sequences, but it also creates more rows
-            the model has to learn.
+            I am going to break my rule and talk about Transformers - the main architecture used in modern LLMs. It's important to understand the impact of tokenization on the performance of these models. For now, the important thing to remember is that during attention, each token's current representation is projected into queries, keys, and values. The attention layer compares tokens with query/key dot products, then uses those scores to mix value vectors from the surrounding tokens. Hence, if a prompt has
+            <code>T</code> tokens and the layer attends over the full prompt, the
+            attention score table has about <code>T * T</code> cells. Doubling the
+            token count does not merely double that table; it makes it roughly four
+            times larger during full-context attention and prompt prefill. During
+            autoregressive generation, KV caching changes the per-token cost profile
+            because earlier keys and values are reused, but long prompts still pay the
+            token budget up front. The tokenizer also chooses the size of the embedding
+            table: with <code>V</code> vocabulary pieces and <code>d</code> numbers per
+            vector, the first table has <code>V * d</code> learned numbers.
+            Tokenization is therefore a tradeoff: a larger vocabulary can shorten
+            sequences, but it also creates more rows the model has to learn.
           </p>
           <div class="worked-example" aria-label="Token count cost by hand">
             <h3>Token cost by hand</h3>
             <p>
               Imagine one sentence becomes 12 tokens with a good <a href="https://en.wikipedia.org/wiki/Byte_pair_encoding" target="_blank" rel="noreferrer">subword tokenizer</a>,
               but 20 tokens with a byte-heavy tokenizer. The text looks the same to
-              you, but the Transformer does more pairwise comparisons.
+              you, but during full-context attention and prompt prefill, the Transformer has more query-key pairs to score.
             </p>
             <div class="formula-stack">
               <code>attention cells with 12 tokens = 12 * 12 = 144</code>
@@ -255,7 +257,7 @@
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">2. Down to the bytes</p>
-          <h2 id="bytes-title">The most simplest tokenization strategy - breaking text all the way down to bytes.</h2>
+          <h2 id="bytes-title">The simplest tokenization strategy - breaking text all the way down to bytes.</h2>
           <p>
             The opening section let four rules - word, character, byte, subword - argue
             over the same sentence. But it skipped a fair question: what is a "piece"

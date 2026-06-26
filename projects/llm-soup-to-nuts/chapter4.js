@@ -117,8 +117,7 @@ const dom = {
   nwMetrics: document.getElementById("nwMetrics"),
   nwLossHistory: document.getElementById("nwLossHistory"),
   nwStatus: document.getElementById("nwStatus"),
-  nwEpochsSlider: document.getElementById("nwEpochsSlider"),
-  nwEpochsLabel: document.getElementById("nwEpochsLabel"),
+  nwBudgetSelect: document.getElementById("nwBudgetSelect"),
   nwTempSlider: document.getElementById("nwTempSlider"),
   nwTempLabel: document.getElementById("nwTempLabel"),
   nwTrainButton: document.getElementById("nwTrainButton"),
@@ -128,7 +127,10 @@ const dom = {
   nwGeneratePanel: document.getElementById("nwGeneratePanel"),
   nwProgress: document.getElementById("nwProgress"),
   nwProgressText: document.getElementById("nwProgressText"),
-  nwProgressBar: document.getElementById("nwProgressBar")
+  nwProgressBar: document.getElementById("nwProgressBar"),
+  nwWatchPanel: document.getElementById("nwWatchPanel"),
+  nwCorpusPreview: document.getElementById("nwCorpusPreview"),
+  nwCorpusCount: document.getElementById("nwCorpusCount")
 };
 
 const probabilityPresets = {
@@ -1811,23 +1813,90 @@ function drawPoints(context, points, toX, toY, isTest) {
 const NW_SENTENCES = [
   "the cat sat on the mat",
   "the cat ran in the sun",
-  "the dog sat on the mat",
-  "the dog ran in the rain",
-  "a cat sat by the dog",
-  "a dog sat by the cat",
+  "the cat slept under the tree",
   "the cat saw a bird",
-  "the dog saw a bird",
-  "the bird sat on the cat",
-  "the bird ran from the dog",
-  "the cat slept on the mat",
-  "the dog slept in the sun"
+  "the cat chased a mouse",
+  "the cat jumped over the fence",
+  "the cat hid in the bush",
+  "the cat rested by the log",
+  "the cat played in the garden",
+  "the cat sat and slept",
+  "the dog sat on the mat",
+  "the dog ran in the park",
+  "the dog slept near the log",
+  "the dog watched a bird",
+  "the dog swam in the lake",
+  "the dog chased a duck",
+  "the dog jumped over the fence",
+  "the dog rested by the river",
+  "the dog played in the field",
+  "the dog ran and played",
+  "the bird sat on the tree",
+  "the bird flew over the hill",
+  "the bird sang in the garden",
+  "the bird hid in the nest",
+  "the bird saw a cat",
+  "the bird rested on the fence",
+  "a bird flew near the pond",
+  "the bird flew and sang",
+  "the fox ran by the river",
+  "the fox hid in the bush",
+  "the fox watched a rabbit",
+  "the fox saw a duck",
+  "the fox ran and hid",
+  "the owl slept in the tree",
+  "the owl flew over the field",
+  "the owl saw a mouse",
+  "the rabbit ran in the field",
+  "the rabbit hid under the log",
+  "the rabbit ate in the garden",
+  "the mouse ran under the fence",
+  "the mouse hid by the bush",
+  "the mouse ate by the log",
+  "the fish swam in the river",
+  "the fish rested under the log",
+  "the frog jumped in the pond",
+  "the frog sat on the log",
+  "the duck swam in the lake",
+  "the duck slept by the pond",
+  "a duck flew over the river",
+  "the girl ran in the park",
+  "the girl played in the garden",
+  "the girl saw a duck",
+  "the girl sang by the river",
+  "the girl rested by the pond",
+  "the boy ran in the field",
+  "the boy jumped over the log",
+  "the boy found a frog",
+  "the boy watched a bird",
+  "the boy played in the park",
+  "the boy swam in the lake",
+  "a cat slept on the mat",
+  "a dog ran in the rain",
+  "a bird sang in the tree",
+  "a fox hid in the bush",
+  "a rabbit ran in the field",
+  "a girl played in the garden",
+  "a boy swam in the lake",
+  "the cat saw a dog",
+  "the dog saw a cat",
+  "the owl saw a fox",
+  "the fox saw a rabbit",
+  "the duck saw a frog"
+];
+const NW_WATCH = [
+  ["the", "cat"],
+  ["the", "dog"],
+  ["saw", "a"],
+  ["in", "the"]
 ];
 const NW_START = "<s>";
 const NW_END = ".";
-const NW_DIM = 8;
-const NW_HIDDEN = 16;
+const NW_DIM = 12;
+const NW_HIDDEN = 24;
 const NW_CONTEXT = 2;
 const NW_RATE = 0.2;
+const NW_DEFAULT_BUDGET_MS = 30000;
 
 let nwData = buildNextWordData();
 let nwModel = null;
@@ -1979,6 +2048,7 @@ function nextWordSummary() {
 
 function trainNextWordModel(epochs = 120) {
   const steps = clamp(Math.round(Number(epochs) || 1), 1, 600);
+  nwState.hasTrained = true;
   nwTrainEpochs(steps);
   renderNextWordLab();
   return nextWordSummary();
@@ -1990,48 +2060,65 @@ function setNwTrainingControls(isRunning) {
   dom.nwTrainStepButton.disabled = isRunning;
   dom.nwResetButton.disabled = isRunning;
   dom.nwGenerateButton.disabled = isRunning;
-  dom.nwEpochsSlider.disabled = isRunning;
+  if (dom.nwBudgetSelect) dom.nwBudgetSelect.disabled = isRunning;
   dom.nwTrainButton.textContent = isRunning ? "Training..." : "Train next-word model";
 }
 
-function setNwProgress(done, total, phase) {
-  const safeTotal = Math.max(1, total);
-  dom.nwProgressBar.style.width = `${clamp(done / safeTotal, 0, 1) * 100}%`;
+function setNwProgress(fraction, phase, headline, detail) {
+  dom.nwProgressBar.style.width = `${clamp(fraction, 0, 1) * 100}%`;
   dom.nwProgress.classList.toggle("is-running", phase === "running");
   dom.nwProgress.classList.toggle("is-complete", phase === "complete");
-  const strong = dom.nwProgress.querySelector("strong");
-  if (phase === "running") {
-    strong.textContent = "Training in progress";
-    dom.nwProgressText.textContent = `Epoch ${done} of ${total}. Loss, perplexity, and the prediction bars update as it learns.`;
-  } else if (phase === "complete") {
-    strong.textContent = "Training complete";
-    dom.nwProgressText.textContent = `Finished ${total} epochs. Try a context, or generate a sentence.`;
-  } else {
-    strong.textContent = "Ready to train";
-    dom.nwProgressText.textContent = "One click runs the selected epochs and updates the predictions live.";
-  }
+  dom.nwProgress.querySelector("strong").textContent = headline;
+  dom.nwProgressText.textContent = detail;
 }
 
-async function trainNextWordAnimated(epochs) {
+async function trainNextWordTimed(budgetMs) {
   if (nwState.isTraining) return nextWordSummary();
-  const total = clamp(Math.round(Number(epochs) || 1), 1, 600);
+  const budget = clamp(Math.round(Number(budgetMs) || NW_DEFAULT_BUDGET_MS), 3000, 120000);
+  const budgetS = Math.round(budget / 1000);
   const runId = nwState.run + 1;
   nwState.run = runId;
+  nwState.hasTrained = true;
   setNwTrainingControls(true);
-  setNwProgress(0, total, "running");
+  const start = performance.now();
+  let elapsed = 0;
+  let converged = false;
+  let plateau = 0;
+  let lastLoss = Infinity;
   try {
-    const chunk = total <= 40 ? 2 : 8;
-    let done = 0;
-    while (done < total) {
+    setNwProgress(0, "running", "Training in progress", `0s of ${budgetS}s - warming up...`);
+    await wait(16);
+    while (elapsed < budget) {
       if (nwState.run !== runId) break;
-      const next = Math.min(chunk, total - done);
-      nwTrainEpochs(next);
-      done += next;
+      const sliceStart = performance.now();
+      do {
+        nwTrainEpochs(1);
+        elapsed = performance.now() - start;
+      } while (performance.now() - sliceStart < 45 && elapsed < budget);
+      const loss = nwHistory[nwHistory.length - 1];
+      const ppl = Math.exp(loss);
       renderNextWordLab();
-      setNwProgress(done, total, "running");
-      await wait(30);
+      setNwProgress(
+        elapsed / budget,
+        "running",
+        "Training in progress",
+        `${(elapsed / 1000).toFixed(0)}s of ${budgetS}s - epoch ${nwModel.epochs}, loss ${loss.toFixed(3)}, perplexity ${ppl.toFixed(1)}`
+      );
+      if (lastLoss - loss < 5e-4) plateau += 1; else plateau = 0;
+      lastLoss = loss;
+      if (plateau >= 6 && elapsed > 2500) { converged = true; break; }
+      await wait(16);
     }
-    if (nwState.run === runId) setNwProgress(total, total, "complete");
+    if (nwState.run === runId) {
+      const finalLoss = nwHistory[nwHistory.length - 1];
+      const finalPpl = Math.exp(finalLoss);
+      setNwProgress(
+        1,
+        "complete",
+        converged ? "Converged - it has learned all it can from this corpus" : "Training complete",
+        `${nwModel.epochs} epochs in ${(elapsed / 1000).toFixed(0)}s - perplexity ${finalPpl.toFixed(1)}. Pick a context or generate a sentence.`
+      );
+    }
   } finally {
     if (nwState.run === runId) setNwTrainingControls(false);
   }
@@ -2041,15 +2128,13 @@ async function trainNextWordAnimated(epochs) {
 function beginNextWordTraining(event) {
   event?.preventDefault();
   if (nwState.isTraining) return;
-  nwState.hasTrained = true;
-  trainNextWordAnimated(Number(dom.nwEpochsSlider.value));
+  trainNextWordTimed(Number(dom.nwBudgetSelect ? dom.nwBudgetSelect.value : NW_DEFAULT_BUDGET_MS));
 }
 
 function beginNextWordStep(event) {
   event?.preventDefault();
   if (nwState.isTraining) return;
-  nwState.hasTrained = true;
-  trainNextWordAnimated(10);
+  trainNextWordTimed(8000);
 }
 
 function resetNextWord() {
@@ -2058,7 +2143,7 @@ function resetNextWord() {
   setNwTrainingControls(false);
   nwModel = makeNextWordModel(nwState.seed);
   nwHistory = [nwEvaluate(nwModel).loss];
-  setNwProgress(0, Number(dom.nwEpochsSlider.value), "ready");
+  setNwProgress(0, "ready", "Ready to train", "Pick a time budget and press Train - it trains until it converges or the budget runs out, showing live progress.");
   dom.nwGeneratePanel.replaceChildren(
     createElement("p", "", "Train the model, then click generate to sample a sentence one word at a time.")
   );
@@ -2099,6 +2184,44 @@ function renderNwPrediction() {
   });
 }
 
+function renderNwWatch() {
+  if (!dom.nwWatchPanel) return;
+  if (!nwState.hasTrained) {
+    dom.nwWatchPanel.replaceChildren(createElement("div", "empty-state", "These four contexts sharpen as the model learns. Press Train and watch each one lock onto a sensible next word."));
+    return;
+  }
+  dom.nwWatchPanel.replaceChildren();
+  NW_WATCH.forEach(([a, b]) => {
+    const ia = nwData.index.get(a);
+    const ib = nwData.index.get(b);
+    if (ia === undefined || ib === undefined) return;
+    const { probs } = nwForward(nwModel, [ia, ib]);
+    let best = 0;
+    for (let i = 1; i < probs.length; i += 1) if (probs[i] > probs[best]) best = i;
+    const row = createElement("div", "watch-row");
+    const track = createElement("div", "watch-track");
+    const fill = createElement("span");
+    fill.style.width = `${clamp(probs[best] * 100, 2, 100)}%`;
+    track.append(fill);
+    row.append(
+      createElement("span", "watch-context", `${nwLabel(a)} ${nwLabel(b)} \u2192`),
+      createElement("strong", "watch-word", nwLabel(nwData.vocab[best])),
+      track,
+      createElement("em", "watch-pct", formatPercent(probs[best]))
+    );
+    dom.nwWatchPanel.append(row);
+  });
+}
+
+function renderCorpusPreview() {
+  if (!dom.nwCorpusPreview) return;
+  dom.nwCorpusPreview.replaceChildren();
+  NW_SENTENCES.slice(0, 14).forEach((line) => {
+    dom.nwCorpusPreview.append(createElement("code", "", line));
+  });
+  if (dom.nwCorpusCount) dom.nwCorpusCount.textContent = `${NW_SENTENCES.length} sentences`;
+}
+
 function renderNwLossHistory() {
   const recent = nwHistory.slice(-8);
   const maxLoss = Math.max(...recent, 0.1);
@@ -2117,13 +2240,13 @@ function renderNwLossHistory() {
 
 function renderNextWordLab() {
   if (!nwModel) return;
-  dom.nwEpochsLabel.textContent = dom.nwEpochsSlider.value;
   dom.nwTempLabel.textContent = formatNumber(Number(dom.nwTempSlider.value) / 100, 2);
   if (!nwState.hasTrained) {
     dom.nwStatus.textContent = "untrained";
-    dom.nwMetrics.replaceChildren(createElement("div", "empty-state", "Press Train next-word model (or Train 10 epochs) to train the model and reveal its metrics."));
+    dom.nwMetrics.replaceChildren(createElement("div", "empty-state", "Press Train next-word model to train the model and reveal its metrics."));
     dom.nwLossHistory.replaceChildren(createElement("div", "empty-state", "Loss history appears once training starts."));
     renderNwPrediction();
+    renderNwWatch();
     return;
   }
   const evaluation = nwEvaluate(nwModel);
@@ -2138,6 +2261,7 @@ function renderNextWordLab() {
   ]);
   renderNwPrediction();
   renderNwLossHistory();
+  renderNwWatch();
 }
 
 function handleGenerate() {
@@ -2304,7 +2428,6 @@ function wireEvents() {
   [dom.nwContextSelectA, dom.nwContextSelectB].forEach((select) => {
     select.addEventListener("change", renderNwPrediction);
   });
-  dom.nwEpochsSlider.addEventListener("input", renderNextWordLab);
   dom.nwTempSlider.addEventListener("input", renderNextWordLab);
   dom.nwTrainButton.addEventListener("pointerdown", beginNextWordTraining);
   dom.nwTrainButton.addEventListener("click", beginNextWordTraining);
@@ -2344,6 +2467,7 @@ function init() {
   renderForwardPass();
   initBackpropLab();
   resetNetwork();
+  renderCorpusPreview();
   populateContextSelects();
   resetNextWord();
   setupSectionSpy();
