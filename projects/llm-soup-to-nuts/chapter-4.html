@@ -695,12 +695,12 @@
             finish with softmax:
           </p>
           $$e = \big[\,E_{w_1}\,;\,E_{w_2}\,\big] \qquad h = \tanh(W_1 e + b_1)$$
-          $$z = W_2 h + b_2 \qquad p = \text{softmax}(z)$$
+          $$z = W_2 h + b_2 \qquad q = \text{softmax}(z)$$
           <ul class="symbol-glossary">
             <li>\(E_{w}\): the embedding row looked up for word \(w\); \(e\): the two rows joined.</li>
             <li>\(W_1, b_1\): the hidden layer's weights and bias; \(\tanh\): its activation \(f\).</li>
             <li>\(W_2, b_2\): the output weights and bias that turn the hidden layer into logits \(z\).</li>
-            <li>\(p\): the next-word probability for every word in the vocabulary.</li>
+            <li>\(q\): the next-word probability the model assigns to every word in the vocabulary (the model's prediction, written \(q\) as in Section 1's cross-entropy).</li>
           </ul>
         </div>
       </div>
@@ -1058,159 +1058,377 @@
           <p class="eyebrow">6. Backpropagation</p>
           <h2 id="backprop-title">Flow the blame backward to fix the weights.</h2>
           <p>
-            We know our final error—that "probability minus target" small miracle we found in Section 4. But that only tells us how wrong the final scores are. How do we fix the weights buried deep in the <strong>hidden layers</strong>? Imagine a factory assembly line: the boss at the end yells, "This car is ruined!" The final assembler says, "Don't just blame me, the chassis arrived crooked from the previous station!" To fix the factory, the blame must be passed backward down the line, proportioned by who caused the most error.
+            We know our final error - that "probability minus target" small miracle we found in Section 4. But that only tells us how wrong the final scores are. How do we fix the weights buried deep in the <strong>hidden layers</strong>? Imagine a factory assembly line: the boss at the end yells, "This car is ruined!" The final assembler says, "Don't just blame me, the chassis arrived crooked from the previous station!" To fix the factory, the blame must be passed backward down the line, proportioned by who caused the most error.
           </p>
           <p>
             This backward flow of blame is <a href="https://en.wikipedia.org/wiki/Backpropagation" target="_blank" rel="noreferrer">Backpropagation</a>. Instead of guessing how to tweak each hidden weight, we use the <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a> from calculus to multiply the sensitivities backward. The error at the output tells the hidden layer how it should have behaved, and the hidden layer tells its weights how they need to adjust. This mathematical chain reaction allows the network to efficiently calculate the perfect downhill gradient for <em>every single weight</em> in one graceful sweep.
           </p>
         </div>
         
-        <div class="math-formal" aria-label="Backpropagation in symbols">
-          <h3>The backward pass, in symbols</h3>
-          <p>
-            Backpropagation is the <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">chain rule</a>
-            run in reverse across the whole network. Start with the simplest case - a single hidden
-            weight \(w\) buried two steps below the loss. To learn how nudging it changes \(L\), you
-            multiply the local sensitivity of every step between them:
-          </p>
-          $$\frac{\partial L}{\partial w} = \frac{\partial L}{\partial z} \cdot \frac{\partial z}{\partial h} \cdot \frac{\partial h}{\partial w}$$
-          <p>
-            That is the entire idea, and it scales: every layer receives an <em>incoming gradient</em>
-            (the blame handed down from above), multiplies it by its own <strong>local derivative</strong>, and
-            passes the result on as the blame for the layer below. Sweep that rule from the loss back to
-            the very first weight and you get, in one pass, the gradient of \(L\) with respect to
-            <em>every</em> parameter at once.
-          </p>
 
-          <h3>First, the forward pass we are differentiating</h3>
+
+
+<div class="math-formal" aria-label="Backpropagation in symbols">
+          <h3>A Step-by-Step Backpropagation Walkthrough</h3>
           <p>
-            Keep these lines from Section 3 in view - the backward pass simply unwinds them one at a
-            time, last line first:
+            To truly demystify backpropagation, we are going to start by ditching the abstract algebra and crunching real numbers step-by-step (an approach heavily inspired by <a href="https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/" target="_blank" rel="noreferrer">Matt Mazur's classic backpropagation tutorial</a>, but adapted for our language model). Once we prove the math works for a single weight, we will scale it up using matrices—revealing why operations like "transpose" are the secret weapons that make modern AI possible.
           </p>
-          $$e = [\,E_{w_1};E_{w_2}\,] \qquad z^{(1)} = W_1 e + b_1$$
-          $$h = f(z^{(1)}) \qquad z = W_2 h + b_2$$
-          $$q = \text{softmax}(z) \qquad L = -\ln q_c$$
+          <p>
+            We will trace exactly how a mistake at the end of the network flows backward to fix a weight at the very beginning.
+          </p>
+          
+          <figure class="build-network-figure backprop-chain-figure">
+            <svg class="mlp-svg" viewBox="0 0 560 270" role="img" aria-labelledby="chain-fig-t chain-fig-d">
+              <title id="chain-fig-t">One weight inside the Section 5 network</title>
+              <desc id="chain-fig-d">The same network as Section 5: two context words feed a hidden layer through the weights W1, the hidden layer feeds the output score z through the weights W2, softmax turns z into probabilities q, and a loss L sits on the end. One weight w inside W1 is highlighted; its influence reaches the loss along the path w to h to z to L. The forward pass runs left to right and the backward pass multiplies the local slopes from right to left.</desc>
+              <defs>
+                <marker id="chainFwd" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="var(--teal)"></path>
+                </marker>
+                <marker id="chainBack" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#9c5a00"></path>
+                </marker>
+              </defs>
+
+              <text class="mlp-axis" x="280" y="18">the same network as Section 5, with a loss L on the end</text>
+
+              <!-- Network Edges -->
+              <line class="network-edge is-muted" x1="78" y1="88" x2="189" y2="130"></line>
+              <line class="network-edge is-muted" x1="78" y1="88" x2="189" y2="190"></line>
+              <line class="network-edge is-muted" x1="78" y1="172" x2="189" y2="70"></line>
+              <line class="network-edge is-muted" x1="78" y1="172" x2="189" y2="130"></line>
+              <line class="network-edge is-muted" x1="78" y1="172" x2="189" y2="190"></line>
+              <line class="network-edge is-muted" x1="223" y1="130" x2="336" y2="130"></line>
+              <line class="network-edge is-muted" x1="223" y1="190" x2="336" y2="130"></line>
+
+              <!-- Active Highlighted Path -->
+              <line class="network-edge is-active" x1="78" y1="88" x2="189" y2="70" marker-end="url(#chainFwd)"></line>
+              <line class="network-edge is-active" x1="223" y1="70" x2="336" y2="130" marker-end="url(#chainFwd)"></line>
+              <line class="network-edge is-active" x1="384" y1="130" x2="452" y2="130" marker-end="url(#chainFwd)"></line>
+
+              <!-- Layer Labels -->
+              <text class="network-value" x="54" y="42" style="font-weight:bold;">x</text>
+              <text class="network-value" x="132" y="42" style="font-weight:bold;">W&#8321;</text>
+              <text class="network-value" x="206" y="42" style="font-weight:bold;">h</text>
+              <text class="network-value" x="286" y="42" style="font-weight:bold;">W&#8322;</text>
+              
+              <!-- Highlighted Single Weight -->
+              <text x="133" y="73" style="fill:#111111;font-size:13px;font-weight:900;text-anchor:middle">w</text>
+
+              <!-- Input Layer -->
+              <circle class="network-node is-input" cx="54" cy="88" r="24"></circle>
+              <text class="network-label" x="54" y="93">word 1</text>
+              <circle class="network-node is-input" cx="54" cy="172" r="24"></circle>
+              <text class="network-label" x="54" y="177">word 2</text>
+              
+              <!-- Hidden Layer -->
+              <circle class="network-node is-hidden" cx="206" cy="70" r="17"></circle>
+              <text class="network-label" x="206" y="75">h&#8321;</text>
+              <circle class="network-node is-hidden" cx="206" cy="130" r="17"></circle>
+              <text class="network-label" x="206" y="135">h&#8322;</text>
+              <circle class="network-node is-hidden" cx="206" cy="190" r="17"></circle>
+              <text class="network-label" x="206" y="195">h&#8323;</text>
+              
+              <!-- Output Logits -->
+              <circle class="network-node is-hidden" cx="360" cy="130" r="24"></circle>
+              <text class="network-label" x="360" y="135">z</text>
+              
+              <!-- Loss Function -->
+              <rect class="network-node is-output" x="454" y="106" width="76" height="48" rx="12"></rect>
+              <text class="network-label" x="492" y="135">L</text>
+
+              <!-- Final Output Descriptions -->
+              <text class="network-value" x="360" y="170">softmax (q)</text>
+              <text class="network-value" x="492" y="170">loss</text>
+              <text class="mlp-axis" x="54" y="226">2 context words</text>
+              <text class="mlp-axis" x="206" y="226">hidden layer &middot; tanh</text>
+
+              <!-- Backpropagation Arrow and Blame -->
+              <line class="backprop-flow" x1="492" y1="246" x2="56" y2="246" marker-end="url(#chainBack)"></line>
+              <text x="274" y="238" style="fill:#9c5a00; font-size:14px; font-weight:bold; text-anchor:middle;">&delta; (blame flow)</text>
+              <text class="mlp-axis" x="280" y="263">chain rule paths: &part;L/&part;w = &part;L/&part;z &middot; &part;z/&part;h &middot; &part;h/&part;w</text>
+            </svg>
+            <figcaption>
+              To find the gradient for a weight deep in the network (like \(w\)), backprop follows the chain rule backward (gold arrow) along every path that connects that weight to the final error.
+            </figcaption>
+          </figure>
+
+          <p>To see this sweep in action, we need to unwind the forward pass we just built. Here is our network's forward logic, read from bottom to top:</p>
+          $$x = [\,E_{w_1};E_{w_2}\,] \qquad h = f(W_1 x + b_1)$$
+          $$z = W_2 h + b_2 \qquad q = \text{softmax}(z)$$
+          $$L = -\ln q_c$$
+          
           <ul class="symbol-glossary">
-            <li>\(e\): the two context-word embeddings joined into one input vector.</li>
-            <li>\(z^{(1)}, h\): the hidden layer's pre-activation and its activation through \(f\) (ReLU, tanh, sigmoid).</li>
-            <li>\(z, q\): the output logits and the softmax probabilities.</li>
-            <li>\(y\): the one-hot target (a \(1\) at the true word \(c\), \(0\) everywhere else); \(L = -\ln q_c\) is the cross-entropy loss.</li>
+            <li>\(x\): the two context-word vectors joined (the input); \(h\): the hidden activation.</li>
+            <li>\(f\): the activation function (like ReLU or tanh). The raw value inside it, \(W_1 x + b_1\), is what we differentiate through.</li>
+            <li>\(z, q\): the output logits and softmax probabilities; \(y\): the one-hot target (\(1\) at the true word \(c\)); \(L = -\ln q_c\): the final loss.</li>
           </ul>
 
-          <h3>The one move, repeated: blame in, local slope, blame out</h3>
-          <p>
-            Write \(\delta\) for the gradient of the loss with respect to a layer's pre-activation - the
-            "blame" arriving at that layer. The whole algorithm is just two rules applied over and over.
-            To push blame <em>down</em> to the previous layer, multiply by the <strong>transpose of the weights</strong>
-            (\(W^{\top}\)) you used on the way up. To turn blame into a <strong>weight gradient</strong>, multiply the
-            incoming blame by the signal that flowed <em>out</em> of that weight on the forward pass.
-          </p>
+          <h3>Part 1: The Micro View (Step-by-Step)</h3>
+          <p>Let's isolate a tiny slice of our network. We have 1 input value, 1 hidden neuron, and 2 output words to choose from. We'll set the learning rate \(\eta\) to \(0.1\), assume biases are \(0\), and use a simple ReLU activation:</p>
+          <ul class="symbol-glossary">
+            <li><strong>Input Data:</strong> \(x_1 = 0.5\)</li>
+            <li><strong>Hidden layer weight (W1):</strong> \(w_1 = 0.4\) (connects input \(x_1\) to hidden neuron \(h_1\)).</li>
+            <li><strong>Output layer weights (W2):</strong> \(w_2 = 0.6\) (connects \(h_1\) to word 1's score \(z_1\)). \(w_3 = -0.5\) (connects \(h_1\) to word 2's score \(z_2\)).</li>
+            <li><strong>The Target:</strong> Word 1 is the correct next word (\(y_1 = 1,\ y_2 = 0\)).</li>
+          </ul>
 
-          <h3>Layer by layer, for our network</h3>
-          <p>
-            <strong>Output layer.</strong> Section 4 already did the hardest part: softmax paired with
-            cross-entropy collapses the output blame to one clean difference,
-          </p>
-          $$\delta = \frac{\partial L}{\partial z} = q - y$$
-          <p>and from that single vector the output weights and bias fall straight out:</p>
-          $$\frac{\partial L}{\partial W_2} = \delta\,h^{\top} \qquad \frac{\partial L}{\partial b_2} = \delta$$
-          <p class="microcopy">
-            Read \(\delta\,h^{\top}\) as one sentence: a weight's gradient is <em>how wrong its output was</em>
-            (\(\delta\)) times <em>how active the neuron feeding it was</em> (\(h\)). A weight earns a big update
-            only when both are large - a confident mistake riding on a strongly-firing neuron.
-          </p>
+          <p><strong>1. The Forward Pass</strong><br>We push the data forward through the pipes to get our prediction:</p>
+          
+          <figure class="build-network-figure" style="margin-top: 1.5rem; margin-bottom: 2rem;">
+            <svg class="mlp-svg" viewBox="0 0 560 210" role="img" aria-label="Forward pass diagram">
+              <defs>
+                <marker id="fwdF1" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--teal)"></path></marker>
+              </defs>
+              <!-- Edges -->
+              <line class="network-edge is-active" x1="80" y1="100" x2="190" y2="100" marker-end="url(#fwdF1)"></line>
+              <line class="network-edge is-active" x1="238" y1="92" x2="330" y2="62" marker-end="url(#fwdF1)"></line>
+              <line class="network-edge is-active" x1="238" y1="108" x2="330" y2="138" marker-end="url(#fwdF1)"></line>
+              <line class="network-edge is-active" x1="378" y1="62" x2="444" y2="90" marker-end="url(#fwdF1)"></line>
+              <line class="network-edge is-active" x1="378" y1="138" x2="444" y2="110" marker-end="url(#fwdF1)"></line>
 
-          <p>
-            <strong>Hand the blame back to the hidden layer.</strong> Each hidden neuron is guilty in
-            proportion to the output errors it fed and the weights it used to feed them:
-          </p>
-          $$\frac{\partial L}{\partial h} = W_2^{\top}\,\delta$$
-          <p>
-            <strong>Through the activation gate.</strong> Multiply element-wise by the local slope of the
-            activation to get the hidden layer's own blame \(\delta^{(1)}\):
-          </p>
-          $$\delta^{(1)} = \frac{\partial L}{\partial z^{(1)}} = \big(W_2^{\top}\delta\big)\odot f'(z^{(1)})$$
-          <p class="microcopy">
-            The \(\odot\) is element-wise multiplication, and \(f'(z^{(1)})\) is the <strong>gate</strong>: where a
-            neuron was saturated or clipped its slope is near zero, so almost no blame passes through. ReLU's
-            gate is fully shut at \(0\) and wide open (slope \(1\)) above it; tanh and sigmoid are always at
-            least partly closed - exactly the behaviour the lab's step 3 reports.
-          </p>
-          <p>
-            <strong>Input weights, the same shape all over again.</strong> Blame times the signal that flowed
-            out - here the input \(e\):
-          </p>
-          $$\frac{\partial L}{\partial W_1} = \delta^{(1)} e^{\top} \qquad \frac{\partial L}{\partial b_1} = \delta^{(1)}$$
-          $$\frac{\partial L}{\partial e} = W_1^{\top}\delta^{(1)}$$
-          <p class="microcopy">
-            That last term, \(\partial L/\partial e\), is the blame that keeps travelling into the
-            embedding rows themselves - which is precisely how the word vectors get trained in the full
-            model at the end of the chapter.
-          </p>
+              <!-- Values -->
+              <text class="network-value" x="135" y="90">w₁ = 0.4</text>
+              <text class="network-value" x="280" y="65">w₂ = 0.6</text>
+              <text class="network-value" x="280" y="140">w₃ = -0.5</text>
+              
+              <!-- Nodes -->
+              <circle class="network-node is-input" cx="56" cy="100" r="24"></circle>
+              <text class="network-label" x="56" y="105">x₁</text>
+              <text class="network-value" x="56" y="145" style="font-weight:bold;">0.5</text>
+              
+              <circle class="network-node is-hidden" cx="214" cy="100" r="24"></circle>
+              <text class="network-label" x="214" y="105">h₁</text>
+              <text class="network-value" x="214" y="145" style="font-weight:bold;">0.2</text>
+              
+              <circle class="network-node is-hidden" cx="354" cy="55" r="24"></circle>
+              <text class="network-label" x="354" y="60">z₁</text>
+              <text class="network-value" x="354" y="20" style="font-weight:bold;">0.12</text>
+              
+              <circle class="network-node is-hidden" cx="354" cy="145" r="24"></circle>
+              <text class="network-label" x="354" y="150">z₂</text>
+              <text class="network-value" x="354" y="190" style="font-weight:bold;">-0.1</text>
+              
+              <rect class="network-node is-output" x="444" y="76" width="76" height="48" rx="12"></rect>
+              <text class="network-label" x="482" y="105">L</text>
+              <text class="network-value" x="482" y="145" style="font-weight:bold;">0.589</text>
+            </svg>
+            <figcaption>Forward pass: calculating the output and total loss from left to right.</figcaption>
+          </figure>
 
-          <h3>The update rule ties it back to Section 5</h3>
-          <p>
-            Every parameter then takes the same small downhill step we met with gradient descent, each
-            using its own gradient:
-          </p>
-          $$\theta \leftarrow \theta - \eta\,\nabla_\theta L \qquad \theta \in \{W_1, b_1, W_2, b_2\}$$
-          <p class="microcopy">
-            \(\eta\) is the learning rate (the slider in the lab below), and \(\nabla_\theta L\) is shorthand
-            for "all the partial derivatives we just collected for \(\theta\)." The lab computes
-            <em>exactly</em> these quantities for your chosen example - press <em>Take a gradient step</em> and
-            watch \(\delta = q - y\) shrink toward zero as \(q\) slides onto the true word.
-          </p>
-          <p class="microcopy">
-            One ordering note for later: in a real training step, this update runs immediately
-            <em>after</em> backprop - backprop produces the gradients, and this rule spends them.
-          </p>
-
-          <h3>Why backward, and why it is cheap</h3>
-          <p>
-            Look at how the same forward quantities - \(h\), \(z^{(1)}\), \(e\) - reappear inside the
-            gradients. That is the whole efficiency trick: one <strong>forward pass</strong> caches those
-            activations, and one <strong>backward pass</strong> reuses them to produce the gradient of <em>every</em>
-            weight at once. The total cost is about two forward passes, no matter whether the network has a
-            dozen parameters or a hundred billion. Estimating each gradient the naive way - nudge one
-            weight, rerun the whole network, see how the loss moved - would cost a full pass <em>per weight</em>,
-            which is hopeless at scale. This reverse sweep is what people mean by
-            <a href="https://en.wikipedia.org/wiki/Automatic_differentiation" target="_blank" rel="noreferrer">reverse-mode automatic differentiation</a>,
-            the engine inside PyTorch and TensorFlow.
-          </p>
-
-          <h3>One warning the formulas predict</h3>
-          <p>
-            Because blame is multiplied by a weight transpose <em>and</em> an activation slope at every layer,
-            a deep stack chains many such factors together. If those factors mostly sit below one (sigmoid's
-            slope never exceeds \(0.25\)), the signal shrinks toward nothing on the way back - the
-            <a href="https://en.wikipedia.org/wiki/Vanishing_gradient_problem" target="_blank" rel="noreferrer">vanishing gradient</a>
-            problem - and if they mostly sit above one, it explodes. That single observation, visible right
-            here in the math, is why later architectures lean on ReLU-like activations, normalization, and the
-            residual "skip" connections we will meet in Chapter 5.
-          </p>
-
-          <p class="microcopy">
-            <em><strong>Deep Dive:</strong> If you want to watch these gradients flow through the network's
-            operations one node at a time, Christopher Olah's classic <u><a href="https://colah.github.io/posts/2015-08-Backprop/" target="_blank" rel="noreferrer">Calculus on Computational Graphs</a></u> is the gold-standard explanation.</em>
-          </p>
-        </div>
-
-        <div class="worked-example" aria-label="Backprop by hand">
-          <h3>Passing blame backward, by hand</h3>
-          <p>
-            Suppose our output gradient (the blame) says the final score \(z\) needs to drop by \(0.5\) (so \(\frac{\partial L}{\partial z} = 0.5\)). That score was created by multiplying a hidden neuron's output \(h\) (say, \(0.8\)) by an output weight \(W_{\text{out}}\) (say, \(2.0\)).
-          </p>
           <div class="formula-stack">
-            <span>\(\text{Output blame: } \frac{\partial L}{\partial z} = 0.5\)</span>
-            <span>\(\text{How much did the weight contribute? } \frac{\partial z}{\partial W_{\text{out}}} = h = 0.8\)</span>
-            <span>\(\text{Chain rule for the weight: } \frac{\partial L}{\partial W_{\text{out}}} = (0.5) \times (0.8) = 0.4\)</span>
-            <span>\(\text{How much did the hidden neuron contribute? } \frac{\partial z}{\partial h} = W_{\text{out}} = 2.0\)</span>
-            <span>\(\text{Chain rule for the neuron: } \frac{\partial L}{\partial h} = (0.5) \times (2.0) = 1.0\)</span>
+            <span>\(\text{Hidden Input } (net_{h1}) = x_1 \times w_1 = 0.5 \times 0.4 = 0.2\)</span>
+            <span>\(\text{Hidden Output } (h_1) = \text{ReLU}(0.2) = 0.2\)</span>
+            <span>\(\text{Word 1 Logit } (z_1) = h_1 \times w_2 = 0.2 \times 0.6 = 0.12\)</span>
+            <span>\(\text{Word 2 Logit } (z_2) = h_1 \times w_3 = 0.2 \times -0.5 = -0.1\)</span>
           </div>
-          <p class="microcopy">
-            The weight gets updated downhill by its gradient (\(0.4\)). The neuron's gradient (\(1.0\)) becomes the new "blame" passed backward to the layer before it. It multiplies as it goes.
+          <p>Pass logits through Softmax to get probabilities (\(q\)) and Cross-Entropy for Loss (\(L\)):</p>
+          <div class="formula-stack">
+            <span>\(\text{Softmax denominator: } e^{0.12} + e^{-0.1} \approx 2.032\)</span>
+            <span>\(q_1 = 1.127 / 2.032 \approx 0.555 \quad \text{(Model is 55.5\% confident in Word 1)}\)</span>
+            <span>\(q_2 = 0.905 / 2.032 \approx 0.445 \quad \text{(Model is 44.5\% confident in Word 2)}\)</span>
+            <span>\(L = -\ln(q_1) = -\ln(0.555) \approx 0.589\)</span>
+          </div>
+
+          <p><strong>2. The Backward Pass (Output Weight \(w_2\))</strong><br>Our goal is to update \(w_2\) so the loss decreases. The formal mathematical rules for this step dictate exactly what we calculate:</p>
+          
+          <div class="formula-stack" style="background-color: var(--surface-2); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+            <span>\(1.\ \delta = q - y \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Find the Output Blame)</span></span>
+            <span>\(2.\ \nabla W_2 = \delta h^{\top} \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Calculate Output Weight Gradient)</span></span>
+            <span>\(5.\ \theta \leftarrow \theta - \eta \nabla \theta \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Update weight downhill)</span></span>
+          </div>
+
+          <figure class="build-network-figure" style="margin-top: 1.5rem; margin-bottom: 2rem;">
+            <svg class="mlp-svg" viewBox="0 0 560 210" role="img" aria-label="Backward pass output weight">
+              <defs>
+                <marker id="bwdB2" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9c5a00"></path></marker>
+              </defs>
+              <!-- Muted Forward Edges -->
+              <line class="network-edge is-muted" x1="80" y1="100" x2="190" y2="100"></line>
+              <line class="network-edge is-muted" x1="238" y1="92" x2="330" y2="62"></line>
+              <line class="network-edge is-muted" x1="238" y1="108" x2="330" y2="138"></line>
+              <line class="network-edge is-muted" x1="378" y1="62" x2="444" y2="90"></line>
+              <line class="network-edge is-muted" x1="378" y1="138" x2="444" y2="110"></line>
+
+              <!-- Backprop Edges -->
+              <line class="backprop-flow" x1="444" y1="75" x2="378" y2="47" marker-end="url(#bwdB2)"></line>
+              <line class="backprop-flow" x1="330" y1="47" x2="238" y2="77" marker-end="url(#bwdB2)"></line>
+              
+              <!-- Annotations -->
+              <text class="network-value" x="420" y="40" style="fill:#9c5a00; font-weight:bold;">&delta;&#8321; = -0.445</text>
+              <text class="network-value" x="290" y="35" style="fill:#9c5a00; font-weight:bold;">&part;L/&part;w&#8322; = -0.089</text>
+              
+              <!-- Nodes -->
+              <circle class="network-node is-input" cx="56" cy="100" r="24"></circle>
+              <text class="network-label" x="56" y="105">x₁</text>
+              <circle class="network-node is-hidden" cx="214" cy="100" r="24"></circle>
+              <text class="network-label" x="214" y="105">h₁</text>
+              <circle class="network-node is-hidden" cx="354" cy="55" r="24"></circle>
+              <text class="network-label" x="354" y="60">z₁</text>
+              <circle class="network-node is-hidden" cx="354" cy="145" r="24"></circle>
+              <text class="network-label" x="354" y="150">z₂</text>
+              <rect class="network-node is-output" x="444" y="76" width="76" height="48" rx="12"></rect>
+              <text class="network-label" x="482" y="105">L</text>
+            </svg>
+            <figcaption>Backward pass for output weight \(w_2\): multiplying the blame \(\delta\) at \(z_1\) by the signal from \(h_1\).</figcaption>
+          </figure>
+
+          <p>The chain rule tells us to multiply the blame at the end by the signal that fed the weight (\(\frac{\partial L}{\partial w_2} = \frac{\partial L}{\partial z_1} \times \frac{\partial z_1}{\partial w_2}\)). Let's execute the rules:</p>
+          <div class="formula-stack">
+            <span>\(\text{Piece 1 (The Blame } \delta_1\text{): } \frac{\partial L}{\partial z_1} = q_1 - y_1 = 0.555 - 1 = -0.445\)</span>
+            <span>\(\text{Piece 2 (The Signal } h_1\text{): } \frac{\partial z_1}{\partial w_2} = h_1 = 0.2\)</span>
+            <span>\(\textbf{Gradient for } \mathbf{w_2} \left( \frac{\partial L}{\partial w_2} \right) = -0.445 \times 0.2 = -0.089\)</span>
+            <span>\(\text{Update: } w_2^+ = 0.6 - (0.1 \times -0.089) = 0.6089\)</span>
+          </div>
+          <p class="microcopy">The weight increased, meaning next time, the network will naturally give a higher score to the correct word.</p>
+
+          <p><strong>3. The Backward Pass (Hidden Weight \(w_1\))</strong><br>This is where it gets interesting. \(w_1\) is buried deep in the network. The formal mathematical rules for passing blame deeper look scary at first glance:</p>
+          
+          <div class="formula-stack" style="background-color: var(--surface-2); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+            <span>\(3.\ \delta^{(1)} = (W_2^{\top} \delta) \odot f' \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Pass Blame down to Hidden Layer)</span></span>
+            <span>\(4.\ \nabla W_1 = \delta^{(1)} x^{\top} \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Calculate Hidden Weight Gradient)</span></span>
+            <span>\(5.\ \theta \leftarrow \theta - \eta \nabla \theta \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Update weight downhill)</span></span>
+          </div>
+
+          <figure class="build-network-figure" style="margin-top: 1.5rem; margin-bottom: 2rem;">
+            <svg class="mlp-svg" viewBox="0 0 560 210" role="img" aria-label="Backward pass hidden weight">
+              <defs>
+                <marker id="bwdB3" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9c5a00"></path></marker>
+              </defs>
+              <!-- Muted Forward Edges -->
+              <line class="network-edge is-muted" x1="80" y1="100" x2="190" y2="100"></line>
+              <line class="network-edge is-muted" x1="238" y1="92" x2="330" y2="62"></line>
+              <line class="network-edge is-muted" x1="238" y1="108" x2="330" y2="138"></line>
+              <line class="network-edge is-muted" x1="378" y1="62" x2="444" y2="90"></line>
+              <line class="network-edge is-muted" x1="378" y1="138" x2="444" y2="110"></line>
+
+              <!-- Backprop Edges -->
+              <line class="backprop-flow" x1="444" y1="75" x2="378" y2="47" marker-end="url(#bwdB3)"></line>
+              <line class="backprop-flow" x1="444" y1="125" x2="378" y2="153" marker-end="url(#bwdB3)"></line>
+              
+              <line class="backprop-flow" x1="330" y1="47" x2="238" y2="77" marker-end="url(#bwdB3)"></line>
+              <line class="backprop-flow" x1="330" y1="153" x2="238" y2="123" marker-end="url(#bwdB3)"></line>
+              
+              <line class="backprop-flow" x1="190" y1="90" x2="80" y2="90" marker-end="url(#bwdB3)"></line>
+              
+              <!-- Annotations -->
+              <text class="network-value" x="420" y="40" style="fill:#9c5a00; font-weight:bold;">&delta;&#8321; = -0.445</text>
+              <text class="network-value" x="420" y="175" style="fill:#9c5a00; font-weight:bold;">&delta;&#8322; = +0.445</text>
+              <text class="network-value" x="214" y="145" style="fill:#9c5a00; font-weight:bold;">&Sigma; = -0.4895</text>
+              <text class="network-value" x="135" y="80" style="fill:#9c5a00; font-weight:bold;">&part;L/&part;w&#8321; = -0.245</text>
+              
+              <!-- Nodes -->
+              <circle class="network-node is-input" cx="56" cy="100" r="24"></circle>
+              <text class="network-label" x="56" y="105">x₁</text>
+              <circle class="network-node is-hidden" cx="214" cy="100" r="24"></circle>
+              <text class="network-label" x="214" y="105">h₁</text>
+              <circle class="network-node is-hidden" cx="354" cy="55" r="24"></circle>
+              <text class="network-label" x="354" y="60">z₁</text>
+              <circle class="network-node is-hidden" cx="354" cy="145" r="24"></circle>
+              <text class="network-label" x="354" y="150">z₂</text>
+              <rect class="network-node is-output" x="444" y="76" width="76" height="48" rx="12"></rect>
+              <text class="network-label" x="482" y="105">L</text>
+            </svg>
+            <figcaption>Backward pass for hidden weight \(w_1\): the blame must be summed from both output paths before passing through the ReLU gate.</figcaption>
+          </figure>
+
+          <p>That matrix multiplication \((W_2^{\top} \delta)\) is just the formal way to say <em>"sum up the blame from all the paths it connects to"</em>. Because the hidden neuron \(h_1\) connects to <em>both</em> \(z_1\) and \(z_2\), it must accept blame from both paths! We must sum them up.</p>
+          $$\frac{\partial L}{\partial h_1} = \left( \frac{\partial L}{\partial z_1} \times \frac{\partial z_1}{\partial h_1} \right) + \left( \frac{\partial L}{\partial z_2} \times \frac{\partial z_2}{\partial h_1} \right)$$
+          <p>The derivative of a logit with respect to its hidden input is simply its connecting weight (\(w_2\) and \(w_3\)). Let's execute the rules:</p>
+          <div class="formula-stack">
+            <span>\(\text{Piece 1 (Gathering Blame } W_2^{\top}\delta \text{): } \frac{\partial L}{\partial h_1} = (-0.445 \times 0.6) + (0.445 \times -0.5) = -0.4895\)</span>
+            <span>\(\text{Piece 2 (Activation Gate } f' \text{): } \frac{\partial h_1}{\partial net_{h1}} = 1 \quad \text{(Since } 0.2 > 0 \text{, ReLU slope is 1)}\)</span>
+            <span>\(\text{Piece 3 (The Signal } x \text{): } \frac{\partial net_{h1}}{\partial w_1} = x_1 = 0.5\)</span>
+            <span>\(\textbf{Gradient for } \mathbf{w_1} \left( \frac{\partial L}{\partial w_1} \right) = -0.4895 \times 1 \times 0.5 \approx -0.245\)</span>
+            <span>\(\text{Update: } w_1^+ = 0.4 - (0.1 \times -0.245) = 0.4245\)</span>
+          </div>
+
+          <h3>Part 2: The Macro View (Scaling to Matrices)</h3>
+          <p>
+            The step-by-step math proves there is no magic happening. But an LLM doesn't have 3 weights; it has billions. Calculating that "Gathering Blame" sum (\( \frac{\partial L}{\partial z_1}w_2 + \frac{\partial L}{\partial z_2}w_3 + \dots \)) one-by-one with a `for` loop would take years. 
           </p>
-        </div>
+          <p>
+            To execute those 5 formal rules instantly, we use <strong>Matrices</strong> and a secret weapon called the <strong>Transpose</strong> (\(\top\)). Transposing simply flips a grid of numbers on its side, turning columns into rows. 
+          </p>
+          <p>
+            Let's expand our example to a hidden layer with <strong>3 neurons</strong> (\(h\)) and an output layer with <strong>5 vocabulary words</strong> (\(z\)). To connect them, we need a <strong>\(5 \times 3\) weight matrix</strong> (\(W_2\)). In the forward pass, the shapes align perfectly:
+          </p>
+          $$\underbrace{\begin{bmatrix} 1 & 0 & 2 \\ -1 & 1 & 0 \\ 0 & 0 & 1 \\ 2 & -1 & -1 \\ 0 & 1 & 1 \end{bmatrix}}_{W_2 \ (5 \times 3)} \times \underbrace{\begin{bmatrix} 2 \\ 1 \\ 0 \end{bmatrix}}_{h \ (3 \times 1)} = \underbrace{\begin{bmatrix} 2 \\ -1 \\ 0 \\ 3 \\ 1 \end{bmatrix}}_{z \ (5 \times 1)}$$
+          <p>
+            But when we go backward to "Gather Blame" (Rule 3), the shapes clash. We have 5 pieces of output blame (\(\delta\)) that need to flow back to the 3 hidden neurons. We cannot mathematically multiply a \(5 \times 3\) grid by a column of 5 blames. 
+          </p>
+          <p>
+            By transposing the weights into a \(3 \times 5\) grid (\(W_2^\top\)), we run the plumbing in exact reverse. Notice how the columns of \(W_2\) become the rows of \(W_2^\top\):
+          </p>
+          $$\underbrace{\begin{bmatrix} 1 & -1 & 0 & 2 & 0 \\ 0 & 1 & 0 & -1 & 1 \\ 2 & 0 & 1 & -1 & 1 \end{bmatrix}}_{W_2^\top \ (3 \times 5)} \times \underbrace{\begin{bmatrix} 0.1 \\ 0 \\ -0.2 \\ 0 \\ 0.1 \end{bmatrix}}_{\delta \ (5 \times 1)} = \underbrace{\begin{bmatrix} 0.1 \\ 0.1 \\ 0.1 \end{bmatrix}}_{\text{hidden blame } (3 \times 1)}$$
+          <p class="microcopy">
+            Look closely at that matrix multiplication: it is performing the exact "Gathering Blame" sum we did by hand in Step 3, but it does it for all 3 neurons simultaneously!
+          </p>
+
+          <p>
+            We use Transpose again to calculate the final weight gradients (Rule 4). To fix the weights, every single one of the 5 output blames must multiply with every single one of the 3 hidden signals. If we stand the 5 blames up in a vertical column and lay the 3 signals flat in a horizontal row (\(h^\top\)), multiplying them draws a full \(5 \times 3\) grid of answers:
+          </p>
+          $$\underbrace{\begin{bmatrix} 0.1 \\ 0 \\ -0.2 \\ 0 \\ 0.1 \end{bmatrix}}_{\delta \ (5 \times 1)} \times \underbrace{\begin{bmatrix} 2 & 1 & 0 \end{bmatrix}}_{h^\top \ (1 \times 3)} = \underbrace{\begin{bmatrix} 0.2 & 0.1 & 0 \\ 0 & 0 & 0 \\ -0.4 & -0.2 & 0 \\ 0 & 0 & 0 \\ 0.2 & 0.1 & 0 \end{bmatrix}}_{\text{weight updates } (5 \times 3)}$$
+          <p class="microcopy">
+            This matches the exact shape of our original \(W_2\) matrix, calculating the perfect gradient for all 15 weights in a single mathematical breath. 
+          </p>
+
+          <details class="math-proof-accordion" style="background-color: var(--surface-2); padding: 1rem; border-radius: 8px; margin-top: 1.5rem; margin-bottom: 2rem; cursor: pointer; border: 1px solid var(--border-color);">
+            <summary style="font-weight: bold; color: var(--text-main); user-select: none;">Click to expand: The Mathematical Proof of the Transpose</summary>
+            <div style="margin-top: 1rem; cursor: text;">
+              <p>The appearance of the transpose (\(\top\)) isn't an arbitrary matrix trick—it is the mathematically unavoidable result of applying the multivariable chain rule to every number in the grid simultaneously.</p>
+              
+              <p>Let's look at our simple linear layer: \(z = Wx\).<br>
+              Let \(W\) be a matrix of size \(M \times N\).<br>
+              Let \(x\) be a column vector of size \(N \times 1\).<br>
+              Let \(z\) be a column vector of size \(M \times 1\).<br>
+              Let \(\delta = \frac{\partial L}{\partial z}\) be the column vector of blame arriving at \(z\) (size \(M \times 1\)).</p>
+
+              <p><strong>Proof 1: The Weight Update (\(\nabla W = \delta x^\top\))</strong></p>
+              <p>To find how a single specific weight, \(W_{ij}\) (the weight in row \(i\), column \(j\)), affects the final loss \(L\), we use the chain rule. Since weight \(W_{ij}\) <em>only</em> connects to one specific output neuron \(z_i\), the chain rule simplifies to a single path:</p>
+              $$\frac{\partial L}{\partial W_{ij}} = \frac{\partial L}{\partial z_i} \times \frac{\partial z_i}{\partial W_{ij}}$$
+              
+              <ol>
+                <li>We already know \(\frac{\partial L}{\partial z_i} = \delta_i\).</li>
+                <li>The formula for output neuron \(z_i\) is \(z_i = (W_{i1}x_1) + \dots + (W_{ij}x_j) + \dots\). If we take the derivative of that sum with respect to \(W_{ij}\), everything else drops away, leaving only the input signal \(x_j\). So, \(\frac{\partial z_i}{\partial W_{ij}} = x_j\).</li>
+              </ol>
+              <p>Plugging those in gives us: \(\frac{\partial L}{\partial W_{ij}} = \delta_i x_j\)</p>
+              
+              <p><strong>The Matrix Connection:</strong> This tells us that the gradient for <em>any</em> weight in the grid is just its corresponding row's blame (\(\delta_i\)) multiplied by its corresponding column's input (\(x_j\)). In linear algebra, the operation that multiplies every element of an \(M \times 1\) column vector (\(\delta\)) by every element of a \(1 \times N\) row vector (\(x^\top\)) to create a full \(M \times N\) grid is called the <strong>Outer Product</strong>. Therefore, written as full matrices, \(\frac{\partial L}{\partial W} = \delta x^\top\).</p>
+
+              <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
+
+              <p><strong>Proof 2: Passing Blame (\(\nabla x = W^\top \delta\))</strong></p>
+              <p>Now we want to find how a single input signal, \(x_j\), affects the final loss \(L\) so we can pass the blame backward to it. Using the multivariable chain rule, we must sum up its effect across all output paths. Unlike a single weight, an input signal \(x_j\) fans out and connects to <strong>every single output neuron</strong> (\(z_1, \dots, z_M\)).</p>
+              
+              <p>So, the chain rule requires a sum over all \(M\) outputs:</p>
+              $$\frac{\partial L}{\partial x_j} = \sum_{i=1}^{M} \left( \frac{\partial L}{\partial z_i} \times \frac{\partial z_i}{\partial x_j} \right)$$
+              
+              <ol>
+                <li>Again, \(\frac{\partial L}{\partial z_i} = \delta_i\).</li>
+                <li>As before, \(z_i = (W_{i1}x_1) + \dots + (W_{ij}x_j) + \dots\). The derivative of \(z_i\) with respect to \(x_j\) is simply the connecting weight: \(W_{ij}\).</li>
+              </ol>
+              <p>Plugging those in gives us: \(\frac{\partial L}{\partial x_j} = \sum_{i=1}^{M} \delta_i W_{ij}\)</p>
+              
+              <p><strong>The Matrix Connection:</strong> Look closely at that sum. We are multiplying the elements of a column vector (\(\delta\)) by the elements of a column from our weight matrix (\(W_{1j}, W_{2j}, \dots\)). Standard matrix multiplication requires us to multiply a <em>row</em> by a <em>column</em>. To make the math legal so the computer can calculate the sums for every \(x\) simultaneously, we have to take the \(W\) matrix and lay its columns down horizontally into rows. Flipping columns into rows is exactly what the <strong>Transpose</strong> (\(W^\top\)) does! Therefore, written as full matrices, \(\frac{\partial L}{\partial x} = W^\top \delta\).</p>
+            </div>
+          </details>
+
+          <h3>The Golden Rules of Backprop</h3>
+          <p>Because of the magic of matrices, the tedious math we did by hand collapses into the clean formal rules we introduced above. Let \(\delta\) represent the blame arriving at any layer. As we sweep backward, every layer applies these steps:</p>
+          <ul class="symbol-glossary">
+            <li><strong>1. The Weight Update Rule:</strong> To find a layer's weight updates, multiply the incoming blame column by the transposed signal row (\(h^\top\) or \(x^\top\)) that fed into it. </li>
+            <li><strong>2. The Blame-Passing Rule:</strong> To pass blame to the layer below, multiply the transposed weights (\(W^\top\)) by the current blame, then multiply by the activation function's local slope (\(f'\)).</li>
+          </ul>
+
+          <h3>A Final Warning</h3>
+          <p>
+            This algorithm—<a href="https://en.wikipedia.org/wiki/Automatic_differentiation" target="_blank" rel="noreferrer">reverse-mode automatic differentiation</a>—is incredibly efficient. However, look closely at Rule 3. Every time we step backward through a layer, we multiply by an activation slope (\(f'\)). If your network is very deep, you are multiplying fraction after fraction. The blame signal gets smaller and smaller until it entirely vanishes before reaching the first layers. This is the infamous <a href="https://en.wikipedia.org/wiki/Vanishing_gradient_problem" target="_blank" rel="noreferrer">vanishing gradient problem</a>, and it is exactly why the modern architectures we cover in Chapter 5 rely heavily on skip connections and normalization to keep the blame flowing clearly.
+          </p>
+        </div>        
+
+        
+        
 
         <div class="network-grid backprop-grid">
           <div class="panel backprop-visual-panel">
