@@ -1,0 +1,486 @@
+/* Chapter 5 exercise-first draft. */
+
+.attention-roadmap,
+.merge-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.attention-roadmap div,
+.merge-grid div {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 118px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.attention-roadmap strong,
+.merge-grid strong {
+  font-weight: 900;
+}
+
+.attention-roadmap span,
+.merge-grid span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.math-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.math-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.math-card h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.math-card p {
+  margin: 0;
+  color: #46413b;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.math-card details {
+  border-top: 1px dashed var(--line);
+}
+
+.math-card summary {
+  cursor: pointer;
+  padding-top: 7px;
+  color: var(--teal);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.proof-stack {
+  display: grid;
+  gap: 7px;
+  padding-top: 8px;
+}
+
+.proof-stack code {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #123a3a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.workbook-lab {
+  display: grid;
+  gap: 14px;
+  margin: 18px 0 22px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--teal);
+  border-radius: 8px;
+  background: #f8fcfb;
+}
+
+.workbook-lab .section-title-row {
+  align-items: start;
+}
+
+.workbook-lab .section-title-row h3 {
+  margin: 4px 0 0;
+}
+
+.lab-layout {
+  display: grid;
+  grid-template-columns: minmax(390px, 1.15fr) minmax(320px, 0.85fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.lab-visual-panel,
+.lab-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.lab-visual-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.lab-svg {
+  display: block;
+  width: 100%;
+  min-height: 340px;
+  overflow: visible;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.lab-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lab-fact {
+  display: grid;
+  gap: 3px;
+  min-height: 58px;
+  align-content: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.lab-fact strong {
+  color: var(--ink);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+.lab-fact span {
+  color: var(--muted);
+  font-size: 0.73rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.lab-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px;
+}
+
+.lab-card h4 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.lab-instruction {
+  min-height: 58px;
+  margin: 0;
+  color: #46413b;
+  line-height: 1.45;
+}
+
+.lab-derivation-wrap {
+  display: block;
+  border: 1px solid rgba(198, 95, 30, 0.24);
+  border-radius: 8px;
+  background: #fff8f2;
+}
+
+.lab-derivation-wrap[hidden] {
+  display: none;
+}
+
+.lab-derivation summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.lab-derivation[open] summary {
+  border-bottom: 1px solid rgba(198, 95, 30, 0.18);
+}
+
+.lab-derivation-body {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+.lab-derivation-body p {
+  margin: 0;
+  color: #3f3b36;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.lab-derivation-body code {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #123a3a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.84rem;
+  font-weight: 850;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.lab-answer-row {
+  display: grid;
+  gap: 7px;
+  margin: 2px 0;
+}
+
+.lab-answer-row span {
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.lab-answer-row input {
+  min-height: 42px;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.98rem;
+  font-weight: 850;
+}
+
+.lab-feedback,
+.lab-hint {
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.lab-feedback.is-correct {
+  border-style: solid;
+  border-color: rgba(26, 128, 98, 0.45);
+  background: #edf8f3;
+  color: #14533f;
+}
+
+.lab-feedback.is-wrong {
+  border-style: solid;
+  border-color: rgba(198, 95, 30, 0.38);
+  background: #fff3eb;
+  color: #74320f;
+}
+
+.lab-feedback.is-solution {
+  border-style: solid;
+  border-color: rgba(156, 90, 0, 0.35);
+  background: #fff6df;
+  color: #674000;
+}
+
+.lab-hint {
+  border-style: solid;
+  background: #f6fbfb;
+  color: #274b47;
+}
+
+.lab-actions,
+.lab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lab-actions button,
+.lab-nav button {
+  flex: 1 1 120px;
+}
+
+.lab-nav {
+  padding-top: 2px;
+  border-top: 1px solid var(--line);
+}
+
+.lab-nav button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.svg-label,
+.svg-small,
+.svg-mono,
+.svg-title {
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.svg-title {
+  fill: var(--ink);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.svg-label {
+  fill: var(--ink);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.svg-small {
+  fill: var(--muted);
+  font-size: 10.5px;
+  font-weight: 760;
+}
+
+.svg-mono {
+  fill: #123a3a;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.token-pill {
+  fill: #fffefa;
+  stroke: var(--line);
+  stroke-width: 1.2;
+}
+
+.token-pill.is-query {
+  fill: var(--teal-soft);
+  stroke: var(--teal);
+  stroke-width: 2.3;
+}
+
+.token-pill.is-focus {
+  fill: var(--gold-soft);
+  stroke: var(--gold);
+  stroke-width: 2.3;
+}
+
+.matrix-cell {
+  fill: #ffffff;
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.matrix-cell.is-active {
+  fill: var(--teal-soft);
+  stroke: var(--teal);
+  stroke-width: 2;
+}
+
+.matrix-cell.is-strong {
+  fill: var(--gold-soft);
+  stroke: var(--gold);
+  stroke-width: 2;
+}
+
+.matrix-cell.is-masked {
+  fill: #f1ece3;
+  stroke-dasharray: 4 3;
+}
+
+.attention-edge {
+  stroke: #d4c9b9;
+  stroke-width: 2;
+}
+
+.attention-edge.is-active {
+  stroke: var(--teal);
+  stroke-width: 4;
+}
+
+.attention-edge.is-strong {
+  stroke: var(--gold);
+  stroke-width: 4;
+}
+
+.mini-bar-track {
+  fill: #e8e1d7;
+}
+
+.mini-bar-fill {
+  fill: var(--teal);
+}
+
+.mini-bar-fill.is-strong {
+  fill: var(--gold);
+}
+
+.tile-box {
+  fill: #ffffff;
+  stroke: var(--line);
+  stroke-width: 1.2;
+}
+
+.tile-box.is-active {
+  fill: var(--teal-soft);
+  stroke: var(--teal);
+  stroke-width: 2.2;
+}
+
+.tile-box.is-strong {
+  fill: var(--gold-soft);
+  stroke: var(--gold);
+  stroke-width: 2.2;
+}
+
+.lab-derivation sub,
+.lab-derivation sup,
+.lab-instruction sub,
+.lab-instruction sup,
+.lab-feedback sub,
+.lab-feedback sup,
+.lab-hint sub,
+.lab-hint sup {
+  line-height: 0;
+}
+
+@media (max-width: 1120px) {
+  .lab-layout,
+  .attention-roadmap,
+  .merge-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .math-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .math-card-grid,
+  .lab-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .lab-svg {
+    min-height: 300px;
+  }
+}

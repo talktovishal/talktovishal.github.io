@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter4.css?v=20260626">
+  <link rel="stylesheet" href="chapter4.css?v=20260627c">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -567,6 +567,15 @@
           </p>
         </div>
 
+        <figure class="manim-clip">
+          <video controls muted playsinline preload="metadata" poster="assets/videos/chapter4-forward-pass-poster.jpg" aria-label="Short animation showing the forward pass through the tiny next-word network">
+            <source src="assets/videos/chapter4-forward-pass.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            <strong>Forward pass in motion.</strong> The same tiny network pushes one number left to right: input value, hidden activation, word scores, then softmax and loss.
+          </figcaption>
+        </figure>
+
         <div class="network-grid">
           <div class="panel diagram-panel">
             <div class="section-title-row">
@@ -700,7 +709,7 @@
             <li>\(E_{w}\): the embedding row looked up for word \(w\); \(e\): the two rows joined.</li>
             <li>\(W_1, b_1\): the hidden layer's weights and bias; \(\tanh\): its activation \(f\).</li>
             <li>\(W_2, b_2\): the output weights and bias that turn the hidden layer into logits \(z\).</li>
-            <li>\(q\): the next-word probability the model assigns to every word in the vocabulary (the model's prediction, written \(q\) as in Section 1's cross-entropy).</li>
+            <li>\(q\): the next-word probability the model assigns to every word in the vocabulary (the model's prediction, written \(q\) as in the cross-entropy setup above).</li>
           </ul>
         </div>
       </div>
@@ -755,6 +764,15 @@
             and watch that one difference become the exact error signal every weight will follow.
           </p>
         </div>
+
+        <figure class="manim-clip">
+          <video controls muted playsinline preload="metadata" poster="assets/videos/chapter4-softmax-loss-poster.jpg" aria-label="Short animation showing how softmax turns raw scores into probabilities and blame">
+            <source src="assets/videos/chapter4-softmax-loss.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            <strong>Softmax to blame.</strong> Raw scores become positive numbers, then probabilities; cross-entropy looks at the true word and turns the gap into <code>probability &minus; target</code>.
+          </figcaption>
+        </figure>
 
         <div class="softmax-grid">
           <div class="panel">
@@ -1058,15 +1076,252 @@
           <p class="eyebrow">6. Backpropagation</p>
           <h2 id="backprop-title">Flow the blame backward to fix the weights.</h2>
           <p>
-            We know our final error - that "probability minus target" small miracle we found in Section 4. But that only tells us how wrong the final scores are. How do we fix the weights buried deep in the <strong>hidden layers</strong>? Imagine a factory assembly line: the boss at the end yells, "This car is ruined!" The final assembler says, "Don't just blame me, the chassis arrived crooked from the previous station!" To fix the factory, the blame must be passed backward down the line, proportioned by who caused the most error.
+            We know our final error - that "probability minus target" small miracle we found in the softmax section. But that only tells us how wrong the final scores are. How do we fix the weights buried deep in the <strong>hidden layers</strong>? Imagine a factory assembly line: the boss at the end yells, "This car is ruined!" The final assembler says, "Don't just blame me, the chassis arrived crooked from the previous station!" To fix the factory, the blame must be passed backward down the line, proportioned by who caused the most error.
           </p>
           <p>
             This backward flow of blame is <a href="https://en.wikipedia.org/wiki/Backpropagation" target="_blank" rel="noreferrer">Backpropagation</a>. Instead of guessing how to tweak each hidden weight, we use the <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a> from calculus to multiply the sensitivities backward. The error at the output tells the hidden layer how it should have behaved, and the hidden layer tells its weights how they need to adjust. This mathematical chain reaction allows the network to efficiently calculate the perfect downhill gradient for <em>every single weight</em> in one graceful sweep.
           </p>
         </div>
-        
 
+        <div class="manim-clip-grid two-up" aria-label="Backpropagation animation clips">
+          <figure class="manim-clip">
+            <video controls muted playsinline preload="metadata" poster="assets/videos/chapter4-backprop-blame-poster.jpg" aria-label="Short animation showing output blame flowing backward through the tiny network">
+              <source src="assets/videos/chapter4-backprop-blame.mp4" type="video/mp4">
+            </video>
+            <figcaption>
+              <strong>Backprop blame flow.</strong> The error starts at the loss, splits across the output scores, then gathers at the hidden neuron through the chain rule.
+            </figcaption>
+          </figure>
+          <figure class="manim-clip">
+            <video controls muted playsinline preload="metadata" poster="assets/videos/chapter4-gradient-update-poster.jpg" aria-label="Short animation showing gradient descent updating the tiny network weights">
+              <source src="assets/videos/chapter4-gradient-update.mp4" type="video/mp4">
+            </video>
+            <figcaption>
+              <strong>Gradient update.</strong> Once backprop has the gradients, gradient descent subtracts them so the important weights move in the direction that lowers loss.
+            </figcaption>
+          </figure>
+        </div>
 
+        <div class="by-hand-lab" id="byHandLab" aria-labelledby="by-hand-title">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">Try it by hand</p>
+              <h3 id="by-hand-title">Do one complete training step yourself.</h3>
+            </div>
+            <span id="byHandProgress" class="pill">step 1 of 13</span>
+          </div>
+          <p class="microcopy">
+            This is the same story as the videos, but now you hold the pencil. A two-number input flows into a hidden layer, then five possible next words. Type each number, check it, ask for hints when you need them, and reveal the solution only when you are ready.
+          </p>
+          <aside class="by-hand-math-refresher" aria-labelledby="by-hand-math-title">
+            <div>
+              <p class="eyebrow">Math refresher</p>
+              <h4 id="by-hand-math-title">The tiny calculus toolkit for the backward half.</h4>
+              <p>When you reach Step 9, these are the local rules we use. You can read them as a cheat sheet while the worksheet asks you to do the actual arithmetic.</p>
+            </div>
+            <dl class="by-hand-math-list">
+              <div>
+                <dt>Partial derivative</dt>
+                <dd>
+                  \(\partial L / \partial W_{\text{sat},h1}\) means: nudge just this one weight, hold the rest still, and ask how fast the loss changes.
+                  <details class="by-hand-math-proof">
+                    <summary>Show why this notation means one knob</summary>
+                    <div class="by-hand-proof-body">
+                      <p>An ordinary derivative watches one input move. A partial derivative does the same thing when the function has many inputs: move one input and freeze the others.</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(L = L(W_{\text{sat},h1}, W_{\text{sat},h2}, \ldots)\)</span>
+                        <span>\(L_{\text{after}} = L(W_{\text{sat},h1}+\epsilon,\text{others fixed})\)</span>
+                        <span>\(L_{\text{before}} = L(W_{\text{sat},h1},\text{others fixed})\)</span>
+                        <span>\(\dfrac{\partial L}{\partial W_{\text{sat},h1}} = \lim_{\epsilon \to 0}\dfrac{L_{\text{after}} - L_{\text{before}}}{\epsilon}\)</span>
+                      </div>
+                      <p>So the symbol is not new magic. It is a tiny "what if I turn only this knob?" experiment.</p>
+                    </div>
+                  </details>
+                </dd>
+              </div>
+              <div>
+                <dt>Chain rule</dt>
+                <dd>
+                  If \(W\) changes \(z\), and \(z\) changes \(L\), multiply the two local slopes: \(\partial L/\partial W = (\partial L/\partial z)(\partial z/\partial W)\).
+                  <details class="by-hand-math-proof">
+                    <summary>Show why slopes multiply</summary>
+                    <div class="by-hand-proof-body">
+                      <p>Imagine nudging \(W\) by a tiny amount \(\Delta W\). First that nudge changes \(z\). Then the change in \(z\) changes the loss.</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(\Delta z \approx \dfrac{\partial z}{\partial W}\Delta W\)</span>
+                        <span>\(\Delta L \approx \dfrac{\partial L}{\partial z}\Delta z\)</span>
+                        <span>\(\Delta L \approx \dfrac{\partial L}{\partial z}\left(\dfrac{\partial z}{\partial W}\Delta W\right)\)</span>
+                        <span>\(\dfrac{\Delta L}{\Delta W} \approx \dfrac{\partial L}{\partial z}\dfrac{\partial z}{\partial W}\)</span>
+                      </div>
+                      <p>As the nudge gets tiny, the approximation becomes the derivative. That is the chain rule.</p>
+                    </div>
+                  </details>
+                </dd>
+              </div>
+              <div>
+                <dt>Many paths add</dt>
+                <dd>
+                  If one hidden neuron feeds several word scores, add each path's contribution: one blame term times one outgoing weight per word.
+                  <details class="by-hand-math-proof">
+                    <summary>Show why paths add</summary>
+                    <div class="by-hand-proof-body">
+                      <p>A hidden value \(h\) can affect the loss through many scores at once. The total loss change is the sum of the loss change coming through each score.</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(\Delta L \approx \dfrac{\partial L}{\partial z_1}\Delta z_1 + \dfrac{\partial L}{\partial z_2}\Delta z_2 + \cdots\)</span>
+                        <span>\(\Delta z_i \approx \dfrac{\partial z_i}{\partial h}\Delta h\)</span>
+                        <span>\(\Delta L \approx \left(\sum_i \dfrac{\partial L}{\partial z_i}\dfrac{\partial z_i}{\partial h}\right)\Delta h\)</span>
+                        <span>\(\dfrac{\partial L}{\partial h} = \sum_i \dfrac{\partial L}{\partial z_i}\dfrac{\partial z_i}{\partial h}\)</span>
+                      </div>
+                      <p>Backprop is doing careful bookkeeping: every downstream route gets its say, then we add them.</p>
+                    </div>
+                  </details>
+                </dd>
+              </div>
+              <div>
+                <dt>Natural log</dt>
+                <dd>
+                  Here \(\log\) means natural log. The key rule is \(d(\ln q)/dq = 1/q\), so \(d(-\ln q)/dq = -1/q\).
+                  <details class="by-hand-math-proof">
+                    <summary>Show why the log slope is 1/q</summary>
+                    <div class="by-hand-proof-body">
+                      <p>The natural log is the inverse of the exponential. If \(y = \ln q\), then exponentiating both sides gives \(e^y = q\).</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(y = \ln q\)</span>
+                        <span>\(e^y = q\)</span>
+                        <span>\(\dfrac{d}{dq}(e^y) = \dfrac{d}{dq}(q)\)</span>
+                        <span>\(e^y\dfrac{dy}{dq} = 1\)</span>
+                        <span>\(\dfrac{dy}{dq} = \dfrac{1}{e^y}\)</span>
+                        <span>\(\dfrac{dy}{dq} = \dfrac{1}{q}\)</span>
+                      </div>
+                      <p>So \(\ln q\) gets flatter as \(q\) gets larger. The minus sign in \(-\ln q\) just flips the slope: \(-1/q\).</p>
+                    </div>
+                  </details>
+                </dd>
+              </div>
+              <div>
+                <dt>Exp and softmax</dt>
+                <dd>
+                  \(d(e^z)/dz = e^z\). Softmax uses those exponentials, and its shared denominator is why one score affects every probability.
+                  <details class="by-hand-math-proof">
+                    <summary>Show why exp and softmax behave this way</summary>
+                    <div class="by-hand-proof-body">
+                      <p>The exponential is special because a tiny increase keeps the same shape scaled by the current value.</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(\dfrac{d(e^z)}{dz} = \lim_{\epsilon\to 0}\dfrac{e^{z+\epsilon}-e^z}{\epsilon}\)</span>
+                        <span>\(= e^z\lim_{\epsilon\to 0}\dfrac{e^\epsilon-1}{\epsilon}\)</span>
+                        <span>\(= e^z\)</span>
+                      </div>
+                      <p>That last limit equals 1 for the natural base \(e\). Softmax then divides one exponential by the shared total \(S\).</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(q_i = e^{z_i}/S,\quad S=\sum_k e^{z_k}\)</span>
+                        <span>\(\dfrac{\partial q_i}{\partial z_i}=q_i(1-q_i)\)</span>
+                        <span>\(\dfrac{\partial q_j}{\partial z_i}=-q_jq_i\quad\text{when }j\ne i\)</span>
+                      </div>
+                      <p>One score raising its own numerator also raises the denominator, so other probabilities get squeezed down.</p>
+                    </div>
+                  </details>
+                </dd>
+              </div>
+              <div>
+                <dt>Linear weights</dt>
+                <dd>
+                  For a score like \(z = Wh + b\), the slope with respect to \(W\) is the signal \(h\), and the slope with respect to \(h\) is the weight \(W\).
+                  <details class="by-hand-math-proof">
+                    <summary>Show why the signal and weight appear</summary>
+                    <div class="by-hand-proof-body">
+                      <p>Hold \(h\) and \(b\) fixed, then nudge \(W\) by a tiny amount \(\epsilon\).</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(z(W+\epsilon) = (W+\epsilon)h+b\)</span>
+                        <span>\(z(W+\epsilon)-z(W)=\epsilon h\)</span>
+                        <span>\(\dfrac{\partial z}{\partial W}=\lim_{\epsilon\to0}\dfrac{\epsilon h}{\epsilon}=h\)</span>
+                      </div>
+                      <p>Now hold \(W\) and \(b\) fixed, then nudge \(h\).</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(z(h+\epsilon)=W(h+\epsilon)+b\)</span>
+                        <span>\(z(h+\epsilon)-z(h)=W\epsilon\)</span>
+                        <span>\(\dfrac{\partial z}{\partial h}=W\)</span>
+                      </div>
+                    </div>
+                  </details>
+                </dd>
+              </div>
+              <div>
+                <dt>ReLU slope</dt>
+                <dd>
+                  ReLU passes positive raw values with slope 1 and blocks negative raw values with slope 0.
+                  <details class="by-hand-math-proof">
+                    <summary>Show why the gate is 1 or 0</summary>
+                    <div class="by-hand-proof-body">
+                      <p>ReLU is a piecewise function. It is one straight line on the positive side and a flat line on the negative side.</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(\operatorname{ReLU}(r)=\max(0,r)\)</span>
+                        <span>\(\operatorname{ReLU}(r)=r\quad\text{if }r>0\)</span>
+                        <span>\(\operatorname{ReLU}(r)=0\quad\text{if }r<0\)</span>
+                      </div>
+                      <p>The derivative of \(r\) is 1. The derivative of a flat constant 0 is 0.</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(\operatorname{ReLU}'(r)=1\quad\text{if }r>0\)</span>
+                        <span>\(\operatorname{ReLU}'(r)=0\quad\text{if }r<0\)</span>
+                      </div>
+                      <p>At exactly \(r=0\), the sharp corner has no single slope. In practice, code chooses a convention; here we treat it as 0.</p>
+                    </div>
+                  </details>
+                </dd>
+              </div>
+              <div>
+                <dt>Gradient step</dt>
+                <dd>
+                  The gradient points uphill, toward higher loss. To lower the loss, gradient descent subtracts it: \(W_{\text{new}} = W_{\text{old}} - \eta g\).
+                  <details class="by-hand-math-proof">
+                    <summary>Show why subtracting moves downhill</summary>
+                    <div class="by-hand-proof-body">
+                      <p>For a tiny move \(\Delta W\), the derivative gives a local estimate of the new loss.</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(g = \dfrac{\partial L}{\partial W}\)</span>
+                        <span>\(L(W+\Delta W) \approx L(W)+g\Delta W\)</span>
+                      </div>
+                      <p>If we choose the move \(\Delta W=-\eta g\), where \(\eta\) is a small positive learning rate, the predicted loss change becomes negative.</p>
+                      <div class="by-hand-proof-lines">
+                        <span>\(L(W-\eta g)\approx L(W)+g(-\eta g)\)</span>
+                        <span>\(L(W-\eta g)\approx L(W)-\eta g^2\)</span>
+                      </div>
+                      <p>Because \(g^2\) cannot be negative, subtracting the gradient aims the step downhill.</p>
+                    </div>
+                  </details>
+                </dd>
+              </div>
+            </dl>
+            <p class="by-hand-refresher-note">One small notation note: \(\mathbb{1}_{i=j}\) is just an on/off switch. It equals 1 when the two indexes match and 0 otherwise.</p>
+          </aside>
+          <div class="by-hand-layout">
+            <div class="by-hand-visual-panel">
+              <svg id="byHandSvg" class="by-hand-svg" viewBox="0 0 760 430" role="img" aria-label="A small neural network for a by-hand forward and backward pass"></svg>
+              <div id="byHandMiniFacts" class="by-hand-facts" aria-label="Current network values"></div>
+            </div>
+            <div class="by-hand-card">
+              <span id="byHandStepTag" class="pill">forward pass</span>
+              <h4 id="byHandPrompt">Calculate the first hidden value.</h4>
+              <p id="byHandInstruction" class="by-hand-instruction"></p>
+              <div id="byHandEquation" class="by-hand-equation" hidden></div>
+              <label class="by-hand-answer-row" for="byHandAnswer">
+                <span>Your answer</span>
+                <input id="byHandAnswer" class="control-input" type="text" inputmode="decimal" autocomplete="off" placeholder="Enter your value">
+              </label>
+              <div id="byHandFeedback" class="by-hand-feedback" aria-live="polite"></div>
+              <div id="byHandHintPanel" class="by-hand-hint" hidden></div>
+              <div class="stepper-row by-hand-actions">
+                <button id="byHandCheckButton" class="primary-button" type="button">Check</button>
+                <button id="byHandHintButton" class="ghost-button" type="button">Hint</button>
+                <button id="byHandSolutionButton" class="ghost-button" type="button">Show solution</button>
+              </div>
+              <div class="stepper-row by-hand-nav">
+                <button id="byHandPrevButton" class="ghost-button" type="button">Previous</button>
+                <button id="byHandNextButton" class="primary-button" type="button">Next</button>
+                <button id="byHandResetButton" class="ghost-button" type="button">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
 
 <div class="math-formal" aria-label="Backpropagation in symbols">
           <h3>A Step-by-Step Backpropagation Walkthrough</h3>
@@ -1079,8 +1334,8 @@
           
           <figure class="build-network-figure backprop-chain-figure">
             <svg class="mlp-svg" viewBox="0 0 560 270" role="img" aria-labelledby="chain-fig-t chain-fig-d">
-              <title id="chain-fig-t">One weight inside the Section 5 network</title>
-              <desc id="chain-fig-d">The same network as Section 5: two context words feed a hidden layer through the weights W1, the hidden layer feeds the output score z through the weights W2, softmax turns z into probabilities q, and a loss L sits on the end. One weight w inside W1 is highlighted; its influence reaches the loss along the path w to h to z to L. The forward pass runs left to right and the backward pass multiplies the local slopes from right to left.</desc>
+              <title id="chain-fig-t">One weight inside the forward-pass network</title>
+              <desc id="chain-fig-d">The same forward-pass network: two context words feed a hidden layer through the weights W1, the hidden layer feeds the output score z through the weights W2, softmax turns z into probabilities q, and a loss L sits on the end. One weight w inside W1 is highlighted; its influence reaches the loss along the path w to h to z to L. The forward pass runs left to right and the backward pass multiplies the local slopes from right to left.</desc>
               <defs>
                 <marker id="chainFwd" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
                   <path d="M0,0 L6,3 L0,6 Z" fill="var(--teal)"></path>
@@ -1090,7 +1345,7 @@
                 </marker>
               </defs>
 
-              <text class="mlp-axis" x="280" y="18">the same network as Section 5, with a loss L on the end</text>
+              <text class="mlp-axis" x="280" y="18">the forward-pass network above, with a loss L on the end</text>
 
               <!-- Network Edges -->
               <line class="network-edge is-muted" x1="78" y1="88" x2="189" y2="130"></line>
@@ -1534,7 +1789,7 @@
           <h2 id="warmup-title">Act 1: watch a network learn - and watch it overfit.</h2>
           <p>
             You have now assembled every beat of the loop and even watched single gradient
-            steps move the loss in Section 6. This last stretch runs the <em>whole</em> loop to
+            steps move the loss in the backprop lab. This last stretch runs the <em>whole</em> loop to
             completion, twice. First, here in Act 1, on a task whose answer is a picture you can
             read at a glance - a boundary between two colours of dots - so you can literally see
             learning happen and meet the one genuinely new idea: <strong>generalization</strong>.
@@ -1560,7 +1815,7 @@
         <div class="build-network-explainer">
           <div class="build-network-copy">
             <p class="eyebrow">What you are training</p>
-            <h3>A tiny multilayer perceptron - the very same shape as Section 3.</h3>
+            <h3>A tiny multilayer perceptron - the very same shape as the forward-pass network above.</h3>
             <p>
               There is no mystery box here. Every dot on the map is just <strong>two numbers</strong>:
               its <code>x</code> and <code>y</code> position. Those two inputs feed a <strong>hidden
@@ -1570,7 +1825,7 @@
               group B." That is the whole network.
             </p>
             <p>
-              It is the exact same architecture as the next-word network you built in Section 3 - only the
+              It is the exact same architecture as the next-word network you built above - only the
               input is two coordinates instead of two word vectors, and there are two output classes
               instead of a whole vocabulary. With <code>N</code> hidden neurons it carries
               <code>5N + 2</code> weights and biases, which is precisely the <strong>parameters</strong>
@@ -1743,7 +1998,7 @@
         <div class="build-network-explainer">
           <div class="build-network-copy">
             <p class="eyebrow">What you are training</p>
-            <h3>A tiny next-word network - the exact forward pass from Section 3, with learning switched on.</h3>
+            <h3>A tiny next-word network - the exact forward pass above, with learning switched on.</h3>
             <p>
               No mystery box here. The two context words are each looked up as a learned
               <strong>vector</strong> (an embedding). The two vectors are joined, pushed
@@ -1754,7 +2009,7 @@
             </p>
             <p>
               Training nudges every number along that path - the embeddings, both weight
-              layers, and the biases - using the exact backprop from Section 6. With a
+              layers, and the biases - using the exact backprop you just traced. With a
               vocabulary of <code>V</code> words, a <code>12</code>-dimensional embedding, and
               <code>24</code> hidden units, that is a few thousand weights; the live
               <strong>parameters</strong> readout below counts them exactly.
@@ -2023,7 +2278,7 @@ return {
     </section>
   </main>
 
-  <script src="chapter4.js?v=20260626"></script>
+  <script src="chapter4.js?v=20260627b"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>

@@ -90,6 +90,23 @@ const dom = {
   backpropMetrics: document.getElementById("backpropMetrics"),
   backpropLossSpark: document.getElementById("backpropLossSpark"),
   backpropTracePanel: document.getElementById("backpropTracePanel"),
+  byHandLab: document.getElementById("byHandLab"),
+  byHandProgress: document.getElementById("byHandProgress"),
+  byHandSvg: document.getElementById("byHandSvg"),
+  byHandMiniFacts: document.getElementById("byHandMiniFacts"),
+  byHandStepTag: document.getElementById("byHandStepTag"),
+  byHandPrompt: document.getElementById("byHandPrompt"),
+  byHandInstruction: document.getElementById("byHandInstruction"),
+  byHandEquation: document.getElementById("byHandEquation"),
+  byHandAnswer: document.getElementById("byHandAnswer"),
+  byHandFeedback: document.getElementById("byHandFeedback"),
+  byHandHintPanel: document.getElementById("byHandHintPanel"),
+  byHandCheckButton: document.getElementById("byHandCheckButton"),
+  byHandHintButton: document.getElementById("byHandHintButton"),
+  byHandSolutionButton: document.getElementById("byHandSolutionButton"),
+  byHandPrevButton: document.getElementById("byHandPrevButton"),
+  byHandNextButton: document.getElementById("byHandNextButton"),
+  byHandResetButton: document.getElementById("byHandResetButton"),
   datasetSelect: document.getElementById("datasetSelect"),
   hiddenUnitsSlider: document.getElementById("hiddenUnitsSlider"),
   hiddenUnitsLabel: document.getElementById("hiddenUnitsLabel"),
@@ -186,7 +203,8 @@ const state = {
   hasExploredGradient: false,
   hasTrainedNetwork: false,
   forwardFocus: null,
-  backprop: null
+  backprop: null,
+  byHand: { index: 0, hints: {}, solved: {}, revealed: {}, answers: {}, feedback: {} }
 };
 
 function formatNumber(value, digits = 3) {
@@ -1059,7 +1077,7 @@ function renderNetworkSvg(contextWords, hidden, candidates, probs, opts = {}) {
   outputNodes.forEach((node) => drawNode(node, "is-output"));
 }
 
-/* ---- Backpropagation lab (reuses the Section 5 forward-pass network) ---- */
+/* ---- Backpropagation lab (reuses the forward-pass network) ---- */
 function signedFixed(value, digits = 2) {
   if (!Number.isFinite(value)) return "n/a";
   return (value < 0 ? "-" : "+") + Math.abs(value).toFixed(digits);
@@ -1386,6 +1404,607 @@ function backpropReading(pass) {
     note.textContent = `After ${bp.steps} step${bp.steps === 1 ? "" : "s"}, "${pass.trueWord}" is up to ${formatPercent(pTrue)} and the loss is down to ${formatNumber(pass.loss, 3)}. Keep stepping to drive this one example toward a confident, low-loss prediction.`;
   }
   return note;
+}
+
+/* ---- By-hand forward/backward worksheet ---- */
+const byHandNetwork = {
+  inputs: [
+    { id: "x1", label: "x1", value: 0.5 },
+    { id: "x2", label: "x2", value: 0.2 }
+  ],
+  hiddenWeights: [
+    [0.4, -0.3],
+    [-0.1, 0.7]
+  ],
+  hiddenBias: [0, 0],
+  words: [
+    { word: "sat", weights: [0.8, -0.2], bias: 0.1 },
+    { word: "ran", weights: [0.2, 0.5], bias: 0 },
+    { word: "slept", weights: [-0.4, 0.1], bias: -0.05 },
+    { word: "purred", weights: [0.6, -0.3], bias: 0.02 },
+    { word: "meowed", weights: [-0.1, 0.4], bias: -0.02 }
+  ],
+  targetWord: "sat",
+  learningRate: 0.1
+};
+
+function computeByHandValues() {
+  const input = byHandNetwork.inputs.map((item) => item.value);
+  const hiddenRaw = byHandNetwork.hiddenBias.map((bias, hiddenIndex) => (
+    bias + input.reduce((sum, value, inputIndex) => (
+      sum + value * byHandNetwork.hiddenWeights[inputIndex][hiddenIndex]
+    ), 0)
+  ));
+  const hidden = hiddenRaw.map((value) => Math.max(0, value));
+  const logits = byHandNetwork.words.map((item) => (
+    item.bias + hidden.reduce((sum, value, hiddenIndex) => sum + value * item.weights[hiddenIndex], 0)
+  ));
+  const expLogits = logits.map((value) => Math.exp(value));
+  const denominator = expLogits.reduce((sum, value) => sum + value, 0);
+  const probabilities = softmax(logits);
+  const targetIndex = byHandNetwork.words.findIndex((item) => item.word === byHandNetwork.targetWord);
+  const loss = -Math.log(Math.max(probabilities[targetIndex], 1e-9));
+  const outputBlame = probabilities.map((probability, index) => probability - (index === targetIndex ? 1 : 0));
+  const hiddenBlame = hidden.map((_, hiddenIndex) => (
+    outputBlame.reduce((sum, blame, wordIndex) => (
+      sum + blame * byHandNetwork.words[wordIndex].weights[hiddenIndex]
+    ), 0)
+  ));
+  const hiddenDelta = hiddenBlame.map((blame, index) => blame * (hiddenRaw[index] > 0 ? 1 : 0));
+  const outputGradSatH1 = outputBlame[targetIndex] * hidden[0];
+  const inputGradX1H1 = hiddenDelta[0] * input[0];
+  const inputGradX2H1 = hiddenDelta[0] * input[1];
+  const updatedX1H1 = byHandNetwork.hiddenWeights[0][0] - byHandNetwork.learningRate * inputGradX1H1;
+  return {
+    input,
+    hiddenRaw,
+    hidden,
+    logits,
+    expLogits,
+    denominator,
+    probabilities,
+    targetIndex,
+    loss,
+    outputBlame,
+    hiddenBlame,
+    hiddenDelta,
+    outputGradSatH1,
+    inputGradX1H1,
+    inputGradX2H1,
+    updatedX1H1
+  };
+}
+
+const byHandValues = computeByHandValues();
+
+const byHandSteps = [
+  {
+    id: "h1-raw",
+    phase: "forward pass",
+    prompt: "Step 1: find the raw value entering hidden neuron h1.",
+    instruction: "Use the two incoming edges: x1 x 0.40 plus x2 x -0.10. With x1 = 0.50 and x2 = 0.20, what enters h1 before ReLU?",
+    answer: byHandValues.hiddenRaw[0],
+    tolerance: 0.005,
+    solution: "0.50 x 0.40 + 0.20 x -0.10 = 0.180",
+    hints: ["Multiply first: 0.50 x 0.40 = 0.200, and 0.20 x -0.10 = -0.020.", "Now add the two pieces: 0.200 + -0.020."],
+    nodes: ["x1", "x2", "h1"],
+    edges: ["x1-h1", "x2-h1"]
+  },
+  {
+    id: "h1-relu",
+    phase: "forward pass",
+    prompt: "Step 2: pass h1 through the ReLU gate.",
+    instruction: "ReLU keeps positive numbers and turns negative numbers into 0. The raw h1 value is 0.180. What is h1 after ReLU?",
+    answer: byHandValues.hidden[0],
+    tolerance: 0.005,
+    solution: "ReLU(0.180) = 0.180",
+    hints: ["Ask whether 0.180 is above or below zero.", "Positive values pass through ReLU unchanged."],
+    nodes: ["h1"],
+    edges: []
+  },
+  {
+    id: "h2-raw",
+    phase: "forward pass",
+    prompt: "Step 3: find the raw value entering hidden neuron h2.",
+    instruction: "Now use the second hidden neuron: x1 x -0.30 plus x2 x 0.70. What enters h2 before ReLU?",
+    answer: byHandValues.hiddenRaw[1],
+    tolerance: 0.005,
+    solution: "0.50 x -0.30 + 0.20 x 0.70 = -0.010",
+    hints: ["The two products are -0.150 and +0.140.", "Add -0.150 + 0.140."],
+    nodes: ["x1", "x2", "h2"],
+    edges: ["x1-h2", "x2-h2"]
+  },
+  {
+    id: "h2-relu",
+    phase: "forward pass",
+    prompt: "Step 4: pass h2 through the ReLU gate.",
+    instruction: "The raw h2 value is -0.010. ReLU shuts negative values off. What is h2 after ReLU?",
+    answer: byHandValues.hidden[1],
+    tolerance: 0.005,
+    solution: "ReLU(-0.010) = 0",
+    hints: ["ReLU is max(0, value).", "Since -0.010 is below zero, the gate closes."],
+    nodes: ["h2"],
+    edges: []
+  },
+  {
+    id: "sat-logit",
+    phase: "forward pass",
+    prompt: "Step 5: calculate the score for the word \"sat\".",
+    instruction: "Use z_sat = h1 x 0.80 + h2 x -0.20 + bias 0.10. With h1 = 0.180 and h2 = 0, what is the logit for \"sat\"?",
+    answer: byHandValues.logits[0],
+    tolerance: 0.005,
+    solution: "0.180 x 0.80 + 0 x -0.20 + 0.10 = 0.244",
+    hints: ["The h2 branch contributes 0 because h2 is 0.", "0.180 x 0.80 = 0.144, then add the bias 0.10."],
+    nodes: ["h1", "h2", "sat"],
+    edges: ["h1-sat", "h2-sat"]
+  },
+  {
+    id: "softmax-denominator",
+    phase: "forward pass",
+    prompt: "Step 6: build the softmax denominator.",
+    instruction: "The five logits are 0.244, 0.036, -0.122, 0.128, and -0.038. Add e raised to each logit. What is the denominator?",
+    answer: byHandValues.denominator,
+    tolerance: 0.015,
+    solution: "e^0.244 + e^0.036 + e^-0.122 + e^0.128 + e^-0.038 = 5.297",
+    hints: ["The exponentials are about 1.277, 1.037, 0.885, 1.137, and 0.963.", "Add those five positive numbers."],
+    nodes: ["sat", "ran", "slept", "purred", "meowed"],
+    edges: ["h1-sat", "h1-ran", "h1-slept", "h1-purred", "h1-meowed"]
+  },
+  {
+    id: "sat-probability",
+    phase: "forward pass",
+    prompt: "Step 7: turn the \"sat\" score into a probability.",
+    instruction: "Use q_sat = e^0.244 / 5.297. What probability does the model give the correct word?",
+    answer: byHandValues.probabilities[0],
+    tolerance: 0.005,
+    solution: "q_sat = 1.277 / 5.297 = 0.241",
+    hints: ["The numerator for \"sat\" is e^0.244, about 1.277.", "Divide 1.277 by the denominator from the previous step."],
+    nodes: ["sat"],
+    edges: ["sat-loss"]
+  },
+  {
+    id: "loss",
+    phase: "forward pass",
+    prompt: "Step 8: calculate the loss.",
+    instruction: "For the true word, cross-entropy is -ln(q_true). Use q_sat = 0.241. What is the loss in nats?",
+    answer: byHandValues.loss,
+    tolerance: 0.01,
+    solution: "-ln(0.241) = 1.423",
+    hints: ["Use the natural log, not log base 10.", "The model is not very confident yet, so the loss should be bigger than 1."],
+    nodes: ["sat", "loss"],
+    edges: ["sat-loss"]
+  },
+  {
+    id: "sat-blame",
+    phase: "backward pass",
+    prompt: "Step 9: find the output blame for \"sat\".",
+    instruction: "Softmax plus cross-entropy gives a very clean output-blame rule. For the true word \"sat\", the target value is 1. What value is <strong>&delta;<sub>sat</sub></strong>, the blame flowing backward from the sat score?",
+    derivationTitle: "Why is output blame probability minus target?",
+    derivation: [
+      { type: "p", html: "First name the pieces. <strong>z<sub>word</sub></strong> is a raw score, also called a logit. <strong>q<sub>word</sub></strong> is the probability after softmax. <strong>y<sub>word</sub></strong> is the target label: 1 for the correct word and 0 for every other word. <strong>&delta;<sub>word</sub></strong> is the blame sent backward into that word's raw score." },
+      { type: "code", html: "q<sub>i</sub> = softmax(z)<sub>i</sub> = e<sup>z<sub>i</sub></sup> / &Sigma;<sub>k</sub> e<sup>z<sub>k</sub></sup>" },
+      { type: "code", html: "L = -&Sigma;<sub>j</sub> y<sub>j</sub> log(q<sub>j</sub>)" },
+      { type: "p", html: "We want the slope of the loss with respect to one raw score <strong>z<sub>i</sub></strong>. Because softmax shares one denominator, changing <strong>z<sub>i</sub></strong> changes every probability <strong>q<sub>j</sub></strong>, not just <strong>q<sub>i</sub></strong>." },
+      { type: "code", html: "&delta;<sub>i</sub> = &part;L / &part;z<sub>i</sub> = &Sigma;<sub>j</sub> (&part;L / &part;q<sub>j</sub>)(&part;q<sub>j</sub> / &part;z<sub>i</sub>)" },
+      { type: "p", html: "Now get the cross-entropy derivative with respect to one probability. Focus on one term, <strong>-y<sub>j</sub> log(q<sub>j</sub>)</strong>. The target <strong>y<sub>j</sub></strong> is just a constant multiplier here." },
+      { type: "code", html: "&part; / &part;q<sub>j</sub> [-y<sub>j</sub> log(q<sub>j</sub>)] = -y<sub>j</sub> &times; &part;log(q<sub>j</sub>) / &part;q<sub>j</sub>" },
+      { type: "p", html: "Why is the log slope <strong>1 / q<sub>j</sub></strong>? Let <strong>u = log(q<sub>j</sub>)</strong>. Natural log means the inverse of exponentiation, so <strong>e<sup>u</sup> = q<sub>j</sub></strong>." },
+      { type: "code", html: "e<sup>u</sup> = q<sub>j</sub>" },
+      { type: "code", html: "&part; / &part;q<sub>j</sub> [e<sup>u</sup>] = &part; / &part;q<sub>j</sub> [q<sub>j</sub>]" },
+      { type: "code", html: "e<sup>u</sup> (&part;u / &part;q<sub>j</sub>) = 1" },
+      { type: "code", html: "&part;u / &part;q<sub>j</sub> = 1 / e<sup>u</sup> = 1 / q<sub>j</sub>" },
+      { type: "p", html: "Substitute that log slope back into the cross-entropy term." },
+      { type: "code", html: "&part;L / &part;q<sub>j</sub> = -y<sub>j</sub> / q<sub>j</sub>" },
+      { type: "p", html: "The softmax part has two cases: the probability for the same word rises when its own score rises, while the other probabilities fall because the denominator got bigger." },
+      { type: "code", html: "&part;q<sub>j</sub> / &part;z<sub>i</sub> = q<sub>j</sub>(1 - q<sub>i</sub>) if i = j" },
+      { type: "code", html: "&part;q<sub>j</sub> / &part;z<sub>i</sub> = -q<sub>j</sub>q<sub>i</sub> if i &ne; j" },
+      { type: "p", html: "A compact way to write both cases is:" },
+      { type: "code", html: "&part;q<sub>j</sub> / &part;z<sub>i</sub> = q<sub>j</sub>(1<sub>i=j</sub> - q<sub>i</sub>)" },
+      { type: "p", html: "Now substitute both derivative pieces into the chain-rule sum." },
+      { type: "code", html: "&part;L / &part;z<sub>i</sub> = &Sigma;<sub>j</sub> (-y<sub>j</sub> / q<sub>j</sub>) q<sub>j</sub>(1<sub>i=j</sub> - q<sub>i</sub>)" },
+      { type: "code", html: "= &Sigma;<sub>j</sub> -y<sub>j</sub>(1<sub>i=j</sub> - q<sub>i</sub>)" },
+      { type: "code", html: "= -y<sub>i</sub> + q<sub>i</sub>&Sigma;<sub>j</sub>y<sub>j</sub>" },
+      { type: "p", html: "For one correct next word, the target vector has exactly one 1, so <strong>&Sigma;<sub>j</sub>y<sub>j</sub> = 1</strong>." },
+      { type: "code", html: "&part;L / &part;z<sub>i</sub> = q<sub>i</sub> - y<sub>i</sub>" },
+      { type: "p", html: "That is why the output blame for any word is predicted probability minus target." }
+    ],
+    answer: byHandValues.outputBlame[0],
+    tolerance: 0.005,
+    solution: "&delta;<sub>sat</sub> = 0.241 - 1 = -0.759",
+    hints: ["The target <strong>y</strong> is 1 only for the correct word.", "Output blame is predicted probability minus target. Open <strong>Why this formula?</strong> if you want to see where that rule comes from."],
+    nodes: ["loss", "sat"],
+    edges: ["sat-loss"]
+  },
+  {
+    id: "w2-gradient",
+    phase: "backward pass",
+    prompt: "Step 10: get the gradient for the h1-to-sat weight.",
+    instruction: "This asks: if we nudge the weight from <strong>h1</strong> into the <strong>sat</strong> score, how much does the loss change? That sensitivity is written <strong>&part;L / &part;W<sub>sat,h1</sub></strong>. Use sat blame -0.759 and h1 = 0.180.",
+    derivationTitle: "Why does this gradient equal blame times signal?",
+    derivation: [
+      { type: "p", html: "First name the pieces. <strong>W<sub>sat,h1</sub></strong> is the weight from hidden activation h1 into the raw sat score. <strong>h<sub>1</sub></strong> is the activation that flowed through that weight. <strong>&delta;<sub>sat</sub></strong> is shorthand for <strong>&part;L / &part;z<sub>sat</sub></strong>, the blame already sitting at the sat score." },
+      { type: "p", html: "The weight affects the loss only by first changing the raw sat score <strong>z<sub>sat</sub></strong>." },
+      { type: "code", html: "z<sub>sat</sub> = W<sub>sat,h1</sub>h<sub>1</sub> + W<sub>sat,h2</sub>h<sub>2</sub> + b<sub>sat</sub>" },
+      { type: "p", html: "We want the slope of the loss with respect to this one weight. Follow the path backward: <strong>L &rarr; z<sub>sat</sub> &rarr; W<sub>sat,h1</sub></strong>." },
+      { type: "code", html: "&part;L / &part;W<sub>sat,h1</sub> = (&part;L / &part;z<sub>sat</sub>) &times; (&part;z<sub>sat</sub> / &part;W<sub>sat,h1</sub>)" },
+      { type: "p", html: "The first slope is the sat blame:" },
+      { type: "code", html: "&part;L / &part;z<sub>sat</sub> = &delta;<sub>sat</sub>" },
+      { type: "p", html: "For the second slope, treat every other term in <strong>z<sub>sat</sub></strong> as constant. The only term containing <strong>W<sub>sat,h1</sub></strong> is <strong>W<sub>sat,h1</sub>h<sub>1</sub></strong>." },
+      { type: "code", html: "&part;z<sub>sat</sub> / &part;W<sub>sat,h1</sub> = h<sub>1</sub>" },
+      { type: "code", html: "&part;L / &part;W<sub>sat,h1</sub> = &delta;<sub>sat</sub> &times; h<sub>1</sub>" }
+    ],
+    answer: byHandValues.outputGradSatH1,
+    tolerance: 0.005,
+    solution: "&part;L / &part;W<sub>sat,h1</sub> = -0.759 &times; 0.180 = -0.137",
+    hints: ["Use the hidden activation <strong>h<sub>1</sub></strong>, not the raw pre-ReLU value. Here they happen to match because ReLU stayed open.", "The chain-rule idea is: output blame times the signal that flowed through this weight. Open <strong>Why this formula?</strong> for the derivation."],
+    nodes: ["h1", "sat"],
+    edges: ["h1-sat"]
+  },
+  {
+    id: "h1-blame",
+    phase: "backward pass",
+    prompt: "Step 11: gather all the blame arriving at h1.",
+    instruction: "Hidden neuron <strong>h1</strong> helped all five word scores, so its blame is the sum of every output blame times the matching outgoing weight. What is <strong>&part;L / &part;h<sub>1</sub></strong>, the blame on h1 before the ReLU gate?",
+    derivationTitle: "Why do we sum blame from every word?",
+    derivation: [
+      { type: "p", html: "First name the pieces. <strong>h<sub>1</sub></strong> is the hidden activation. <strong>z<sub>word</sub></strong> is a raw score for one output word. <strong>&delta;<sub>word</sub></strong> means <strong>&part;L / &part;z<sub>word</sub></strong>, the blame at that word score. <strong>W<sub>word,h1</sub></strong> is the weight from h1 into that word score." },
+      { type: "p", html: "Hidden neuron h1 fans out into every word score. Changing h1 changes sat, ran, slept, purred, and meowed at the same time." },
+      { type: "p", html: "When one variable affects the loss through multiple paths, the chain rule adds the path contributions from all paths." },
+      { type: "code", html: "&part;L / &part;h<sub>1</sub> = &Sigma;<sub>word</sub> (&part;L / &part;z<sub>word</sub>) &times; (&part;z<sub>word</sub> / &part;h<sub>1</sub>)" },
+      { type: "p", html: "The first piece on each path is that word's output blame:" },
+      { type: "code", html: "&part;L / &part;z<sub>word</sub> = &delta;<sub>word</sub>" },
+      { type: "p", html: "For the second piece, write one output score. The term containing h1 is the outgoing weight times h1." },
+      { type: "code", html: "z<sub>word</sub> = W<sub>word,h1</sub>h<sub>1</sub> + W<sub>word,h2</sub>h<sub>2</sub> + b<sub>word</sub>" },
+      { type: "code", html: "&part;z<sub>word</sub> / &part;h<sub>1</sub> = W<sub>word,h1</sub>" },
+      { type: "code", html: "&part;L / &part;h<sub>1</sub> = &Sigma;<sub>word</sub> &delta;<sub>word</sub> &times; W<sub>word,h1</sub>" }
+    ],
+    answer: byHandValues.hiddenBlame[0],
+    tolerance: 0.008,
+    solution: "&part;L / &part;h<sub>1</sub> = (-0.759 &times; 0.80) + (0.196 &times; 0.20) + (0.167 &times; -0.40) + (0.215 &times; 0.60) + (0.182 &times; -0.10) = -0.524",
+    hints: ["Use one output-blame value for each word score.", "Pair each output blame with the matching h1 outgoing weight, multiply each pair, then add the path contributions."],
+    nodes: ["h1", "sat", "ran", "slept", "purred", "meowed"],
+    edges: ["h1-sat", "h1-ran", "h1-slept", "h1-purred", "h1-meowed"]
+  },
+  {
+    id: "w1-gradient",
+    phase: "backward pass",
+    prompt: "Step 12: turn h1's blame into the x1-to-h1 gradient.",
+    instruction: "Now move one edge farther backward. We want the gradient for the weight from <strong>x1</strong> into <strong>h1</strong>, written <strong>&part;L / &part;W<sub>h1,x1</sub></strong>. Because h1's ReLU gate was open, its slope is 1.",
+    derivationTitle: "Why does the ReLU gate appear here?",
+    derivation: [
+      { type: "p", html: "First name the pieces. <strong>r<sub>1</sub></strong> is the raw value going into hidden neuron h1. <strong>h<sub>1</sub></strong> is the value after ReLU. <strong>W<sub>h1,x1</sub></strong> is the input weight from x1 into h1. <strong>x<sub>1</sub></strong> is the input signal." },
+      { type: "p", html: "The input weight does not touch h1 directly. It first changes the raw hidden value <strong>r<sub>1</sub></strong>; then ReLU turns <strong>r<sub>1</sub></strong> into <strong>h<sub>1</sub></strong>." },
+      { type: "code", html: "r<sub>1</sub> = W<sub>h1,x1</sub>x<sub>1</sub> + W<sub>h1,x2</sub>x<sub>2</sub> + b<sub>h1</sub>" },
+      { type: "code", html: "h<sub>1</sub> = ReLU(r<sub>1</sub>)" },
+      { type: "p", html: "The chain rule follows the path backward: <strong>L &rarr; h<sub>1</sub> &rarr; r<sub>1</sub> &rarr; W<sub>h1,x1</sub></strong>." },
+      { type: "code", html: "&part;L / &part;W<sub>h1,x1</sub> = (&part;L / &part;h<sub>1</sub>) &times; (&part;h<sub>1</sub> / &part;r<sub>1</sub>) &times; (&part;r<sub>1</sub> / &part;W<sub>h1,x1</sub>)" },
+      { type: "p", html: "The middle slope is the ReLU gate. ReLU's derivative is 1 when the raw value is positive and 0 when the raw value is negative or zero." },
+      { type: "code", html: "&part;h<sub>1</sub> / &part;r<sub>1</sub> = ReLU'(r<sub>1</sub>)" },
+      { type: "p", html: "The last slope is <strong>x<sub>1</sub></strong>, because the term containing this weight is <strong>W<sub>h1,x1</sub>x<sub>1</sub></strong>." },
+      { type: "code", html: "&part;r<sub>1</sub> / &part;W<sub>h1,x1</sub> = x<sub>1</sub>" },
+      { type: "code", html: "&part;L / &part;W<sub>h1,x1</sub> = (&part;L / &part;h<sub>1</sub>) &times; ReLU'(r<sub>1</sub>) &times; x<sub>1</sub>" }
+    ],
+    answer: byHandValues.inputGradX1H1,
+    tolerance: 0.006,
+    solution: "&part;L / &part;W<sub>h1,x1</sub> = -0.524 &times; 1 &times; 0.50 = -0.262",
+    hints: ["The ReLU slope contributes <strong>1</strong> because h1's raw value was positive.", "Follow the path backward: hidden blame, then the ReLU gate, then the input signal <strong>x<sub>1</sub></strong>."],
+    nodes: ["x1", "h1"],
+    edges: ["x1-h1"]
+  },
+  {
+    id: "w1-update",
+    phase: "gradient update",
+    prompt: "Step 13: update the x1-to-h1 weight.",
+    instruction: "Gradient descent now uses that gradient to move the weight downhill. The old weight is 0.400, the learning rate is 0.10, and the gradient is -0.262. What is the new <strong>x1 &rarr; h1</strong> weight?",
+    derivationTitle: "Why do we subtract the gradient?",
+    derivation: [
+      { type: "p", html: "First name the pieces. <strong>W</strong> is the weight we are updating. <strong>g</strong> is its gradient, meaning <strong>g = &part;L / &part;W</strong>. <strong>&eta;</strong> is the learning rate, the size of the step." },
+      { type: "p", html: "The gradient points uphill: it tells us which direction makes the loss increase fastest." },
+      { type: "p", html: "For a tiny change <strong>&Delta;W</strong>, calculus gives this local approximation:" },
+      { type: "code", html: "L(W + &Delta;W) &approx; L(W) + g&Delta;W" },
+      { type: "p", html: "To move downhill, choose a change that makes <strong>g&Delta;W</strong> negative. Gradient descent chooses the opposite direction of the gradient." },
+      { type: "code", html: "&Delta;W = -&eta;g" },
+      { type: "p", html: "Substitute that into the local approximation:" },
+      { type: "code", html: "L(W + &Delta;W) &approx; L(W) - &eta;g<sup>2</sup>" },
+      { type: "p", html: "Since <strong>g<sup>2</sup></strong> is never negative, this small step is aimed downhill." },
+      { type: "code", html: "W<sub>new</sub> = W<sub>old</sub> + &Delta;W = W<sub>old</sub> - &eta;g" },
+      { type: "code", html: "W<sub>new</sub> = W<sub>old</sub> - &eta;(&part;L / &part;W)" }
+    ],
+    answer: byHandValues.updatedX1H1,
+    tolerance: 0.006,
+    solution: "W<sub>new</sub> = 0.400 - 0.10 &times; (-0.262) = 0.426",
+    hints: ["Subtracting a negative gradient makes the weight increase.", "First scale the gradient by the learning rate, then subtract that scaled value from the old weight."],
+    nodes: ["x1", "h1"],
+    edges: ["x1-h1"]
+  }
+];
+
+function byHandStepDone(index = state.byHand.index) {
+  const step = byHandSteps[index];
+  return Boolean(state.byHand.solved[step.id] || state.byHand.revealed[step.id]);
+}
+
+function byHandKnown(stepId) {
+  return Boolean(state.byHand.solved[stepId] || state.byHand.revealed[stepId]);
+}
+
+function parseByHandAnswer(raw) {
+  const cleaned = raw.trim().replace(/[−–—]/g, "-").replace(/,/g, "");
+  if (!cleaned) return null;
+  const direct = Number(cleaned);
+  if (Number.isFinite(direct)) return direct;
+  if (!/^[0-9eE+\-*/().\s]+$/.test(cleaned)) return null;
+  try {
+    const value = Function(`"use strict"; return (${cleaned});`)();
+    return Number.isFinite(value) ? value : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function setByHandFeedback(step, text, className = "") {
+  state.byHand.feedback[step.id] = { text, className };
+}
+
+function setByHandHtml(element, html) {
+  element.innerHTML = html || "";
+}
+
+function checkByHandAnswer() {
+  const step = byHandSteps[state.byHand.index];
+  const raw = dom.byHandAnswer.value;
+  const value = parseByHandAnswer(raw);
+  state.byHand.answers[step.id] = raw;
+  if (value === null) {
+    setByHandFeedback(step, "I need a number here. You can type a rounded answer like 0.241, or a simple arithmetic expression like 1.277 / 5.297.", "is-wrong");
+    renderByHandLab();
+    return;
+  }
+  const diff = Math.abs(value - step.answer);
+  if (diff <= step.tolerance) {
+    state.byHand.solved[step.id] = true;
+    const entered = formatNumber(value, 3);
+    const expected = formatNumber(step.answer, 3);
+    const verdict = entered === expected
+      ? `Correct: ${entered} matches.`
+      : `Correct with rounding: ${entered} is accepted; the target is ${expected}.`;
+    setByHandFeedback(step, `${verdict} ${step.solution}`, "is-correct");
+  } else if (Math.sign(value) !== Math.sign(step.answer) && Math.abs(step.answer) > step.tolerance && Math.abs(value) > step.tolerance) {
+    setByHandFeedback(step, "The size may be in the neighborhood, but the sign is flipped. Trace whether this step is pushing blame up or down.", "is-wrong");
+  } else if (diff <= step.tolerance * 5) {
+    setByHandFeedback(step, "Very close. Check your rounding and try one more decimal place.", "is-wrong");
+  } else {
+    setByHandFeedback(step, "Not quite yet. Try the next hint and keep the arithmetic small.", "is-wrong");
+  }
+  renderByHandLab();
+}
+
+function showByHandHint() {
+  const step = byHandSteps[state.byHand.index];
+  const current = state.byHand.hints[step.id] || 0;
+  state.byHand.hints[step.id] = Math.min(step.hints.length, current + 1);
+  setByHandFeedback(step, "Good - use the hint, then check your number again.", "");
+  renderByHandLab();
+}
+
+function revealByHandSolution() {
+  const step = byHandSteps[state.byHand.index];
+  state.byHand.revealed[step.id] = true;
+  state.byHand.answers[step.id] = formatNumber(step.answer, 3);
+  setByHandFeedback(step, `Solution revealed. ${step.solution}`, "is-solution");
+  renderByHandLab();
+}
+
+function moveByHandStep(delta) {
+  const next = clamp(state.byHand.index + delta, 0, byHandSteps.length - 1);
+  if (delta > 0 && !byHandStepDone()) return;
+  state.byHand.index = next;
+  renderByHandLab();
+  dom.byHandAnswer.focus();
+}
+
+function resetByHandWorksheet() {
+  state.byHand = { index: 0, hints: {}, solved: {}, revealed: {}, answers: {}, feedback: {} };
+  renderByHandLab();
+}
+
+function byHandNodeValue(id) {
+  if (id === "x1") return "0.50";
+  if (id === "x2") return "0.20";
+  if (id === "h1") return byHandKnown("h1-relu") ? `h=${formatNumber(byHandValues.hidden[0], 2)}` : "h=?";
+  if (id === "h2") return byHandKnown("h2-relu") ? `h=${formatNumber(byHandValues.hidden[1], 2)}` : "h=?";
+  if (id === "loss") return byHandKnown("loss") ? `L=${formatNumber(byHandValues.loss, 3)}` : "loss";
+  const wordIndex = byHandNetwork.words.findIndex((item) => item.word === id);
+  if (wordIndex >= 0) {
+    if (id === "sat" && byHandKnown("sat-probability")) return `q=${formatNumber(byHandValues.probabilities[0], 3)}`;
+    if (byHandKnown("softmax-denominator")) return `z=${formatNumber(byHandValues.logits[wordIndex], 3)}`;
+    if (id === "sat" && byHandKnown("sat-logit")) return `z=${formatNumber(byHandValues.logits[0], 3)}`;
+    return id === "sat" ? "true word" : "word";
+  }
+  return "";
+}
+
+function renderByHandMiniFacts() {
+  const facts = [
+    { label: "inputs", value: "x1=0.50, x2=0.20" },
+    { label: "target", value: "\"sat\"" },
+    {
+      label: "hidden state",
+      value: byHandKnown("h2-relu")
+        ? `h=[${formatNumber(byHandValues.hidden[0], 2)}, ${formatNumber(byHandValues.hidden[1], 2)}]`
+        : "compute h"
+    },
+    {
+      label: "learning rate",
+      value: formatNumber(byHandNetwork.learningRate, 2)
+    }
+  ];
+  dom.byHandMiniFacts.replaceChildren(...facts.map((fact) => {
+    const item = createElement("div", "by-hand-fact");
+    item.append(createElement("strong", "", fact.value), createElement("span", "", fact.label));
+    return item;
+  }));
+}
+
+function renderByHandSvg(step) {
+  const svg = dom.byHandSvg;
+  svg.replaceChildren();
+  const defs = createSvgElement("defs");
+  const forwardMarker = createSvgElement("marker", { id: "byHandForwardArrow", markerWidth: 8, markerHeight: 8, refX: 7, refY: 3, orient: "auto" });
+  forwardMarker.append(createSvgElement("path", { d: "M0,0 L7,3 L0,6 Z", fill: "var(--teal)" }));
+  const backMarker = createSvgElement("marker", { id: "byHandBackArrow", markerWidth: 8, markerHeight: 8, refX: 7, refY: 3, orient: "auto" });
+  backMarker.append(createSvgElement("path", { d: "M0,0 L7,3 L0,6 Z", fill: "#a76500" }));
+  defs.append(forwardMarker, backMarker);
+  svg.append(defs);
+
+  const nodes = {
+    x1: { x: 72, y: 155, kind: "input", label: "x1" },
+    x2: { x: 72, y: 275, kind: "input", label: "x2" },
+    h1: { x: 280, y: 155, kind: "hidden", label: "h1" },
+    h2: { x: 280, y: 275, kind: "hidden", label: "h2" },
+    sat: { x: 545, y: 58, kind: "output", label: "sat" },
+    ran: { x: 545, y: 128, kind: "output", label: "ran" },
+    slept: { x: 545, y: 198, kind: "output", label: "slept" },
+    purred: { x: 545, y: 268, kind: "output", label: "purred" },
+    meowed: { x: 545, y: 338, kind: "output", label: "meowed" },
+    loss: { x: 695, y: 58, kind: "loss", label: "L" }
+  };
+  const edges = [
+    { id: "x1-h1", from: "x1", to: "h1", label: "0.40" },
+    { id: "x2-h1", from: "x2", to: "h1", label: "-0.10" },
+    { id: "x1-h2", from: "x1", to: "h2", label: "-0.30" },
+    { id: "x2-h2", from: "x2", to: "h2", label: "0.70" },
+    ...byHandNetwork.words.flatMap((item, wordIndex) => ([
+      { id: `h1-${item.word}`, from: "h1", to: item.word, label: formatNumber(item.weights[0], 2) },
+      { id: `h2-${item.word}`, from: "h2", to: item.word, label: formatNumber(item.weights[1], 2), skipComplete: wordIndex > 0 }
+    ])),
+    { id: "sat-loss", from: "sat", to: "loss", label: "loss" }
+  ];
+  const activeNodes = new Set(step.nodes || []);
+  const activeEdges = new Set(step.edges || []);
+  const completeNodes = new Set();
+  const completeEdges = new Set();
+  byHandSteps.forEach((pastStep, index) => {
+    if (index >= state.byHand.index || !byHandStepDone(index)) return;
+    (pastStep.nodes || []).forEach((node) => completeNodes.add(node));
+    (pastStep.edges || []).forEach((edge) => completeEdges.add(edge));
+  });
+
+  const addLayerLabel = (x, text) => {
+    const label = createSvgElement("text", { class: "by-hand-layer-label", x, y: 28 });
+    label.textContent = text;
+    svg.append(label);
+  };
+  addLayerLabel(72, "two inputs");
+  addLayerLabel(280, "hidden layer");
+  addLayerLabel(545, "five word scores");
+  addLayerLabel(695, "loss");
+
+  edges.forEach((edge) => {
+    const from = nodes[edge.from];
+    const to = nodes[edge.to];
+    const isActive = activeEdges.has(edge.id);
+    const isComplete = completeEdges.has(edge.id) && !edge.skipComplete;
+    const isBackward = isActive && step.phase !== "forward pass";
+    const start = isBackward ? to : from;
+    const end = isBackward ? from : to;
+    const className = [
+      "by-hand-edge",
+      isActive ? "is-active" : "",
+      isComplete ? "is-complete" : "",
+      isBackward ? "is-backward" : ""
+    ].filter(Boolean).join(" ");
+    const attrs = { class: className, x1: start.x, y1: start.y, x2: end.x, y2: end.y };
+    if (isActive) attrs["marker-end"] = isBackward ? "url(#byHandBackArrow)" : "url(#byHandForwardArrow)";
+    svg.append(createSvgElement("line", attrs));
+    if (isActive) {
+      const label = createSvgElement("text", {
+        class: "by-hand-value",
+        x: (start.x + end.x) / 2,
+        y: (start.y + end.y) / 2 - 8
+      });
+      label.textContent = edge.label;
+      svg.append(label);
+    }
+  });
+
+  Object.entries(nodes).forEach(([id, node]) => {
+    const group = createSvgElement("g");
+    const classes = [
+      "by-hand-node",
+      `is-${node.kind}`,
+      activeNodes.has(id) ? "is-active" : "",
+      completeNodes.has(id) ? "is-complete" : ""
+    ].filter(Boolean).join(" ");
+    if (node.kind === "output") {
+      group.append(createSvgElement("rect", {
+        class: classes,
+        x: node.x - 43,
+        y: node.y - 20,
+        width: 86,
+        height: 40,
+        rx: 10
+      }));
+    } else if (node.kind === "loss") {
+      group.append(createSvgElement("rect", {
+        class: classes,
+        x: node.x - 34,
+        y: node.y - 22,
+        width: 68,
+        height: 44,
+        rx: 10
+      }));
+    } else {
+      group.append(createSvgElement("circle", { class: classes, cx: node.x, cy: node.y, r: 27 }));
+    }
+    const label = createSvgElement("text", { class: "by-hand-label", x: node.x, y: node.y - 2 });
+    label.textContent = node.label;
+    const value = createSvgElement("text", { class: "by-hand-value", x: node.x, y: node.y + 15 });
+    value.textContent = byHandNodeValue(id);
+    group.append(label, value);
+    svg.append(group);
+  });
+}
+
+function renderByHandLab() {
+  if (!dom.byHandLab) return;
+  const step = byHandSteps[state.byHand.index];
+  const done = byHandStepDone();
+  const feedback = state.byHand.feedback[step.id];
+  const hintCount = state.byHand.hints[step.id] || 0;
+  dom.byHandProgress.textContent = `step ${state.byHand.index + 1} of ${byHandSteps.length}`;
+  dom.byHandStepTag.textContent = step.phase;
+  dom.byHandPrompt.textContent = step.prompt;
+  setByHandHtml(dom.byHandInstruction, step.instruction);
+  if (step.derivation?.length) {
+    const details = createElement("details", "by-hand-derivation");
+    const summary = createElement("summary");
+    setByHandHtml(summary, step.derivationTitle || "Why this formula?");
+    const derivationBody = createElement("div", "by-hand-derivation-body");
+    step.derivation.forEach((item) => {
+      const node = createElement(item.type === "code" ? "code" : "p");
+      setByHandHtml(node, item.html);
+      derivationBody.append(node);
+    });
+    details.append(summary, derivationBody);
+    dom.byHandEquation.hidden = false;
+    dom.byHandEquation.replaceChildren(details);
+  } else {
+    dom.byHandEquation.hidden = true;
+    dom.byHandEquation.replaceChildren();
+  }
+  dom.byHandAnswer.value = state.byHand.answers[step.id] || "";
+  dom.byHandAnswer.placeholder = "Enter your value";
+  dom.byHandFeedback.className = `by-hand-feedback ${feedback?.className || ""}`.trim();
+  setByHandHtml(dom.byHandFeedback, feedback?.text || "Enter a number, then press Check or Enter. Rounding to three decimals is fine.");
+  dom.byHandHintPanel.hidden = hintCount === 0;
+  setByHandHtml(dom.byHandHintPanel, hintCount > 0 ? step.hints.slice(0, hintCount).join(" ") : "");
+  dom.byHandHintButton.disabled = hintCount >= step.hints.length;
+  dom.byHandPrevButton.disabled = state.byHand.index === 0;
+  dom.byHandNextButton.disabled = !done || state.byHand.index === byHandSteps.length - 1;
+  dom.byHandNextButton.textContent = state.byHand.index === byHandSteps.length - 1 ? "Finished" : "Next";
+  renderByHandMiniFacts();
+  renderByHandSvg(step);
 }
 
 function mulberry32(seed) {
@@ -2415,6 +3034,20 @@ function wireEvents() {
   dom.backpropRateSlider.addEventListener("input", renderBackprop);
   dom.backpropStepButton.addEventListener("click", backpropStep);
   dom.backpropResetButton.addEventListener("click", restartBackpropRun);
+  if (dom.byHandLab) {
+    dom.byHandCheckButton.addEventListener("click", checkByHandAnswer);
+    dom.byHandHintButton.addEventListener("click", showByHandHint);
+    dom.byHandSolutionButton.addEventListener("click", revealByHandSolution);
+    dom.byHandPrevButton.addEventListener("click", () => moveByHandStep(-1));
+    dom.byHandNextButton.addEventListener("click", () => moveByHandStep(1));
+    dom.byHandResetButton.addEventListener("click", resetByHandWorksheet);
+    dom.byHandAnswer.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        checkByHandAnswer();
+      }
+    });
+  }
   dom.datasetSelect.addEventListener("change", () => resetNetwork({ newData: true }));
   dom.hiddenUnitsSlider.addEventListener("input", () => resetNetwork());
   dom.networkRateSlider.addEventListener("input", renderNetworkControls);
@@ -2466,6 +3099,7 @@ function init() {
   renderSoftmax();
   renderForwardPass();
   initBackpropLab();
+  renderByHandLab();
   resetNetwork();
   renderCorpusPreview();
   populateContextSelects();

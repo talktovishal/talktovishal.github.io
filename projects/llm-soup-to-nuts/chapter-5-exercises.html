@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attention By Hand - Chapter 5 Exercise Draft</title>
+  <link rel="stylesheet" href="styles.css?v=20260621c">
+  <link rel="stylesheet" href="chapter5-exercises.css?v=20260701a">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="LLM Soup to Nuts overview">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>
+        <strong>LLM Soup to Nuts</strong>
+        <small>Chapter 5 draft</small>
+      </span>
+    </a>
+    <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="https://talktovishal.github.io/">Home</a>
+      <a href="index.html">Overview</a>
+      <a href="chapter-4.html">Ch 4</a>
+      <a href="chapter-5.html">Current Ch 5</a>
+    </nav>
+  </header>
+
+  <aside class="lesson-toc" aria-label="Table of contents">
+    <p>Attention workbook</p>
+    <nav>
+      <a href="#overview"><span>00</span>Why this draft exists</a>
+      <a href="#math-kit"><span>01</span>Math you will use</a>
+      <a href="#single-head"><span>02</span>One attention head</a>
+      <a href="#matrix-mask"><span>03</span>Matrix and mask</a>
+      <a href="#efficiency"><span>04</span>Cache and FlashAttention</a>
+      <a href="#merge-notes"><span>05</span>Merge notes</a>
+    </nav>
+  </aside>
+
+  <main id="top">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title">
+      <div class="workbench">
+        <article class="intro-copy">
+          <div class="progress-banner" role="status">
+            <span class="progress-banner-badge">Draft</span>
+            <p class="progress-banner-text">This is a separate exercise-first Chapter 5 draft. The current Chapter 5 is unchanged while we test this workbook shape.</p>
+          </div>
+          <p class="eyebrow">Learning by doing</p>
+          <h1 id="page-title">Attention by hand: make "it" look back at "cat".</h1>
+          <p class="lead">
+            This draft turns the attention layer into a workbook. You compute the numbers,
+            check each one, open hints when needed, and reveal the solution only when you
+            want the training wheels.
+          </p>
+          <p>
+            Our entire chapter will keep one sentence on the table:
+            <code>Sarah fed the cat because it</code>. The question is wonderfully concrete:
+            when the model reaches <code>it</code>, how does the attention layer pull useful
+            information from <code>cat</code> into that stream?
+          </p>
+          <p>
+            We will not jump straight to a giant matrix. First you compute one score. Then
+            you turn scores into weights. Then you blend values. Only after that do we zoom
+            out to the full attention matrix, the causal mask, the KV cache, grouped-query
+            attention, and FlashAttention. Same numbers, wider view.
+          </p>
+
+          <div class="attention-roadmap" aria-label="Workbook roadmap">
+            <div>
+              <strong>Lab 1</strong>
+              <span>One attention head, one query row, every number visible.</span>
+            </div>
+            <div>
+              <strong>Lab 2</strong>
+              <span>The whole score matrix, then the causal mask.</span>
+            </div>
+            <div>
+              <strong>Lab 3</strong>
+              <span>KV cache, grouped-query attention, and FlashAttention bookkeeping.</span>
+            </div>
+          </div>
+
+          <div class="example-note prereq-note">
+            <p><em>Before you start, a few prerequisites are in order.</em> You only need the pieces below, and each one gets a local refresher on this page.</p>
+            <ul>
+              <li><strong>Vectors.</strong> A token is represented as a short row of numbers.</li>
+              <li><strong>Dot products.</strong> Multiply matching channels, then add.</li>
+              <li><strong>Softmax.</strong> Turn scores into positive weights that add to 1.</li>
+              <li><strong>Matrix shape.</strong> Rows and columns tell you what can multiply what.</li>
+            </ul>
+            <p>What you do <strong>not</strong> need yet: training. These Q/K/V numbers are hand-picked so the mechanism is visible.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="math-kit" class="band" aria-labelledby="math-kit-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">1. Math kit</p>
+          <h2 id="math-kit-title">The rules we will use, with the "why" tucked inside.</h2>
+          <p>
+            This is intentionally compact. The card gives the rule; the collapsed proof
+            shows why it works. You can skip the proof on a first pass and open it exactly
+            when a step feels like it came from nowhere.
+          </p>
+        </div>
+
+        <div class="math-card-grid" aria-label="Attention math refresher">
+          <article class="math-card">
+            <h3>Dot product</h3>
+            <p>\(q \cdot k\) means multiply matching channels and add the products.</p>
+            <details>
+              <summary>Show why it measures match</summary>
+              <div class="proof-stack">
+                <p>If two vectors put large numbers in the same channels, their products are large and positive.</p>
+                <code>[a,b,c,d] \cdot [w,x,y,z] = aw + bx + cy + dz</code>
+                <p>In attention, the query is the question and the key is the label. A large dot product means the label matches the question.</p>
+              </div>
+            </details>
+          </article>
+          <article class="math-card">
+            <h3>Scaling by sqrt(d)</h3>
+            <p>Attention uses \(q \cdot k / \sqrt{d_k}\) so scores stay in a softmax-friendly range.</p>
+            <details>
+              <summary>Show why we scale</summary>
+              <div class="proof-stack">
+                <p>A dot product adds \(d_k\) products. Wider vectors tend to make larger raw sums even when the match quality has not really changed.</p>
+                <code>raw score grows with vector width</code>
+                <code>scaled score = raw score / sqrt(d_k)</code>
+                <p>The scaling keeps softmax from becoming too spiky just because the vectors are wider.</p>
+              </div>
+            </details>
+          </article>
+          <article class="math-card">
+            <h3>Softmax</h3>
+            <p>Softmax turns scaled scores into weights: exponentiate, add, then divide.</p>
+            <details>
+              <summary>Show the steps</summary>
+              <div class="proof-stack">
+                <code>weight_i = exp(score_i) / sum_j exp(score_j)</code>
+                <p>Exponentials make every weight positive. Dividing by the sum makes all weights add to 1.</p>
+                <code>sum_i weight_i = sum_i exp(score_i) / sum_j exp(score_j) = 1</code>
+              </div>
+            </details>
+          </article>
+          <article class="math-card">
+            <h3>Causal mask</h3>
+            <p>Future scores become \(-\infty\) before softmax, so their weights become 0.</p>
+            <details>
+              <summary>Show why future weight is zero</summary>
+              <div class="proof-stack">
+                <code>exp(-infinity) = 0</code>
+                <code>future weight = 0 / denominator = 0</code>
+                <p>The future token stays in the grid, but it contributes nothing.</p>
+              </div>
+            </details>
+          </article>
+          <article class="math-card">
+            <h3>Weighted sum</h3>
+            <p>The attention output is each value vector multiplied by its attention weight, then added.</p>
+            <details>
+              <summary>Show why values blend</summary>
+              <div class="proof-stack">
+                <code>output = alpha_1 v_1 + alpha_2 v_2 + ...</code>
+                <p>If a token gets a small weight, its value barely contributes. If it gets a large weight, its value dominates the output.</p>
+              </div>
+            </details>
+          </article>
+          <article class="math-card">
+            <h3>Matrix shapes</h3>
+            <p>For \(N\) tokens, \(QK^\top\) is an \(N \times N\) score grid.</p>
+            <details>
+              <summary>Show the shape logic</summary>
+              <div class="proof-stack">
+                <code>Q shape: N x d_k</code>
+                <code>K^T shape: d_k x N</code>
+                <code>QK^T shape: N x N</code>
+                <p>Rows are query tokens. Columns are key tokens.</p>
+              </div>
+            </details>
+          </article>
+          <article class="math-card">
+            <h3>KV cache</h3>
+            <p>During generation, old keys and values can be reused because past tokens do not change.</p>
+            <details>
+              <summary>Show what is saved</summary>
+              <div class="proof-stack">
+                <code>without cache: remake K and V for the whole prefix</code>
+                <code>with cache: make K and V only for the new token</code>
+                <p>The new query still scores against every cached key, but the old key/value projections are not recomputed.</p>
+              </div>
+            </details>
+          </article>
+          <article class="math-card">
+            <h3>FlashAttention</h3>
+            <p>FlashAttention computes the same softmax attention while streaming through tiles.</p>
+            <details>
+              <summary>Show what stays the same</summary>
+              <div class="proof-stack">
+                <code>normal: materialize scores -> softmax -> multiply V</code>
+                <code>flash: tile scores -> keep running max/sum/output</code>
+                <p>The result is exact attention. The win is less slow memory traffic, not a different formula.</p>
+              </div>
+            </details>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="single-head" class="band band-muted" aria-labelledby="single-head-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">2. Lab 1</p>
+          <h2 id="single-head-title">Compute one attention head by hand.</h2>
+          <p>
+            We focus on the query token <code>it</code>. The left panel shows the Q, K,
+            and V rows. The right panel asks for one number at a time. The goal is to see
+            why <code>cat</code> receives the largest attention weight and why the output
+            vector for <code>it</code> becomes cat-like.
+          </p>
+        </div>
+
+        <div class="workbook-lab" id="headLab" data-lab="head" aria-labelledby="head-lab-title">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">Try it by hand</p>
+              <h3 id="head-lab-title">One query row: scores, softmax, values.</h3>
+            </div>
+            <span id="headProgress" class="pill">step 1 of 10</span>
+          </div>
+          <div class="lab-layout">
+            <div class="lab-visual-panel">
+              <svg id="headSvg" class="lab-svg" viewBox="0 0 780 430" role="img" aria-label="Attention head worksheet visual"></svg>
+              <div id="headFacts" class="lab-facts" aria-label="Current attention facts"></div>
+            </div>
+            <div class="lab-card">
+              <span id="headPhase" class="pill">single head</span>
+              <h4 id="headPrompt">Calculate the first attention number.</h4>
+              <p id="headInstruction" class="lab-instruction"></p>
+              <div id="headDerivation" class="lab-derivation-wrap" hidden></div>
+              <label class="lab-answer-row" for="headAnswer">
+                <span>Your answer</span>
+                <input id="headAnswer" class="control-input" type="text" inputmode="decimal" autocomplete="off" placeholder="Enter your value">
+              </label>
+              <div id="headFeedback" class="lab-feedback" aria-live="polite"></div>
+              <div id="headHint" class="lab-hint" hidden></div>
+              <div class="stepper-row lab-actions">
+                <button id="headCheck" class="primary-button" type="button">Check</button>
+                <button id="headHintButton" class="ghost-button" type="button">Hint</button>
+                <button id="headSolution" class="ghost-button" type="button">Show solution</button>
+              </div>
+              <div class="stepper-row lab-nav">
+                <button id="headPrev" class="ghost-button" type="button">Previous</button>
+                <button id="headNext" class="primary-button" type="button">Next</button>
+                <button id="headReset" class="ghost-button" type="button">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="matrix-mask" class="band" aria-labelledby="matrix-mask-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">3. Lab 2</p>
+          <h2 id="matrix-mask-title">Zoom out to the attention matrix and the mask.</h2>
+          <p>
+            Once one row is familiar, the full matrix is just repetition. Every token takes
+            a turn as the query. A causal decoder then masks the future before softmax so
+            the model cannot peek ahead.
+          </p>
+        </div>
+
+        <div class="workbook-lab" id="matrixLab" data-lab="matrix" aria-labelledby="matrix-lab-title">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">Try it by hand</p>
+              <h3 id="matrix-lab-title">From one score cell to a masked row.</h3>
+            </div>
+            <span id="matrixProgress" class="pill">step 1 of 8</span>
+          </div>
+          <div class="lab-layout">
+            <div class="lab-visual-panel">
+              <svg id="matrixSvg" class="lab-svg" viewBox="0 0 780 430" role="img" aria-label="Attention matrix worksheet visual"></svg>
+              <div id="matrixFacts" class="lab-facts" aria-label="Current matrix facts"></div>
+            </div>
+            <div class="lab-card">
+              <span id="matrixPhase" class="pill">matrix and mask</span>
+              <h4 id="matrixPrompt">Calculate a matrix fact.</h4>
+              <p id="matrixInstruction" class="lab-instruction"></p>
+              <div id="matrixDerivation" class="lab-derivation-wrap" hidden></div>
+              <label class="lab-answer-row" for="matrixAnswer">
+                <span>Your answer</span>
+                <input id="matrixAnswer" class="control-input" type="text" autocomplete="off" placeholder="Enter your value">
+              </label>
+              <div id="matrixFeedback" class="lab-feedback" aria-live="polite"></div>
+              <div id="matrixHint" class="lab-hint" hidden></div>
+              <div class="stepper-row lab-actions">
+                <button id="matrixCheck" class="primary-button" type="button">Check</button>
+                <button id="matrixHintButton" class="ghost-button" type="button">Hint</button>
+                <button id="matrixSolution" class="ghost-button" type="button">Show solution</button>
+              </div>
+              <div class="stepper-row lab-nav">
+                <button id="matrixPrev" class="ghost-button" type="button">Previous</button>
+                <button id="matrixNext" class="primary-button" type="button">Next</button>
+                <button id="matrixReset" class="ghost-button" type="button">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="efficiency" class="band band-muted" aria-labelledby="efficiency-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">4. Lab 3</p>
+          <h2 id="efficiency-title">Keep the math, change the bookkeeping.</h2>
+          <p>
+            The next set of ideas can sound like separate tricks: KV cache,
+            grouped-query attention, multi-query attention, and FlashAttention. This lab
+            ties them back to the same attention formula. Each one saves work or memory
+            while preserving the core query-key-value computation.
+          </p>
+        </div>
+
+        <div class="workbook-lab" id="speedLab" data-lab="speed" aria-labelledby="speed-lab-title">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">Try it by hand</p>
+              <h3 id="speed-lab-title">Count what modern attention saves.</h3>
+            </div>
+            <span id="speedProgress" class="pill">step 1 of 11</span>
+          </div>
+          <div class="lab-layout">
+            <div class="lab-visual-panel">
+              <svg id="speedSvg" class="lab-svg" viewBox="0 0 780 430" role="img" aria-label="Attention efficiency worksheet visual"></svg>
+              <div id="speedFacts" class="lab-facts" aria-label="Current efficiency facts"></div>
+            </div>
+            <div class="lab-card">
+              <span id="speedPhase" class="pill">efficiency</span>
+              <h4 id="speedPrompt">Calculate an efficiency fact.</h4>
+              <p id="speedInstruction" class="lab-instruction"></p>
+              <div id="speedDerivation" class="lab-derivation-wrap" hidden></div>
+              <label class="lab-answer-row" for="speedAnswer">
+                <span>Your answer</span>
+                <input id="speedAnswer" class="control-input" type="text" autocomplete="off" placeholder="Enter your value">
+              </label>
+              <div id="speedFeedback" class="lab-feedback" aria-live="polite"></div>
+              <div id="speedHint" class="lab-hint" hidden></div>
+              <div class="stepper-row lab-actions">
+                <button id="speedCheck" class="primary-button" type="button">Check</button>
+                <button id="speedHintButton" class="ghost-button" type="button">Hint</button>
+                <button id="speedSolution" class="ghost-button" type="button">Show solution</button>
+              </div>
+              <div class="stepper-row lab-nav">
+                <button id="speedPrev" class="ghost-button" type="button">Previous</button>
+                <button id="speedNext" class="primary-button" type="button">Next</button>
+                <button id="speedReset" class="ghost-button" type="button">Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="merge-notes" class="band" aria-labelledby="merge-notes-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">5. Later merge plan</p>
+          <h2 id="merge-notes-title">How this draft can become the main Chapter 5 spine.</h2>
+          <p>
+            If this feels right, the current Chapter 5 prose can wrap around these labs:
+            short motivation, by-hand computation, then the existing heatmaps and real
+            model demo as confirmation. The current chapter's explanations and references
+            are still valuable; this page is testing whether the exercises should become
+            the center of gravity.
+          </p>
+        </div>
+        <div class="merge-grid">
+          <div>
+            <strong>Keep from current Chapter 5</strong>
+            <span>Autoregressive loop, forward pass, real model demo, references, and the existing visual language.</span>
+          </div>
+          <div>
+            <strong>Promote from this draft</strong>
+            <span>The stepper labs, the local math kit, and the efficiency bookkeeping exercise.</span>
+          </div>
+          <div>
+            <strong>Review carefully</strong>
+            <span>How much FlashAttention detail belongs in Chapter 5 versus a later systems chapter.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="chapter5-exercises.js?v=20260701a"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (window.renderMathInElement) {
+        window.renderMathInElement(document.body, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "\\(", right: "\\)", display: false }
+          ]
+        });
+      }
+    });
+  </script>
+</body>
+</html>
