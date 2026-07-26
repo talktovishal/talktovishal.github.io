@@ -184,6 +184,14 @@ const dom = {
   gradientSummary: document.getElementById("gradientSummary"),
   gradientMode: document.getElementById("gradientMode"),
   gradientPanel: document.getElementById("gradientPanel"),
+  memoryClipStage: document.getElementById("memoryClipStage"),
+  memoryClipStatus: document.getElementById("memoryClipStatus"),
+  memoryClipBack: document.getElementById("memoryClipBack"),
+  memoryClipPlay: document.getElementById("memoryClipPlay"),
+  memoryClipNext: document.getElementById("memoryClipNext"),
+  memoryClipReplay: document.getElementById("memoryClipReplay"),
+  embeddingNudgePlay: document.getElementById("embeddingNudgePlay"),
+  embeddingNudgeStatus: document.getElementById("embeddingNudgeStatus"),
   tokenizerInput: document.getElementById("tokenizerInput"),
   boundarySummary: document.getElementById("boundarySummary"),
   boundaryPanel: document.getElementById("boundaryPanel"),
@@ -222,8 +230,46 @@ const state = {
   embeddingJob: 0,
   hasCheckedSparsity: false,
   hasExploredGradient: false,
-  hasComparedVectors: false
+  hasComparedVectors: false,
+  memoryClipStep: -1,
+  memoryClipPlaying: false
 };
+
+let memoryClipTimer = null;
+let embeddingNudgeTimer = null;
+
+const memoryClipReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const memoryClipSteps = [
+  {
+    title: "1. The clue enters",
+    tokens: ["I grew up in", "France"],
+    rnnStrength: 100,
+    rnnNote: "The hidden state holds France clearly.",
+    lstmNote: "The input gate writes France onto the protected cell-state path."
+  },
+  {
+    title: "2. New words keep arriving",
+    tokens: ["France", "so", "I", "speak"],
+    rnnStrength: 55,
+    rnnNote: "Each new word rewrites the RNN's one running note.",
+    lstmNote: "The forget gate stays near 1, so France keeps riding forward."
+  },
+  {
+    title: "3. The blank is getting close",
+    tokens: ["France", "…", "fluent"],
+    rnnStrength: 12,
+    rnnNote: "The old clue has faded to a weak trace.",
+    lstmNote: "The cell state still carries the same useful clue."
+  },
+  {
+    title: "4. The model reaches the blank",
+    tokens: ["France", "…", "fluent", "___"],
+    rnnStrength: 4,
+    rnnNote: "The plain RNN has almost no France signal left.",
+    lstmNote: "The output gate reveals the preserved clue: french.",
+    output: "french"
+  }
+];
 
 function wordAndPunctuationTokens(text, keepWhitespace = false) {
   const pattern = keepWhitespace
@@ -1808,6 +1854,148 @@ function appendResultTable(container, headings, rows) {
   container.append(table);
 }
 
+function stopMemoryClip() {
+  if (memoryClipTimer) window.clearInterval(memoryClipTimer);
+  memoryClipTimer = null;
+  state.memoryClipPlaying = false;
+}
+
+function renderMemoryClip() {
+  if (!dom.memoryClipStage) return;
+  dom.memoryClipStage.replaceChildren();
+
+  if (state.memoryClipStep < 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.innerHTML = "Press Play or Next to send <strong>France</strong> through the sentence.";
+    dom.memoryClipStage.append(empty);
+    dom.memoryClipStatus.textContent = "not started";
+    dom.memoryClipBack.disabled = true;
+    dom.memoryClipNext.disabled = false;
+    dom.memoryClipPlay.textContent = "Play";
+    return;
+  }
+
+  const step = memoryClipSteps[state.memoryClipStep];
+  const title = document.createElement("p");
+  title.className = "sequence-beat";
+  title.textContent = step.title;
+
+  const tokens = document.createElement("div");
+  tokens.className = "memory-token-rail";
+  step.tokens.forEach((token, index) => {
+    const chip = document.createElement("span");
+    chip.textContent = token;
+    if (token === "France") chip.classList.add("is-clue");
+    if (token === "___") chip.classList.add("is-blank");
+    if (index === step.tokens.length - 1) chip.classList.add("is-current");
+    tokens.append(chip);
+  });
+
+  const lanes = document.createElement("div");
+  lanes.className = "memory-lanes";
+
+  const rnnLane = document.createElement("div");
+  rnnLane.className = "memory-lane rnn-lane";
+  const rnnTitle = document.createElement("h4");
+  rnnTitle.textContent = "Plain RNN: one note keeps being rewritten";
+  const rnnMeter = document.createElement("div");
+  rnnMeter.className = "memory-meter";
+  const rnnFill = document.createElement("span");
+  rnnFill.style.width = `${step.rnnStrength}%`;
+  rnnFill.style.opacity = String(Math.max(0.18, step.rnnStrength / 100));
+  rnnMeter.append(rnnFill);
+  const rnnText = document.createElement("p");
+  rnnText.textContent = `${step.rnnNote} France signal: ${step.rnnStrength}%.`;
+  rnnLane.append(rnnTitle, rnnMeter, rnnText);
+
+  const lstmLane = document.createElement("div");
+  lstmLane.className = "memory-lane lstm-lane";
+  const lstmTitle = document.createElement("h4");
+  lstmTitle.textContent = "LSTM: a protected cell-state path";
+  const cellTrack = document.createElement("div");
+  cellTrack.className = "cell-state-track";
+  const cellClue = document.createElement("span");
+  cellClue.textContent = "France";
+  cellTrack.append(cellClue);
+  const lstmText = document.createElement("p");
+  lstmText.textContent = step.lstmNote;
+  lstmLane.append(lstmTitle, cellTrack, lstmText);
+
+  lanes.append(rnnLane, lstmLane);
+  dom.memoryClipStage.append(title, tokens, lanes);
+
+  if (step.output) {
+    const output = document.createElement("div");
+    output.className = "memory-output";
+    output.innerHTML = `I grew up in France, so I speak fluent <strong>${step.output}</strong>.`;
+    dom.memoryClipStage.append(output);
+  }
+
+  dom.memoryClipStatus.textContent = `frame ${state.memoryClipStep + 1} of ${memoryClipSteps.length}`;
+  dom.memoryClipBack.disabled = state.memoryClipStep === 0;
+  dom.memoryClipNext.disabled = state.memoryClipStep === memoryClipSteps.length - 1;
+  dom.memoryClipPlay.textContent = state.memoryClipPlaying ? "Pause" : "Play";
+}
+
+function stepMemoryClip(direction) {
+  stopMemoryClip();
+  if (state.memoryClipStep < 0 && direction > 0) state.memoryClipStep = 0;
+  else state.memoryClipStep = clamp(state.memoryClipStep + direction, 0, memoryClipSteps.length - 1);
+  renderMemoryClip();
+}
+
+function playMemoryClip() {
+  if (state.memoryClipPlaying) {
+    stopMemoryClip();
+    renderMemoryClip();
+    return;
+  }
+  if (memoryClipReducedMotion.matches) {
+    state.memoryClipStep = memoryClipSteps.length - 1;
+    renderMemoryClip();
+    return;
+  }
+  if (state.memoryClipStep < 0 || state.memoryClipStep === memoryClipSteps.length - 1) {
+    state.memoryClipStep = 0;
+  }
+  state.memoryClipPlaying = true;
+  renderMemoryClip();
+  memoryClipTimer = window.setInterval(() => {
+    if (state.memoryClipStep >= memoryClipSteps.length - 1) {
+      stopMemoryClip();
+      renderMemoryClip();
+      return;
+    }
+    state.memoryClipStep += 1;
+    renderMemoryClip();
+  }, 1500);
+}
+
+function playEmbeddingNudge() {
+  if (!dom.embeddingNudgePlay) return;
+  if (embeddingNudgeTimer) window.clearTimeout(embeddingNudgeTimer);
+  if (memoryClipReducedMotion.matches) {
+    dom.embeddingNudgeStatus.textContent = "Reduced motion is on. The static diagram and caption show the same idea.";
+    dom.embeddingNudgePlay.textContent = "Replay the nudge";
+    return;
+  }
+
+  const motions = document.querySelectorAll(".nudge-motion");
+  motions.forEach((motion) => {
+    if (typeof motion.beginElement === "function") motion.beginElement();
+  });
+  dom.embeddingNudgePlay.disabled = true;
+  dom.embeddingNudgePlay.textContent = "Playing…";
+  dom.embeddingNudgeStatus.textContent = "Cat and dog move together while table moves away.";
+  embeddingNudgeTimer = window.setTimeout(() => {
+    embeddingNudgeTimer = null;
+    dom.embeddingNudgePlay.disabled = false;
+    dom.embeddingNudgePlay.textContent = "Replay the nudge";
+    dom.embeddingNudgeStatus.textContent = "Finished. Press Replay to watch the one-step nudge again.";
+  }, 4600);
+}
+
 function wireEvents() {
   dom.corpusSelect.addEventListener("change", () => {
     state.activeCorpusId = dom.corpusSelect.value;
@@ -1827,6 +2015,20 @@ function wireEvents() {
   if (dom.comparePresetSelect) dom.comparePresetSelect.addEventListener("change", () => { dom.compareAnalogyInput.value = dom.comparePresetSelect.value; state.hasComparedVectors = true; renderComparison(); });
   dom.recurrentWeightSlider.addEventListener("input", () => { state.hasExploredGradient = true; renderGradient(); });
   dom.sequenceStepsSlider.addEventListener("input", () => { state.hasExploredGradient = true; renderGradient(); });
+  if (dom.memoryClipStage) {
+    dom.memoryClipBack.addEventListener("click", () => stepMemoryClip(-1));
+    dom.memoryClipNext.addEventListener("click", () => stepMemoryClip(1));
+    dom.memoryClipPlay.addEventListener("click", () => playMemoryClip());
+    dom.memoryClipReplay.addEventListener("click", () => {
+      stopMemoryClip();
+      state.memoryClipStep = 0;
+      renderMemoryClip();
+      if (!memoryClipReducedMotion.matches) playMemoryClip();
+    });
+  }
+  if (dom.embeddingNudgePlay) {
+    dom.embeddingNudgePlay.addEventListener("click", () => playEmbeddingNudge());
+  }
   document.querySelectorAll(".chapter-code-cell .run-button").forEach((button) => {
     button.addEventListener("click", () => runCodeCell(button.closest(".chapter-code-cell")));
   });
@@ -1863,6 +2065,7 @@ function init() {
   renderGradientPlaceholder();
   populateCompareWords();
   renderComparisonPlaceholder();
+  renderMemoryClip();
   setupSectionSpy();
 }
 

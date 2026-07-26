@@ -172,7 +172,7 @@
 
 .diagram-stage {
   display: grid;
-  grid-template-columns: minmax(110px, 0.8fr) minmax(150px, 1fr) minmax(150px, 1fr);
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
 }
@@ -215,6 +215,7 @@
   padding: 6px 8px;
   color: #123a3a;
   font-size: 0.88rem;
+  overflow-wrap: anywhere;
 }
 
 .positive-pairs {

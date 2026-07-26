@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>When Count Tables Need Help - LLM Soup to Nuts</title>
-  <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter2.css">
+  <link rel="stylesheet" href="styles.css?v=20260726">
+  <link rel="stylesheet" href="chapter2.css?v=20260726">
 </head>
 <body>
   <header class="topbar">
@@ -39,7 +39,7 @@
   </aside>
 
   <main id="top">
-    <section id="overview" class="workbench-band" aria-labelledby="page-title">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title" frozen="yes">
       <div class="workbench">
         <article class="intro-copy">
           <p class="eyebrow">Learning by doing</p>
@@ -128,7 +128,7 @@
       </div>
     </section>
 
-    <section id="limits" class="band" aria-labelledby="limits-title">
+    <section id="limits" class="band" aria-labelledby="limits-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">1. Limits of n-grams</p>
@@ -181,7 +181,7 @@ small rabbit</textarea>
       </div>
     </section>
 
-    <section id="neural" class="band band-muted" aria-labelledby="neural-title">
+    <section id="neural" class="band band-muted" aria-labelledby="neural-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">2. Neural probabilistic language models</p>
@@ -490,7 +490,7 @@ small rabbit</textarea>
             <text class="svg-label" x="42" y="44">cat &amp; dog closeness</text>
             <rect x="240" y="34" width="300" height="12" rx="6" fill="#efe9df"></rect>
             <rect x="240" y="34" width="40" height="12" rx="6" fill="#27664a">
-              <animate attributeName="width" values="40;250;250;40" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" repeatCount="indefinite"></animate>
+              <animate class="nudge-motion" attributeName="width" values="40;250;250;40" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" begin="indefinite" repeatCount="1"></animate>
             </rect>
 
             <rect x="40" y="78" width="640" height="232" rx="12" fill="#fffdf9" stroke="var(--line)" stroke-width="1"></rect>
@@ -511,17 +511,17 @@ small rabbit</textarea>
             <g>
               <circle cx="170" cy="210" r="9" fill="#27664a"></circle>
               <text class="svg-word" x="156" y="215" text-anchor="end">cat</text>
-              <animateTransform attributeName="transform" type="translate" values="0 0; 130 -18; 130 -18; 0 0" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" repeatCount="indefinite"></animateTransform>
+              <animateTransform class="nudge-motion" attributeName="transform" type="translate" values="0 0; 130 -18; 130 -18; 0 0" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" begin="indefinite" repeatCount="1"></animateTransform>
             </g>
             <g>
               <circle cx="560" cy="150" r="9" fill="#27664a"></circle>
               <text class="svg-word" x="574" y="155" text-anchor="start">dog</text>
-              <animateTransform attributeName="transform" type="translate" values="0 0; -140 42; -140 42; 0 0" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" repeatCount="indefinite"></animateTransform>
+              <animateTransform class="nudge-motion" attributeName="transform" type="translate" values="0 0; -140 42; -140 42; 0 0" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" begin="indefinite" repeatCount="1"></animateTransform>
             </g>
             <g>
               <circle cx="380" cy="205" r="9" fill="#8a8178"></circle>
               <text class="svg-word" x="394" y="210" text-anchor="start">table</text>
-              <animateTransform attributeName="transform" type="translate" values="0 0; 180 92; 180 92; 0 0" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" repeatCount="indefinite"></animateTransform>
+              <animateTransform class="nudge-motion" attributeName="transform" type="translate" values="0 0; 180 92; 180 92; 0 0" keyTimes="0;0.35;0.85;1" dur="4.5s" calcMode="spline" keySplines="0.25 0.1 0.25 1; 0 0 1 1; 0.42 0 0.58 1" begin="indefinite" repeatCount="1"></animateTransform>
             </g>
 
             <circle cx="150" cy="335" r="6" fill="#27664a"></circle>
@@ -529,6 +529,10 @@ small rabbit</textarea>
             <circle cx="400" cy="335" r="6" fill="#8a8178"></circle>
             <text class="svg-caption" x="414" y="340" text-anchor="start">unrelated word &#8594; pushed apart</text>
           </svg>
+          <div class="motion-control-bar">
+            <button class="btn" id="embeddingNudgePlay" type="button">Play the nudge</button>
+            <span class="motion-status" id="embeddingNudgeStatus" role="status">Paused on the first state.</span>
+          </div>
           <figcaption>Training the word vectors is many tiny pushes: words used alike (cat, dog) get pulled together, while an unrelated word (table) is pushed away so the space does not collapse into one point. Please note, we have the word vectors in a multiple dimensional space (remember 36 numbers per word), but we're showing them in 2 dimensions (x, y) for simplicity.</figcaption>
         </figure>
 
@@ -543,7 +547,7 @@ small rabbit</textarea>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
-        <section class="trainer chapter2-trainer" aria-label="Train word vectors">
+        <section class="trainer chapter2-trainer" aria-label="Train word vectors" frozen="yes">
           <div class="trainer-head">
             <div>
               <h3>Now choose the text and train</h3>
@@ -685,7 +689,7 @@ return { focus: focusWord, neighbors };</textarea>
       </div>
     </section>
 
-    <section id="embeddings" class="band" aria-labelledby="embeddings-title">
+    <section id="embeddings" class="band" aria-labelledby="embeddings-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">3. Word embeddings</p>
@@ -780,92 +784,6 @@ return { focus: focusWord, neighbors };</textarea>
           neighbors, train on more text or pick a corpus where your target words are
           common.
           </p>
-        <div class="example-note">
-
-          <p><em>How is the map drawn? A quick word on PCA.</em> Our vectors live in 36
-          dimensions, but a screen has only two.
-          <a href="https://en.wikipedia.org/wiki/Principal_component_analysis" target="_blank" rel="noreferrer">Principal component analysis (PCA)</a>
-          is the standard trick for turning a high-dimensional cloud of points into a
-          two-dimensional picture. The best intuition is not to think of PCA as
-          “throwing away dimensions” first. Think of it as choosing the best camera
-          angle.</p>
-
-
-          <p>Imagine a group of people standing in a park. If you take a photo from a
-          bad angle, many people may overlap, and the photo hides important differences
-          between them. If you move around and take the photo from a better angle, the
-          people are more spread out in the picture, and you can see the structure of
-          the group more clearly. PCA does something similar for vectors. It looks for
-          the viewing direction that makes the cloud of points look as spread out as
-          possible. That first best viewing direction is the
-          <strong>first principal component</strong>.</p>
-
-
-          <p>After PCA finds that first direction, it looks for a second one. But the
-          second direction has to be at right angles to the first, so that it adds new
-          information rather than repeating the same view. This becomes the
-          <strong>second principal component</strong>. These two directions become the
-          map's <code>x</code> and <code>y</code> axes. Each dot on the screen is the
-          original 36-number vector's shadow on this two-dimensional plane.</p>
-
-
-          <p>To make this more concrete, imagine a much simpler example with only two
-          measurements: a person's height and arm span. If we plot many people using
-          those two numbers, the points will not form a random blob. Taller people often
-          have longer arm spans, so the cloud stretches along a diagonal direction. That
-          diagonal direction is more meaningful than either “height only” or “arm span
-          only.” It captures the main way people vary in that small dataset: overall
-          body size. PCA is looking for exactly that kind of natural direction in the
-          data.</p>
-
-
-          <p>This is where the <em>covariance matrix</em> comes in. A covariance matrix
-          is just a table that asks: which measurements tend to move together? In the
-          height-and-arm-span example, the covariance between height and arm span would
-          be positive, because they often increase together. If one measurement tends to
-          go up when another goes down, their covariance is negative. If two
-          measurements do not have a consistent relationship, their covariance is near
-          zero.</p>
-
-
-          <p>The calculation is also not mysterious. First we center every dimension by
-          subtracting its average, so each value says “how far above or below average is
-          this word on this dimension?” Then, for every pair of dimensions, we multiply
-          those two centered values for each word and average the result:
-          <code>average((dimension i - average i) × (dimension j - average j))</code>.
-          That number is the covariance between those two dimensions. Since our word
-          vectors have 36 dimensions, the covariance matrix is a <code>36 × 36</code>
-          table. It summarizes the overall shape of the whole cloud: which directions
-          stretch together, which oppose each other, and which are mostly unrelated.</p>
-
-
-          <p>Now for <em>eigenvectors</em>. A useful way to think about them is as the
-          natural directions of a stretched-out shape. If a cloud of points looks like a
-          long oval, one natural direction runs along the length of the oval, and
-          another runs across its width. Those directions are not chosen by us
-          arbitrarily; they come from the shape of the data itself. For PCA, the
-          eigenvectors of the covariance matrix are those natural directions. The
-          eigenvalue attached to each eigenvector tells us how much spread there is in
-          that direction.</p>
-
-
-          <p>So the first principal component is the eigenvector with the largest
-          eigenvalue: the direction where the cloud is most spread out. The second
-          principal component is the next strongest direction, at right angles to the
-          first. In the height-and-arm-span example, the first component might point
-          along “overall body size.” In our word-vector example, the direction is harder
-          to name, but the idea is the same: PCA finds the strongest patterns of
-          variation in the trained vectors and uses the top two as the map axes.</p>
-
-
-          <p>This picture is useful, but it is still only a projection. Because we keep
-          only 2 of the original 36 directions, PCA must throw information away. Two
-          dots can look close on the map even though they are far apart in the full
-          36-dimensional space. That is exactly why we trust the neighbor list, which is
-          computed using all 36 numbers, more than the picture.</p>
-          
-
-        </div>
         <div class="embedding-layout real-embedding-layout">
           <div class="panel">
             <div class="section-title-row">
@@ -900,6 +818,84 @@ return { focus: focusWord, neighbors };</textarea>
             <div id="analogyPanel" class="vector-readout" aria-live="polite"></div>
           </div>
         </div>
+
+        <details class="lesson-disclosure pca-disclosure">
+          <summary>How is the map drawn? A quick word on PCA.</summary>
+          <div class="lesson-disclosure-body">
+            <p>Our vectors live in 36 dimensions, but a screen has only two.
+            <a href="https://en.wikipedia.org/wiki/Principal_component_analysis" target="_blank" rel="noreferrer">Principal component analysis (PCA)</a>
+            is the standard trick for turning a high-dimensional cloud of points into a
+            two-dimensional picture. The best intuition is not to think of PCA as
+            “throwing away dimensions” first. Think of it as choosing the best camera
+            angle.</p>
+
+            <p>Imagine a group of people standing in a park. If you take a photo from a
+            bad angle, many people may overlap, and the photo hides important differences
+            between them. If you move around and take the photo from a better angle, the
+            people are more spread out in the picture, and you can see the structure of
+            the group more clearly. PCA does something similar for vectors. It looks for
+            the viewing direction that makes the cloud of points look as spread out as
+            possible. That first best viewing direction is the
+            <strong>first principal component</strong>.</p>
+
+            <p>After PCA finds that first direction, it looks for a second one. But the
+            second direction has to be at right angles to the first, so that it adds new
+            information rather than repeating the same view. This becomes the
+            <strong>second principal component</strong>. These two directions become the
+            map's <code>x</code> and <code>y</code> axes. Each dot on the screen is the
+            original 36-number vector's shadow on this two-dimensional plane.</p>
+
+            <p>To make this more concrete, imagine a much simpler example with only two
+            measurements: a person's height and arm span. If we plot many people using
+            those two numbers, the points will not form a random blob. Taller people often
+            have longer arm spans, so the cloud stretches along a diagonal direction. That
+            diagonal direction is more meaningful than either “height only” or “arm span
+            only.” It captures the main way people vary in that small dataset: overall
+            body size. PCA is looking for exactly that kind of natural direction in the
+            data.</p>
+
+            <p>This is where the <em>covariance matrix</em> comes in. A covariance matrix
+            is just a table that asks: which measurements tend to move together? In the
+            height-and-arm-span example, the covariance between height and arm span would
+            be positive, because they often increase together. If one measurement tends to
+            go up when another goes down, their covariance is negative. If two
+            measurements do not have a consistent relationship, their covariance is near
+            zero.</p>
+
+            <p>The calculation is also not mysterious. First we center every dimension by
+            subtracting its average, so each value says “how far above or below average is
+            this word on this dimension?” Then, for every pair of dimensions, we multiply
+            those two centered values for each word and average the result:
+            <code>average((dimension i - average i) × (dimension j - average j))</code>.
+            That number is the covariance between those two dimensions. Since our word
+            vectors have 36 dimensions, the covariance matrix is a <code>36 × 36</code>
+            table. It summarizes the overall shape of the whole cloud: which directions
+            stretch together, which oppose each other, and which are mostly unrelated.</p>
+
+            <p>Now for <em>eigenvectors</em>. A useful way to think about them is as the
+            natural directions of a stretched-out shape. If a cloud of points looks like a
+            long oval, one natural direction runs along the length of the oval, and
+            another runs across its width. Those directions are not chosen by us
+            arbitrarily; they come from the shape of the data itself. For PCA, the
+            eigenvectors of the covariance matrix are those natural directions. The
+            eigenvalue attached to each eigenvector tells us how much spread there is in
+            that direction.</p>
+
+            <p>So the first principal component is the eigenvector with the largest
+            eigenvalue: the direction where the cloud is most spread out. The second
+            principal component is the next strongest direction, at right angles to the
+            first. In the height-and-arm-span example, the first component might point
+            along “overall body size.” In our word-vector example, the direction is harder
+            to name, but the idea is the same: PCA finds the strongest patterns of
+            variation in the trained vectors and uses the top two as the map axes.</p>
+
+            <p>This picture is useful, but it is still only a projection. Because we keep
+            only 2 of the original 36 directions, PCA must throw information away. Two
+            dots can look close on the map even though they are far apart in the full
+            36-dimensional space. That is exactly why we trust the neighbor list, which is
+            computed using all 36 numbers, more than the picture.</p>
+          </div>
+        </details>
 
         <div id="comparisonPanel" class="panel comparison-panel">
           <div class="section-title-row">
@@ -971,7 +967,7 @@ return { focus: focusWord, neighbors };</textarea>
       </div>
     </section>
 
-    <section id="sequences" class="band band-muted" aria-labelledby="sequences-title">
+    <section id="sequences" class="band band-muted" aria-labelledby="sequences-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">4. Sequence models before Transformers</p>
@@ -1057,6 +1053,38 @@ return { focus: focusWord, neighbors };</textarea>
           </div>
         </div>
 
+        <figure class="intuition-figure intuition-figure-wide controlled-sequence memory-clip">
+          <div class="section-title-row">
+            <h3>Watch the clue make the long trip</h3>
+            <span id="memoryClipStatus" class="pill">not started</span>
+          </div>
+          <div id="memoryClipStage" class="sequence-stage memory-clip-stage" aria-live="polite">
+            <div class="empty-state">Press Play or Next to send <strong>France</strong> through the sentence.</div>
+          </div>
+          <div class="motion-control-bar">
+            <div>
+              <strong>Plain RNN versus LSTM</strong>
+              <span>The same clue follows two memory paths to the blank.</span>
+            </div>
+            <div class="motion-button-row">
+              <button id="memoryClipBack" class="ghost-button" type="button">Back</button>
+              <button id="memoryClipPlay" class="primary-button" type="button">Play</button>
+              <button id="memoryClipNext" class="ghost-button" type="button">Next</button>
+              <button id="memoryClipReplay" class="ghost-button" type="button">Replay</button>
+            </div>
+          </div>
+          <figcaption>A plain RNN repeatedly rewrites its note; an LSTM can keep the <code>France</code> clue on a protected path until the model needs <code>french</code>.</figcaption>
+          <details class="motion-transcript">
+            <summary>Read the four-frame transcript</summary>
+            <ol>
+              <li><code>France</code> enters both models as the important clue.</li>
+              <li>As later words arrive, the plain RNN rewrites its hidden state while the LSTM keeps the clue on its cell-state path.</li>
+              <li>Near the blank, the RNN's clue is faint; the LSTM still carries it.</li>
+              <li>At the blank, the LSTM opens its output gate and makes <code>french</code> the natural completion.</li>
+            </ol>
+          </details>
+        </figure>
+
         <div class="section-heading">
           <p>
             So how do LSTMs and GRUs escape that trap? The root problem was that a plain
@@ -1101,7 +1129,7 @@ return { focus: focusWord, neighbors };</textarea>
       </div>
     </section>
 
-    <section id="references" class="band band-muted" aria-labelledby="references-title">
+    <section id="references" class="band band-muted" aria-labelledby="references-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">5. Going deeper</p>
@@ -1147,7 +1175,7 @@ return { focus: focusWord, neighbors };</textarea>
       </div>
     </section>
 
-    <section class="chapter-nav-band" aria-label="Chapter navigation">
+    <section class="chapter-nav-band" aria-label="Chapter navigation" frozen="yes">
       <div class="section-shell">
         <nav class="chapter-nav">
           <a class="chapter-nav-card" href="chapter-1.html">
@@ -1167,7 +1195,7 @@ return { focus: focusWord, neighbors };</textarea>
 
   <script src="corpora.js"></script>
   <script src="glove-mini.js"></script>
-  <script src="chapter2.js"></script>
+  <script src="chapter2.js?v=20260726"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script defer src="code-highlight.js"></script>
   <script defer src="code-quiz.js"></script>

@@ -129,7 +129,19 @@ const dom = {
   evalSettings: document.getElementById("evalSettings"),
   evaluationPanel: document.getElementById("evaluationPanel"),
   perplexitySummary: document.getElementById("perplexitySummary"),
-  surprisePanel: document.getElementById("surprisePanel")
+  surprisePanel: document.getElementById("surprisePanel"),
+  surpriseStaircase: document.getElementById("surpriseStaircase"),
+  surpriseStaircaseStatus: document.getElementById("surpriseStaircaseStatus"),
+  surpriseBackButton: document.getElementById("surpriseBackButton"),
+  surpriseStartButton: document.getElementById("surpriseStartButton"),
+  surpriseNextButton: document.getElementById("surpriseNextButton"),
+  surpriseResetButton: document.getElementById("surpriseResetButton"),
+  ngramFrameImage: document.getElementById("ngramFrameImage"),
+  ngramFrameStatus: document.getElementById("ngramFrameStatus"),
+  ngramFrameBack: document.getElementById("ngramFrameBack"),
+  ngramFramePlay: document.getElementById("ngramFramePlay"),
+  ngramFrameNext: document.getElementById("ngramFrameNext"),
+  ngramFrameReplay: document.getElementById("ngramFrameReplay")
 };
 
 const state = {
@@ -152,7 +164,10 @@ const state = {
   hasExploredProbability: false,
   hasComparedGeneration: false,
   hasUsedBackoff: false,
-  hasEvaluated: false
+  hasEvaluated: false,
+  surpriseStep: -1,
+  ngramFrameIndex: 0,
+  ngramFramePlaying: false
 };
 
 let animationTimer = null;
@@ -160,6 +175,19 @@ let inputTimer = null;
 let codeCellTimer = null;
 let modelRefreshTimer = null;
 let continuationTimer = null;
+let ngramFrameTimer = null;
+
+const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const ngramFrameSources = Array.from(
+  { length: 4 },
+  (_, index) => `assets/figures/chapter1-ngram-window-frame-${index + 1}.webp`
+);
+const surpriseSteps = [
+  { probability: "1", surprise: 0, perplexity: 1 },
+  { probability: "1/2", surprise: 1, perplexity: 2 },
+  { probability: "1/4", surprise: 2, perplexity: 4 },
+  { probability: "1/8", surprise: 3, perplexity: 8 }
+];
 
 function currentN() {
   const selected = dom.nChoices.find((choice) => choice.checked);
@@ -2145,6 +2173,112 @@ function renderInteractiveViews({ includeMemory = false, includeContextChoices =
   if (includeEvaluation) renderEvaluation();
 }
 
+function renderSurpriseStaircase() {
+  if (!dom.surpriseStaircase) return;
+  dom.surpriseStaircase.replaceChildren();
+
+  if (state.surpriseStep < 0) {
+    dom.surpriseStaircase.append(emptyState("Press Start to connect probability, surprise, and perplexity."));
+    dom.surpriseStaircaseStatus.textContent = "not started";
+    dom.surpriseBackButton.disabled = true;
+    dom.surpriseNextButton.disabled = true;
+    return;
+  }
+
+  const current = surpriseSteps[state.surpriseStep];
+  const readout = document.createElement("div");
+  readout.className = "staircase-readout";
+  [
+    ["True-token probability", `p = ${current.probability}`],
+    ["Surprise", `${current.surprise} ${current.surprise === 1 ? "bit" : "bits"}`],
+    ["Perplexity", `PPL = ${current.perplexity}`]
+  ].forEach(([label, value]) => {
+    const item = document.createElement("div");
+    const strong = document.createElement("strong");
+    const span = document.createElement("span");
+    strong.textContent = value;
+    span.textContent = label;
+    item.append(strong, span);
+    readout.append(item);
+  });
+
+  const staircase = document.createElement("div");
+  staircase.className = "staircase-track";
+  surpriseSteps.forEach((step, index) => {
+    const stair = document.createElement("div");
+    stair.className = "staircase-step";
+    if (index < state.surpriseStep) stair.classList.add("is-complete");
+    if (index === state.surpriseStep) {
+      stair.classList.add("is-current");
+      stair.setAttribute("aria-current", "step");
+    }
+    const probability = document.createElement("code");
+    probability.textContent = `p=${step.probability}`;
+    const arrow = document.createElement("span");
+    arrow.textContent = `${step.surprise} bit${step.surprise === 1 ? "" : "s"} → PPL ${step.perplexity}`;
+    stair.append(probability, arrow);
+    staircase.append(stair);
+  });
+
+  dom.surpriseStaircase.append(readout, staircase);
+  dom.surpriseStaircaseStatus.textContent = `step ${state.surpriseStep + 1} of ${surpriseSteps.length}`;
+  dom.surpriseBackButton.disabled = state.surpriseStep === 0;
+  dom.surpriseNextButton.disabled = state.surpriseStep === surpriseSteps.length - 1;
+}
+
+function stopNgramFramePlayback() {
+  if (ngramFrameTimer) window.clearInterval(ngramFrameTimer);
+  ngramFrameTimer = null;
+  state.ngramFramePlaying = false;
+}
+
+function renderNgramFrame() {
+  if (!dom.ngramFrameImage) return;
+  state.ngramFrameIndex = clamp(state.ngramFrameIndex, 0, ngramFrameSources.length - 1);
+  dom.ngramFrameImage.src = ngramFrameSources[state.ngramFrameIndex];
+  dom.ngramFrameStatus.textContent = `Frame ${state.ngramFrameIndex + 1} of ${ngramFrameSources.length}. ${
+    state.ngramFrameIndex === ngramFrameSources.length - 1 ? "The window has reached the end." : "The window will move one token to the right."
+  }`;
+  dom.ngramFrameBack.disabled = state.ngramFrameIndex === 0;
+  dom.ngramFrameNext.disabled = state.ngramFrameIndex === ngramFrameSources.length - 1;
+  dom.ngramFramePlay.textContent = state.ngramFramePlaying ? "Pause" : "Play";
+}
+
+function stepNgramFrame(direction) {
+  stopNgramFramePlayback();
+  state.ngramFrameIndex = clamp(
+    state.ngramFrameIndex + direction,
+    0,
+    ngramFrameSources.length - 1
+  );
+  renderNgramFrame();
+}
+
+function playNgramFrames() {
+  if (state.ngramFramePlaying) {
+    stopNgramFramePlayback();
+    renderNgramFrame();
+    return;
+  }
+  if (prefersReducedMotion.matches) {
+    state.ngramFrameIndex = ngramFrameSources.length - 1;
+    renderNgramFrame();
+    return;
+  }
+  if (state.ngramFrameIndex === ngramFrameSources.length - 1) state.ngramFrameIndex = 0;
+  state.ngramFramePlaying = true;
+  renderNgramFrame();
+  ngramFrameTimer = window.setInterval(() => {
+    if (state.ngramFrameIndex >= ngramFrameSources.length - 1) {
+      stopNgramFramePlayback();
+      renderNgramFrame();
+      return;
+    }
+    state.ngramFrameIndex += 1;
+    renderNgramFrame();
+  }, 560);
+}
+
 function wireEvents() {
   [dom.lowercaseToggle, dom.punctuationToggle].forEach((element) => {
     element.addEventListener("change", () => {
@@ -2190,6 +2324,37 @@ function wireEvents() {
   });
 
   dom.corpusSelect.addEventListener("change", () => loadCorpus(dom.corpusSelect.value));
+
+  if (dom.surpriseStartButton) {
+    dom.surpriseStartButton.addEventListener("click", () => {
+      state.surpriseStep = 0;
+      renderSurpriseStaircase();
+    });
+    dom.surpriseBackButton.addEventListener("click", () => {
+      state.surpriseStep = clamp(state.surpriseStep - 1, 0, surpriseSteps.length - 1);
+      renderSurpriseStaircase();
+    });
+    dom.surpriseNextButton.addEventListener("click", () => {
+      state.surpriseStep = clamp(state.surpriseStep + 1, 0, surpriseSteps.length - 1);
+      renderSurpriseStaircase();
+    });
+    dom.surpriseResetButton.addEventListener("click", () => {
+      state.surpriseStep = -1;
+      renderSurpriseStaircase();
+    });
+  }
+
+  if (dom.ngramFrameImage) {
+    dom.ngramFrameBack.addEventListener("click", () => stepNgramFrame(-1));
+    dom.ngramFrameNext.addEventListener("click", () => stepNgramFrame(1));
+    dom.ngramFramePlay.addEventListener("click", () => playNgramFrames());
+    dom.ngramFrameReplay.addEventListener("click", () => {
+      stopNgramFramePlayback();
+      state.ngramFrameIndex = 0;
+      renderNgramFrame();
+      if (!prefersReducedMotion.matches) playNgramFrames();
+    });
+  }
 
   dom.prevWindowButton.addEventListener("click", () => stepWindow(-1));
   dom.nextWindowButton.addEventListener("click", () => stepWindow(1));
@@ -2458,4 +2623,6 @@ function setupSectionSpy() {
 populateCorpusSelect();
 wireEvents();
 loadCorpus(corpora[0].id);
+renderSurpriseStaircase();
+renderNgramFrame();
 setupSectionSpy();

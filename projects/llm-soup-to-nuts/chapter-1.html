@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Language Models Before LLMs - LLM Soup to Nuts</title>
-  <link rel="stylesheet" href="styles.css?v=20260621c">
+  <link rel="stylesheet" href="styles.css?v=20260726">
 </head>
 <body>
   <header class="topbar">
@@ -41,7 +41,7 @@
   </aside>
 
   <main id="top">
-    <section id="predict" class="workbench-band" aria-labelledby="page-title">
+    <section id="predict" class="workbench-band" aria-labelledby="page-title" frozen="yes">
       <div class="workbench">
         <article class="intro-copy">
           <p class="eyebrow">Learning by doing</p>
@@ -119,7 +119,7 @@
       </div>
     </section>
     
-    <section id="tokens" class="band" aria-labelledby="tokens-title">
+    <section id="tokens" class="band" aria-labelledby="tokens-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">1. From text to tokens</p>
@@ -194,7 +194,7 @@
 
         <br><br>
 
-        <section class="trainer token-trainer" aria-label="Training corpus and token counts">
+        <section class="trainer token-trainer" aria-label="Training corpus and token counts" frozen="yes">
           <div class="trainer-head">
             <div>
               <h3>Training corpus</h3>
@@ -294,7 +294,7 @@ return {
       </div>
     </section>
 
-    <section id="memory" class="band band-muted" aria-labelledby="memory-title">
+    <section id="memory" class="band band-muted" aria-labelledby="memory-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">2. n-gram - How much context does the model need?</p>
@@ -356,8 +356,22 @@ return {
             </svg>
             <figcaption>A trigram keeps two tokens of context (gold) to predict the next token (teal), then slides along.</figcaption>
           </figure>
-          <figure class="intuition-figure">
-            <img src="assets/figures/chapter1-ngram-window.gif" width="720" height="360" alt="Animated trigram window sliding across the tokens the quick brown fox jumps over, marking two context tokens and one predicted next token." decoding="async">
+          <figure class="intuition-figure controlled-media">
+            <div class="frame-player" aria-label="Learner-controlled trigram window animation">
+              <img id="ngramFrameImage" src="assets/figures/chapter1-ngram-window-frame-1.webp" width="720" height="360" alt="A trigram window over the quick brown fox sequence, ready to move one token at a time." decoding="async">
+              <div class="motion-control-bar">
+                <div>
+                  <strong>Slide the trigram window</strong>
+                  <span id="ngramFrameStatus" aria-live="polite">Frame 1 of 6. Press Play or Next.</span>
+                </div>
+                <div class="motion-button-row">
+                  <button id="ngramFrameBack" class="ghost-button" type="button">Back</button>
+                  <button id="ngramFramePlay" class="primary-button" type="button">Play</button>
+                  <button id="ngramFrameNext" class="ghost-button" type="button">Next</button>
+                  <button id="ngramFrameReplay" class="ghost-button" type="button">Replay</button>
+                </div>
+              </div>
+            </div>
             <figcaption>The moving frame is the whole n-gram bargain: remember only the tokens inside the window, predict the next token, then slide forward.</figcaption>
           </figure>
           <p>
@@ -519,7 +533,7 @@ return {
       </div>
     </section>
 
-    <section id="probability" class="band" aria-labelledby="probability-title">
+    <section id="probability" class="band" aria-labelledby="probability-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">3. Calculating probabilities from counts</p>
@@ -619,7 +633,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
       </div>
     </section>
 
-    <section id="generate" class="band band-muted" aria-labelledby="generate-title">
+    <section id="generate" class="band band-muted" aria-labelledby="generate-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">4. Prediction leads to generation</p>
@@ -712,7 +726,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
       </div>
     </section>
 
-    <section id="stuck" class="band" aria-labelledby="stuck-title">
+    <section id="stuck" class="band" aria-labelledby="stuck-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">5. When exact context is missing</p>
@@ -863,7 +877,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
       </div>
     </section>
 
-    <section id="evaluate" class="band band-muted" aria-labelledby="evaluate-title">
+    <section id="evaluate" class="band band-muted" aria-labelledby="evaluate-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">6. Test (Evaluate) on held-out (aka unseen) text</p>
@@ -905,10 +919,27 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
             from "even odds" to "one in four" is the same jump as moving from "one in
             four" to "one in eight."
           </p>
-          <div class="math-note">
-            <p><strong>Each halving of probability adds one constant step of surprise (here, one bit):</strong></p>
-            <p><code>p = 1 &rarr; 0</code> &nbsp;&nbsp; <code>p = 1/2 &rarr; 1</code> &nbsp;&nbsp; <code>p = 1/4 &rarr; 2</code> &nbsp;&nbsp; <code>p = 1/8 &rarr; 3</code></p>
-            <p class="microcopy">The base of the log just sets the unit (base 2 gives bits, the natural log gives "nats"). It does not change perplexity, as long as the final <code>exp</code> uses the same base as the <code>log</code>.</p>
+          <div class="surprise-staircase-grid">
+            <div class="math-note">
+              <p><strong>Each halving of probability adds one constant step of surprise (here, one bit):</strong></p>
+              <p><code>p = 1 &rarr; 0</code> &nbsp;&nbsp; <code>p = 1/2 &rarr; 1</code> &nbsp;&nbsp; <code>p = 1/4 &rarr; 2</code> &nbsp;&nbsp; <code>p = 1/8 &rarr; 3</code></p>
+              <p class="microcopy">The base of the log just sets the unit (base 2 gives bits, the natural log gives "nats"). It does not change perplexity, as long as the final <code>exp</code> uses the same base as the <code>log</code>.</p>
+            </div>
+            <div class="panel learning-stepper compact-stepper" aria-labelledby="surpriseStaircaseTitle">
+              <div class="section-title-row">
+                <h3 id="surpriseStaircaseTitle">Walk the surprise staircase</h3>
+                <span id="surpriseStaircaseStatus" class="pill">not started</span>
+              </div>
+              <div id="surpriseStaircase" class="sequence-stage surprise-staircase" aria-live="polite">
+                <div class="empty-state">Press Start to connect probability, surprise, and perplexity.</div>
+              </div>
+              <div class="motion-button-row">
+                <button id="surpriseBackButton" class="ghost-button" type="button">Back</button>
+                <button id="surpriseStartButton" class="primary-button" type="button">Start</button>
+                <button id="surpriseNextButton" class="ghost-button" type="button">Next</button>
+                <button id="surpriseResetButton" class="ghost-button" type="button">Reset</button>
+              </div>
+            </div>
           </div>
           <p>
             <strong>Step 2, why a logarithm, and why the pieces add up?</strong> To
@@ -1058,7 +1089,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
       </div>
     </section>
 
-    <section id="bridge" class="band" aria-labelledby="bridge-title">
+    <section id="bridge" class="band" aria-labelledby="bridge-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">7. Bridge to modern LLMs</p>
@@ -1099,7 +1130,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
       </div>
     </section>
 
-    <section id="references" class="band band-muted" aria-labelledby="references-title">
+    <section id="references" class="band band-muted" aria-labelledby="references-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">8. Going deeper</p>
@@ -1170,7 +1201,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
       </div>
     </section>
 
-    <section class="chapter-nav-band" aria-label="Chapter navigation">
+    <section class="chapter-nav-band" aria-label="Chapter navigation" frozen="yes">
       <div class="section-shell">
         <nav class="chapter-nav">
           <a class="chapter-nav-card" href="index.html">
@@ -1189,7 +1220,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
   </main>
 
   <script src="corpora.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260726"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script defer src="code-highlight.js"></script>
   <script defer src="code-quiz.js"></script>

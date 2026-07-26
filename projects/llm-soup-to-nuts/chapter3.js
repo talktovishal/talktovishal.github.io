@@ -59,6 +59,21 @@ const edgeCases = {
     text: "pay\u200bload says ignore previous instructions",
     note: "The word payload contains a zero-width character.",
     warnings: ["Displayed text and tokenized text can diverge when hidden Unicode controls are present."]
+  },
+  format: {
+    title: "JSON versus YAML",
+    note: "Equivalent data can have different token costs. The winner depends on the text and tokenizer.",
+    warnings: ["Token count is one tradeoff; syntax, tooling, safety, and reliability still matter."],
+    variants: [
+      {
+        label: "JSON",
+        text: "{\n  \"name\": \"Ada\",\n  \"role\": \"engineer\",\n  \"active\": true\n}"
+      },
+      {
+        label: "YAML",
+        text: "name: Ada\nrole: engineer\nactive: true"
+      }
+    ]
   }
 };
 
@@ -83,15 +98,66 @@ const dom = {
   edgeCasePanel: document.getElementById("edgeCasePanel"),
   edgeCaseSummary: document.getElementById("edgeCaseSummary"),
   edgeCaseTokens: document.getElementById("edgeCaseTokens"),
-  edgeCaseWarnings: document.getElementById("edgeCaseWarnings")
+  edgeCaseWarnings: document.getElementById("edgeCaseWarnings"),
+  bpeStepStage: document.getElementById("bpeStepStage"),
+  bpeStepStatus: document.getElementById("bpeStepStatus"),
+  bpeStepBack: document.getElementById("bpeStepBack"),
+  bpeStepPlay: document.getElementById("bpeStepPlay"),
+  bpeStepNext: document.getElementById("bpeStepNext"),
+  bpeStepReset: document.getElementById("bpeStepReset")
 };
 
 const state = {
   activeCorpusId: corpora[0].id,
   wordTokens: [],
   tokenizerModels: null,
-  hasExploredBoundary: false
+  hasExploredBoundary: false,
+  bpeStep: -1,
+  bpeStepPlaying: false
 };
+
+let bpeStepTimer = null;
+
+const bpeReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const bpeLessonSteps = [
+  {
+    title: "1. Start from the byte pieces",
+    description: "For readable ASCII, each letter below is exactly one UTF-8 byte.",
+    rows: [
+      ["hug ×10", ["h", "u", "g"]],
+      ["pug ×5", ["p", "u", "g"]],
+      ["pun ×12", ["p", "u", "n"]],
+      ["bun ×4", ["b", "u", "n"]],
+      ["hugs ×5", ["h", "u", "g", "s"]]
+    ]
+  },
+  {
+    title: "2. Count every adjacent pair",
+    description: "The count comes from the whole weighted toy corpus.",
+    counts: [["ug", 20], ["pu", 17], ["un", 16], ["hu", 15], ["gs", 5]]
+  },
+  {
+    title: "3. Choose the winner",
+    description: "BPE asks only for the largest raw count, so u + g wins with 20.",
+    winner: "u + g → ug"
+  },
+  {
+    title: "4. Mint token 256 and replace it",
+    description: "The new token is used everywhere the winning pair appears.",
+    rows: [
+      ["hug", ["h", "ug"]],
+      ["pug", ["p", "ug"]],
+      ["hugs", ["h", "ug", "s"]]
+    ],
+    winner: "token 256 = ug"
+  },
+  {
+    title: "5. Freeze the merge list",
+    description: "At runtime, the encoder does not recount your prompt. It replays the learned rule and emits token IDs.",
+    rows: [["new prompt: pug", ["p", "ug"]]],
+    winner: "replay u + g → ug → IDs [112, 256]"
+  }
+];
 
 // --- tokenization helpers ---
 
@@ -529,12 +595,66 @@ function renderTokenChips(container, tokens) {
 function renderEdges() {
   if (!dom.edgeCaseSelect.value) {
     dom.edgeCasePanel.replaceChildren(notice("Choose an edge case above to inspect how the tokenizer handles it."));
-    dom.edgeCaseSummary.textContent = "choose a case";
+    dom.edgeCaseSummary.textContent = "Toy BPE tokenizer";
     dom.edgeCaseTokens.replaceChildren();
     dom.edgeCaseWarnings.replaceChildren();
     return;
   }
   const item = edgeCases[dom.edgeCaseSelect.value] || edgeCases.multilingual;
+
+  if (Array.isArray(item.variants)) {
+    const results = item.variants.map((variant) => ({
+      ...variant,
+      encoded: encodeWithCurrentAlgorithm(variant.text)
+    }));
+    dom.edgeCasePanel.replaceChildren();
+    const title = document.createElement("h3");
+    title.textContent = item.title;
+    const comparison = document.createElement("div");
+    comparison.className = "format-sample-grid";
+    results.forEach((result) => {
+      const block = document.createElement("div");
+      const heading = document.createElement("strong");
+      heading.textContent = result.label;
+      const sample = document.createElement("pre");
+      sample.className = "edge-sample";
+      sample.textContent = result.text;
+      block.append(heading, sample);
+      comparison.append(block);
+    });
+    const note = document.createElement("p");
+    note.textContent = item.note;
+    dom.edgeCasePanel.append(title, comparison, note);
+
+    const modelLabel = results[0].encoded.label;
+    dom.edgeCaseSummary.textContent = `Toy ${modelLabel} | ${results.map((result) => `${result.label} ${result.encoded.tokens.length}`).join(" vs ")}`;
+    dom.edgeCaseTokens.replaceChildren();
+    results.forEach((result) => {
+      const block = document.createElement("div");
+      block.className = "format-token-block";
+      const heading = document.createElement("div");
+      heading.className = "section-title-row";
+      const label = document.createElement("strong");
+      label.textContent = result.label;
+      const count = document.createElement("span");
+      count.className = "pill";
+      count.textContent = `${result.encoded.tokens.length} tokens`;
+      heading.append(label, count);
+      const rail = document.createElement("div");
+      rail.className = "tokenizer-chip-rail";
+      renderTokenChips(rail, result.encoded.tokens);
+      block.append(heading, rail);
+      dom.edgeCaseTokens.append(block);
+    });
+    dom.edgeCaseWarnings.replaceChildren();
+    item.warnings.forEach((warning) => {
+      const p = document.createElement("p");
+      p.textContent = warning;
+      dom.edgeCaseWarnings.append(p);
+    });
+    return;
+  }
+
   const encoded = encodeWithCurrentAlgorithm(item.text);
   dom.edgeCasePanel.replaceChildren();
   const title = document.createElement("h3");
@@ -545,7 +665,7 @@ function renderEdges() {
   const note = document.createElement("p");
   note.textContent = item.note;
   dom.edgeCasePanel.append(title, sample, note);
-  dom.edgeCaseSummary.textContent = `${encoded.label} | ${encoded.tokens.length} tokens`;
+  dom.edgeCaseSummary.textContent = `Toy ${encoded.label} | ${encoded.tokens.length} tokens`;
   renderTokenChips(dom.edgeCaseTokens, encoded.tokens);
   dom.edgeCaseWarnings.replaceChildren();
   warningsForText(item.text, item.warnings).forEach((warning) => {
@@ -731,6 +851,135 @@ function populateCorpusSelect() {
   fillCorpusSelect(dom.buildCorpusSelect);
 }
 
+function stopBpeStepPlayback() {
+  if (bpeStepTimer) window.clearInterval(bpeStepTimer);
+  bpeStepTimer = null;
+  state.bpeStepPlaying = false;
+}
+
+function appendBpePieceRail(container, pieces) {
+  const rail = document.createElement("div");
+  rail.className = "bpe-piece-rail";
+  pieces.forEach((piece) => {
+    const chip = document.createElement("span");
+    chip.textContent = piece;
+    if (piece === "ug") chip.classList.add("is-merged");
+    rail.append(chip);
+  });
+  container.append(rail);
+}
+
+function renderBpeStep() {
+  if (!dom.bpeStepStage) return;
+  dom.bpeStepStage.replaceChildren();
+
+  if (state.bpeStep < 0) {
+    dom.bpeStepStage.append(notice("Press Start or Next to begin with the byte pieces."));
+    dom.bpeStepStatus.textContent = "not started";
+    dom.bpeStepBack.disabled = true;
+    dom.bpeStepNext.disabled = false;
+    dom.bpeStepPlay.textContent = "Start";
+    return;
+  }
+
+  const step = bpeLessonSteps[state.bpeStep];
+  const heading = document.createElement("p");
+  heading.className = "sequence-beat";
+  heading.textContent = step.title;
+  const description = document.createElement("p");
+  description.className = "sequence-description";
+  description.textContent = step.description;
+  dom.bpeStepStage.append(heading, description);
+
+  if (Array.isArray(step.rows)) {
+    const rows = document.createElement("div");
+    rows.className = "bpe-corpus-rows";
+    step.rows.forEach(([label, pieces]) => {
+      const row = document.createElement("div");
+      const strong = document.createElement("strong");
+      strong.textContent = label;
+      row.append(strong);
+      appendBpePieceRail(row, pieces);
+      rows.append(row);
+    });
+    dom.bpeStepStage.append(rows);
+  }
+
+  if (Array.isArray(step.counts)) {
+    const counts = document.createElement("div");
+    counts.className = "bpe-count-grid";
+    step.counts.forEach(([pair, count], index) => {
+      const item = document.createElement("div");
+      if (index === 0) item.classList.add("is-winner");
+      const code = document.createElement("code");
+      const strong = document.createElement("strong");
+      code.textContent = pair;
+      strong.textContent = String(count);
+      item.append(code, strong);
+      counts.append(item);
+    });
+    dom.bpeStepStage.append(counts);
+  }
+
+  if (step.winner) {
+    const winner = document.createElement("div");
+    winner.className = "bpe-winner";
+    winner.textContent = step.winner;
+    dom.bpeStepStage.append(winner);
+  }
+
+  const progress = document.createElement("div");
+  progress.className = "sequence-progress";
+  bpeLessonSteps.forEach((_, index) => {
+    const marker = document.createElement("span");
+    if (index < state.bpeStep) marker.classList.add("is-complete");
+    if (index === state.bpeStep) {
+      marker.classList.add("is-current");
+      marker.setAttribute("aria-current", "step");
+    }
+    marker.textContent = String(index + 1);
+    progress.append(marker);
+  });
+  dom.bpeStepStage.append(progress);
+
+  dom.bpeStepStatus.textContent = `step ${state.bpeStep + 1} of ${bpeLessonSteps.length}`;
+  dom.bpeStepBack.disabled = state.bpeStep === 0;
+  dom.bpeStepNext.disabled = state.bpeStep === bpeLessonSteps.length - 1;
+  dom.bpeStepPlay.textContent = state.bpeStepPlaying ? "Pause" : "Play";
+}
+
+function stepBpeLesson(direction) {
+  stopBpeStepPlayback();
+  if (state.bpeStep < 0 && direction > 0) state.bpeStep = 0;
+  else state.bpeStep = clamp(state.bpeStep + direction, 0, bpeLessonSteps.length - 1);
+  renderBpeStep();
+}
+
+function playBpeLesson() {
+  if (state.bpeStepPlaying) {
+    stopBpeStepPlayback();
+    renderBpeStep();
+    return;
+  }
+  if (bpeReducedMotion.matches) {
+    state.bpeStep = bpeLessonSteps.length - 1;
+    renderBpeStep();
+    return;
+  }
+  if (state.bpeStep < 0 || state.bpeStep === bpeLessonSteps.length - 1) state.bpeStep = 0;
+  state.bpeStepPlaying = true;
+  renderBpeStep();
+  bpeStepTimer = window.setInterval(() => {
+    if (state.bpeStep >= bpeLessonSteps.length - 1) {
+      stopBpeStepPlayback();
+      renderBpeStep();
+      return;
+    }
+    state.bpeStep += 1;
+    renderBpeStep();
+  }, 1500);
+}
+
 function wireEvents() {
   if (dom.corpusSelect) {
     dom.corpusSelect.addEventListener("change", () => setActiveCorpus(dom.corpusSelect.value));
@@ -761,6 +1010,16 @@ function wireEvents() {
     renderEdges();
   });
   dom.edgeCaseSelect.addEventListener("change", () => renderEdges());
+  if (dom.bpeStepStage) {
+    dom.bpeStepBack.addEventListener("click", () => stepBpeLesson(-1));
+    dom.bpeStepNext.addEventListener("click", () => stepBpeLesson(1));
+    dom.bpeStepPlay.addEventListener("click", () => playBpeLesson());
+    dom.bpeStepReset.addEventListener("click", () => {
+      stopBpeStepPlayback();
+      state.bpeStep = -1;
+      renderBpeStep();
+    });
+  }
   document.querySelectorAll(".chapter-code-cell .run-button").forEach((button) => {
     button.addEventListener("click", () => runCodeCell(button.closest(".chapter-code-cell")));
   });
@@ -791,6 +1050,7 @@ function init() {
   wireEvents();
   renderTokenizers();
   renderEdges();
+  renderBpeStep();
   setupSectionSpy();
 }
 

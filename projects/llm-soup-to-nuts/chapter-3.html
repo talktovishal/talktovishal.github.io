@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tokenization - LLM Soup to Nuts</title>
-  <link rel="stylesheet" href="styles.css?v=20260621c">
-  <link rel="stylesheet" href="chapter2.css">
+  <link rel="stylesheet" href="styles.css?v=20260726">
+  <link rel="stylesheet" href="chapter2.css?v=20260726">
 </head>
 <body>
   <header class="topbar">
@@ -195,25 +195,42 @@
             the four views disagree on the very same text.
           </p>
           <p>
-            I am going to break my rule and talk about Transformers - the main architecture used in modern LLMs. It's important to understand the impact of tokenization on the performance of these models. For now, the important thing to remember is that during attention, each token's current representation is projected into queries, keys, and values. The attention layer compares tokens with query/key dot products, then uses those scores to mix value vectors from the surrounding tokens. Hence, if a prompt has
-            <code>T</code> tokens and the layer attends over the full prompt, the
-            attention score table has about <code>T * T</code> cells. Doubling the
-            token count does not merely double that table; it makes it roughly four
-            times larger during full-context attention and prompt prefill. During
-            autoregressive generation, KV caching changes the per-token cost profile
-            because earlier keys and values are reused, but long prompts still pay the
-            token budget up front. The tokenizer also chooses the size of the embedding
-            table: with <code>V</code> vocabulary pieces and <code>d</code> numbers per
-            vector, the first table has <code>V * d</code> learned numbers.
-            Tokenization is therefore a tradeoff: a larger vocabulary can shorten
-            sequences, but it also creates more rows the model has to learn.
+            I am going to break my rule and talk about Transformers - the main architecture used in modern LLMs. It's important to understand the impact of tokenization on the performance of these models. More
+            tokens mean more steps for the model to process, more memory to hold them,
+            and more token-to-token comparisons when the full prompt is read. If a
+            prompt has <code>T</code> tokens, that comparison table has about
+            <code>T * T</code> cells. Double the token count and the table becomes
+            roughly four times larger. You do not need the machinery behind that fact
+            yet; the worked example below is the part I want you to feel.
           </p>
+          <details class="lesson-disclosure">
+            <summary>Optional: why Transformer cost grows faster</summary>
+            <div class="lesson-disclosure-body">
+              <p>
+                During attention, each token's current representation is projected into
+                queries, keys, and values. The attention layer compares tokens with
+                query/key dot products, then uses those scores to mix value vectors from
+                the surrounding tokens. That is where the <code>T * T</code> table comes
+                from during full-context attention and prompt prefill.
+              </p>
+              <p>
+                During autoregressive generation, a KV cache changes the per-token cost
+                because earlier keys and values can be reused, but a long prompt still
+                pays its token budget up front. The tokenizer also helps choose the size
+                of the embedding table: with <code>V</code> vocabulary pieces and
+                <code>d</code> numbers per vector, that table has <code>V * d</code>
+                learned numbers. A larger vocabulary can shorten sequences, but it also
+                creates more rows for the model to learn. Do not worry if some of this is still fuzzy - we will go into it in detail in the subsequent chapters.
+              </p>
+            </div>
+          </details>
           <div class="worked-example" aria-label="Token count cost by hand">
             <h3>Token cost by hand</h3>
             <p>
               Imagine one sentence becomes 12 tokens with a good <a href="https://en.wikipedia.org/wiki/Byte_pair_encoding" target="_blank" rel="noreferrer">subword tokenizer</a>,
               but 20 tokens with a byte-heavy tokenizer. The text looks the same to
-              you, but during full-context attention and prompt prefill, the Transformer has more query-key pairs to score.
+              you, but while reading the full prompt, the Transformer has more
+              token-to-token pairs to score.
             </p>
             <div class="formula-stack">
               <code>attention cells with 12 tokens = 12 * 12 = 144</code>
@@ -409,12 +426,12 @@
           </p>
           <p class="microcopy">
             A useful summary number is the <strong>fertility rate</strong>: average
-            tokens per word. Around 1.5-3 tokens per word is a healthy middle zone for
-            many single-language settings. If the rate is too high, the model is paying
-            a token tax. If it is too low because the vocabulary is enormous, the model
-            pays in parameters and output scoring instead. Multilingual models often
-            need larger vocabularies because many scripts and word-building systems
-            have to share the same budget.
+            tokens per word. Treat it as a diagnostic, not a universal health score:
+            the useful range changes with the language, domain, boundary policy, and
+            job. A high rate can reveal a token tax. A very low rate may come from an
+            enormous vocabulary, which shifts the cost into parameters and output
+            scoring instead. Multilingual models often need larger vocabularies because
+            many scripts and word-building systems have to share the same budget.
           </p>
 
           <div class="code-quiz" data-quiz-type="predict" data-explain="Whole-word tokenization keeps sequences short, but the vocabulary gets huge. That means a huge embedding table and a huge output softmax, plus unknown-word trouble. Subwords are the middle ground.">
@@ -531,8 +548,11 @@
               characters is the breakthrough that made SentencePiece the default
               boundary policy for modern multilingual LLMs.
             </p>
+            <details class="lesson-disclosure">
+              <summary>Optional history: how these branches emerged</summary>
+              <div class="lesson-disclosure-body">
             <p>
-              Let's see how  these systems come from.
+              Let's see how these systems came to be.
               <a href="https://jacobfilipp.com/DrDobbs/articles/CUJ/1994/9402/gage/gage.htm" target="_blank" rel="noreferrer">Byte-pair encoding</a>
               began back in 1994 as a data-compression trick: repeatedly fuse the most
               common adjacent byte pair into a new symbol. Two decades later,
@@ -572,6 +592,8 @@
               One more reminder that "SentencePiece BPE" is not a competitor to BPE,
               just BPE trained in SentencePiece's raw-text machinery.
             </p>
+              </div>
+            </details>
             <div style="overflow-x: auto;">
               <table class="output-table">
                 <thead>
@@ -624,69 +646,104 @@
               </div>
               <p class="quiz-feedback" aria-live="polite" hidden></p>
             </div>
-            <p>
-              Two of these systems now dominate modern LLMs, so it is worth ending
-              this section with the question every model builder actually faces:
-              <strong>GPT-style byte-level BPE</strong> (OpenAI's <code>tiktoken</code>,
-              encodings like <code>cl100k_base</code> and <code>o200k_base</code>) or
-              <strong>SentencePiece</strong>? The honest answer is a tug-of-war between
-              <em>multilingual purity</em> and <em>strict structural control</em> for
-              math and code. Following are the considerations:
-            </p>
-            <p>
-              <strong>1. Regex pre-splitting buys structural control.</strong>
-              SentencePiece feeds raw text straight into the merger, so pure BPE will
-              fuse anything frequent: a comma onto a word (<code>, The</code>),
-              or a whole year like <code>1999</code> or <code>2024</code> into one lump.
-              GPT-style tokenizers run a strict regex first (the pre-tokenization
-              step we dissect in the next section) that forbids letters,
-              punctuation, and digits from merging across kinds and caps numbers at one-
-              to three-digit chunks. That consistency is a real win for
-              <strong>math and code</strong>, where the model learns digits as steady
-              building blocks instead of a chaotic mix of lone digits and giant clumps.
-            </p>
-            <p>
-              <strong>2. Bytes guarantee zero unknowns.</strong> Traditional
-              SentencePiece starts from the Unicode <em>characters</em> it saw in
-              training, so a rare emoji or an unfamiliar script can fall through to an
-              <code>&lt;unk&gt;</code> token and the model goes blind. (Modern
-              SentencePiece can switch on byte fallback, but it was bolted on later.)
-              GPT-style BPE converts everything to UTF-8 bytes <em>first</em>, with a
-              base of exactly 256 byte values. So, as we saw down in the bytes
-              section, it is impossible to hit an out-of-vocabulary character.
-            </p>
-            <p>
-              <strong>3. Raw text stays the most multilingual and
-              self-contained.</strong> That same English-friendly regex is the catch:
-              its rules about spaces and ASCII punctuation quietly assume Western-style
-              text, so for a deeply multilingual model (Google's Aya, the early Gemma
-              tokenizers) SentencePiece is the safer bet because it imposes no such
-              rules. It also ships as a single self-contained <code>.model</code> file,
-              so an inference server reproduces the exact tokenization without having to
-              re-match a complex regex.
-            </p>
-            <p>
-              So which wins? For years SentencePiece was the open-source default:
-              Llama 1 and 2, T5, and Mistral v1 and v2 all shipped it. But once
-              <strong>coding and reasoning</strong> became the headline benchmarks, the
-              math-and-code edge of regex pre-splitting began to outweigh its slight
-              English bias, and the field pivoted: <strong>Llama 3</strong> and
-              <strong>Mistral v3</strong> (its <code>tekken</code> tokenizer) both
-              dropped SentencePiece for <code>tiktoken</code>-style byte-level BPE. The
-              lesson is not that one is better; it is that the tokenizer follows
-              the job: reach for SentencePiece when broad multilingual coverage leads,
-              and for GPT-style byte-level BPE when math, code, and structural control
-              lead.
-            </p>
-            <div class="code-quiz" data-quiz-type="predict" data-explain="Regex pre-splitting forces clean boundaries (especially consistent one-to-three-digit number chunks) and byte-level pieces never hit an unknown character, which together help math and code. That structural control, not a multilingual failure, is why Llama 3 and Mistral v3 moved to tiktoken-style byte-level BPE.">
-              <p class="quiz-prompt">Quick check: why did Llama 3 and Mistral v3 switch from SentencePiece to <code>tiktoken</code>-style byte-level BPE?</p>
-              <div class="quiz-options" role="group" aria-label="Why models moved to byte-level BPE">
-                <button class="quiz-option" type="button" data-feedback="SentencePiece is fully multilingual - that is its strength. The pivot was about structural control for math and code, not a language failure.">Because SentencePiece cannot handle more than one language</button>
-                <button class="quiz-option" type="button" data-feedback="Token counts depend on the language and corpus; byte-level BPE is not universally shorter. The real draw is structural control.">Because byte-level BPE always uses fewer tokens for every language</button>
-                <button class="quiz-option" type="button" data-correct="true">Regex pre-splitting and byte-level pieces give cleaner, stronger math and code behavior</button>
+            <details class="lesson-disclosure">
+              <summary>Optional: how current model families make the tradeoff</summary>
+              <div class="lesson-disclosure-body">
+                <p>
+                  Two of these systems now dominate many modern LLMs, so it is worth
+                  ending this section with the question every model builder actually
+                  faces: <strong>GPT-style byte-level BPE</strong> (OpenAI's
+                  <code>tiktoken</code>, encodings like <code>cl100k_base</code> and
+                  <code>o200k_base</code>) or <strong>SentencePiece</strong>? The honest
+                  answer is a tug-of-war between <em>multilingual purity</em> and
+                  <em>strict structural control</em> for math and code. But that is not
+                  the only axis: boundary policy, Unicode coverage, vocabulary size,
+                  compression on the actual training languages, and runtime packaging
+                  all pull on the decision. Following are the considerations:
+                </p>
+                <p>
+                  <strong>1. Regex pre-splitting buys structural control.</strong>
+                  SentencePiece can train directly on raw text, without an external
+                  language-specific word splitter. In its BPE mode, it can therefore
+                  fuse whatever neighboring pieces are frequent and allowed by its
+                  learned representation: perhaps a comma near a word
+                  (<code>, The</code>), or a whole year such as <code>1999</code> or
+                  <code>2024</code>. GPT-style tokenizers often run a strict regex first
+                  (the pre-tokenization step we dissect in the next section), so BPE
+                  learns only inside the regions that regex creates. In particular,
+                  OpenAI's
+                  <a href="https://github.com/openai/tiktoken/blob/main/tiktoken_ext/openai_public.py" target="_blank" rel="noreferrer"><i>cl100k_base</i> and <i>o200k_base</i> definitions</a>
+                  keep letters, punctuation, whitespace, and digits in deliberately
+                  shaped regions and group digits into one-to-three-digit runs. That
+                  consistency can be useful for <strong>math and code</strong>, where
+                  steady number and whitespace boundaries give the model more regular
+                  building blocks than a chaotic mix of lone digits and giant clumps.
+                  The one-to-three-digit rule is a documented property of those named
+                  encodings, not a rule every byte-level tokenizer must follow.
+                </p>
+                <p>
+                  <strong>2. Bytes guarantee zero unknown characters.</strong> A
+                  character-based SentencePiece model without byte fallback starts
+                  from the Unicode characters covered during training, so a rare emoji
+                  or an unfamiliar script can fall through to an
+                  <code>&lt;unk&gt;</code> token and the model loses the original
+                  character. Modern SentencePiece can switch on byte fallback, so this
+                  is not an unavoidable SentencePiece weakness; it is a choice in the
+                  tokenizer configuration. GPT-style byte-level BPE converts everything
+                  to UTF-8 bytes <em>first</em>, with a base of exactly 256 byte values.
+                  So, as we saw down in the bytes section, every Unicode string has a
+                  byte representation and cannot hit an out-of-vocabulary
+                  <em>character</em>. This is why we have to compare complete tokenizer
+                  systems, not toolkit names alone.
+                </p>
+                <p>
+                  <strong>3. Raw text stays multilingual and
+                  self-contained.</strong> The same hand-designed regex that gives
+                  structural control is also a policy: its rules about spaces,
+                  punctuation, contractions, and digits can fit some languages and
+                  domains better than others. SentencePiece learns directly from raw
+                  sentences, treats whitespace as part of its representation, and does
+                  not require a language-specific word splitter. That made it a natural
+                  fit for systems such as T5 and the early Gemma tokenizers, and it
+                  remains attractive when many scripts and word-building systems have
+                  to share one vocabulary. It also commonly ships as a self-contained
+                  <code>.model</code> file, so an inference server can reproduce the
+                  exact normalization, vocabulary, and segmentation rules without
+                  separately re-matching an application regex.
+                </p>
+                <p>
+                  So which wins? For years SentencePiece was the open-source default:
+                  Llama 1 and 2 and T5 shipped SentencePiece-based systems, and Mistral
+                  documents Tokenizers V1, V2, and V3 as SentencePiece-based.
+                  Llama 3 then adopted a
+                  <code>tiktoken</code>-derived vocabulary:
+                  <a href="https://arxiv.org/pdf/2407.21783" target="_blank" rel="noreferrer">Meta's Llama 3 report</a>
+                  documents 128K pieces—100K from the tiktoken3 tokenizer plus 28K
+                  added to better support non-English languages—and reports that its
+                  English sample improved from 3.17 to 3.94 characters per token
+                  compared with Llama 2. Mistral's naming needs extra care:
+                  <a href="https://docs.mistral.ai/resources/cookbooks/concept-deep-dive-tokenization-templates" target="_blank" rel="noreferrer">Tokenizer V3 remains SentencePiece, while V3-Tekken is the tiktoken-based branch</a>.
+                  Those sources document what shipped, the vocabulary sizes, and the
+                  measured compression. They do not say that one coding benchmark
+                  single-handedly caused the changes. The broader lesson is not that
+                  one family is simply better; it is that the tokenizer follows the
+                  job. SentencePiece is attractive when raw multilingual coverage and
+                  self-contained packaging lead. A regex-plus-byte design is attractive
+                  when explicit boundaries, complete byte coverage, and structural
+                  regularity lead. The actual winner still has to be measured on the
+                  languages and data the model will read.
+                </p>
+                <div class="code-quiz" data-quiz-type="predict" data-explain="A tokenizer is the combination of boundary policy, base alphabet, vocabulary-learning rule, runtime encoder, and the corpus it learned from. Official reports can establish vocabulary size, compression, regex behavior, and which tokenizer shipped; they do not prove that one family is universally better or that one historical motive explains every design choice.">
+                  <p class="quiz-prompt">Quick check: what is the safest way to compare two model families that chose different tokenizers?</p>
+                  <div class="quiz-options" role="group" aria-label="How to compare tokenizer choices">
+                    <button class="quiz-option" type="button" data-feedback="SentencePiece was designed for raw multilingual text; multilingual coverage is one of its strengths.">SentencePiece cannot support multilingual models</button>
+                    <button class="quiz-option" type="button" data-correct="true">Inspect the named boundary rules, coverage, vocabulary, compression data, and runtime—not just the family label</button>
+                    <button class="quiz-option" type="button" data-feedback="Token counts depend on the corpus, language, vocabulary, and boundary policy. No family is always shorter.">Byte-level BPE always produces fewer tokens</button>
+                  </div>
+                  <p class="quiz-feedback" aria-live="polite" hidden></p>
+                </div>
               </div>
-              <p class="quiz-feedback" aria-live="polite" hidden></p>
-            </div>
+            </details>
         </div>
       </div>
     </section>
@@ -723,21 +780,23 @@
             <code>dog.</code>, <code>dog!</code>, and <code>dog?</code>. Hence, GPT-2 first
             splits text with a regular expression: contractions, Unicode letters,
             Unicode numbers, punctuation, and whitespace become separate regions, and
-            BPE only merges <em>within</em> a region. Newer GPT-style encodings keep
-            the same split-then-merge idea and tune a few places:
+            BPE only merges <em>within</em> a region. OpenAI's newer
+            <a href="https://github.com/openai/tiktoken/blob/main/tiktoken_ext/openai_public.py" target="_blank" rel="noreferrer"><i>cl100k_base</i> and <i>o200k_base</i> definitions</a>
+            keep the same split-then-merge idea and tune a few places:
           </p>
           <ul class="lesson-list">
             <li>
-              <strong>Numbers are capped at three digits.</strong> Long numbers become
-              steadier groups (<code>1234567</code> &rarr; <code>123</code>,
-              <code>456</code>, <code>7</code>) instead of one-off lumpy number tokens.
+              <strong>Digits are grouped in one-to-three-digit runs.</strong> In these
+              encodings, <code>1234567</code> is pre-split as <code>123</code>,
+              <code>456</code>, <code>7</code> before vocabulary merges are replayed.
             </li>
             <li>
-              <strong>Runs of whitespace are grouped.</strong> Code stops paying one
-              token for every indentation space, which matters a lot for Python.
+              <strong>Whitespace gets explicit grouping rules.</strong> These regexes
+              can keep useful runs together instead of treating every indentation
+              space as an unrelated region.
             </li>
             <li>
-              <strong>Contractions are matched case-insensitively.</strong>
+              <strong>Contractions get case-aware rules.</strong>
               <code>DON'T</code> and <code>don't</code> are less likely to split in
               oddly different ways.
             </li>
@@ -888,83 +947,43 @@
               </div>
               <p class="quiz-feedback" aria-live="polite" hidden></p>
             </div>
-          <figure class="intuition-figure">
-            <svg class="pipeline-svg bpe-merge-svg" viewBox="0 0 920 360" role="img" aria-labelledby="bpe-merge-title bpe-merge-desc">
-              <title id="bpe-merge-title">A byte-pair encoding merge step</title>
-              <desc id="bpe-merge-desc">The toy corpus starts as byte pieces, adjacent pairs are counted, the most frequent pair u g wins, a new token ID is minted for ug, and the merge list is frozen for later encoding.</desc>
-              <defs>
-                <marker id="bpe-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
-                </marker>
-              </defs>
-
-              <text x="32" y="34" class="svg-label">1. Start from byte pieces</text>
-              <rect x="24" y="50" width="242" height="118" rx="8" class="svg-box-soft"></rect>
-              <text x="46" y="78" class="svg-caption">tiny corpus</text>
-              <text x="46" y="108" class="svg-id">hug x10</text>
-              <rect x="118" y="90" width="30" height="28" rx="6" class="svg-chip"></rect>
-              <text x="133" y="109" class="svg-chip-text" text-anchor="middle">h</text>
-              <rect x="154" y="90" width="30" height="28" rx="6" class="svg-chip"></rect>
-              <text x="169" y="109" class="svg-chip-text" text-anchor="middle">u</text>
-              <rect x="190" y="90" width="30" height="28" rx="6" class="svg-chip"></rect>
-              <text x="205" y="109" class="svg-chip-text" text-anchor="middle">g</text>
-              <text x="46" y="145" class="svg-id">pug x5</text>
-              <rect x="118" y="127" width="30" height="28" rx="6" class="svg-chip"></rect>
-              <text x="133" y="146" class="svg-chip-text" text-anchor="middle">p</text>
-              <rect x="154" y="127" width="30" height="28" rx="6" class="svg-chip"></rect>
-              <text x="169" y="146" class="svg-chip-text" text-anchor="middle">u</text>
-              <rect x="190" y="127" width="30" height="28" rx="6" class="svg-chip"></rect>
-              <text x="205" y="146" class="svg-chip-text" text-anchor="middle">g</text>
-
-              <line x1="274" y1="109" x2="322" y2="109" class="svg-arrow" marker-end="url(#bpe-arrow)"></line>
-
-              <text x="340" y="34" class="svg-label">2. Count adjacent pairs</text>
-              <rect x="332" y="50" width="232" height="118" rx="8" class="svg-box-soft"></rect>
-              <rect x="354" y="65" width="82" height="28" rx="6" class="svg-chip">
-                <animate attributeName="opacity" values="0.45;1;0.45" dur="2.2s" repeatCount="indefinite"></animate>
-              </rect>
-              <text x="358" y="82" class="svg-id">ug = 20</text>
-              <text x="358" y="112" class="svg-id">pu = 17</text>
-              <text x="358" y="138" class="svg-id">un = 16</text>
-              <text x="456" y="112" class="svg-id">hu = 15</text>
-              <text x="456" y="138" class="svg-id">gs = 5</text>
-
-              <line x1="572" y1="109" x2="620" y2="109" class="svg-arrow" marker-end="url(#bpe-arrow)"></line>
-
-              <text x="638" y="34" class="svg-label">3. Mint the winning token</text>
-              <rect x="630" y="50" width="266" height="118" rx="8" class="svg-box-soft"></rect>
-              <text x="660" y="84" class="svg-caption">highest raw count wins</text>
-              <rect x="660" y="104" width="64" height="34" rx="7" class="svg-chip"></rect>
-              <text x="692" y="127" class="svg-chip-text" text-anchor="middle">u g</text>
-              <line x1="736" y1="121" x2="778" y2="121" class="svg-arrow" marker-end="url(#bpe-arrow)"></line>
-              <rect x="790" y="104" width="70" height="34" rx="7" class="svg-box-accent"></rect>
-              <text x="825" y="127" class="svg-model-text" text-anchor="middle">ug</text>
-              <text x="660" y="156" class="svg-id">new id 256 = ug</text>
-
-              <text x="46" y="222" class="svg-label">4. Replace everywhere, then count again</text>
-              <rect x="40" y="238" width="386" height="72" rx="8" class="svg-box-soft"></rect>
-              <text x="64" y="281" class="svg-id">hug -> h</text>
-              <rect x="132" y="262" width="46" height="28" rx="6" class="svg-chip"></rect>
-              <text x="155" y="281" class="svg-chip-text" text-anchor="middle">ug</text>
-              <text x="202" y="281" class="svg-id">pug -> p</text>
-              <rect x="280" y="262" width="46" height="28" rx="6" class="svg-chip"></rect>
-              <text x="303" y="281" class="svg-chip-text" text-anchor="middle">ug</text>
-              <text x="344" y="281" class="svg-id">...</text>
-
-              <line x1="438" y1="274" x2="492" y2="274" class="svg-arrow" marker-end="url(#bpe-arrow)"></line>
-
-              <text x="512" y="222" class="svg-label">5. Freeze the recipe</text>
-              <rect x="504" y="238" width="360" height="72" rx="8" class="svg-box-soft"></rect>
-              <text x="532" y="266" class="svg-id">merge list: [u + g -> ug, ...]</text>
-              <text x="532" y="292" class="svg-caption">At model time, encoding just replays this frozen list and outputs IDs.</text>
-            </svg>
+          <figure class="intuition-figure intuition-figure-wide controlled-sequence bpe-stepper">
+            <div class="section-title-row">
+              <h3>Take one BPE merge step by step</h3>
+              <span id="bpeStepStatus" class="pill">not started</span>
+            </div>
+            <div id="bpeStepStage" class="sequence-stage bpe-step-stage" aria-live="polite">
+              <div class="empty-state">Press Start or Next to begin with the byte pieces.</div>
+            </div>
+            <div class="motion-control-bar">
+              <div>
+                <strong>One corpus, one frozen merge</strong>
+                <span>Follow the exact <code>ug = 20</code> and token <code>256</code> example above.</span>
+              </div>
+              <div class="motion-button-row">
+                <button id="bpeStepBack" class="ghost-button" type="button">Back</button>
+                <button id="bpeStepPlay" class="primary-button" type="button">Start</button>
+                <button id="bpeStepNext" class="ghost-button" type="button">Next</button>
+                <button id="bpeStepReset" class="ghost-button" type="button">Reset</button>
+              </div>
+            </div>
             <figcaption>BPE is a counting loop: find the most frequent neighboring byte pair, mint a token for it, replace it, and repeat until the vocabulary budget is full.</figcaption>
+            <details class="motion-transcript">
+              <summary>Read the five-step transcript</summary>
+              <ol>
+                <li>Start from readable ASCII byte pieces in the toy corpus.</li>
+                <li>Count every adjacent pair; <code>ug = 20</code> is the largest count.</li>
+                <li>Choose <code>u + g</code> as the winning pair.</li>
+                <li>Mint token ID <code>256 = ug</code> and replace the pair everywhere.</li>
+                <li>Freeze the merge list so the runtime encoder can replay it on new text.</li>
+              </ol>
+            </details>
           </figure>
             <p>
               <strong>WordPiece</strong> asks, "which pair is unusually attached?"
               This is the key intuition. A pair can be common just because its two
-              parts are common. WordPiece discounts that by dividing by the individual
-              frequencies:
+              parts are common. For this lesson, we make that association visible with
+              the following simplified score:
             </p>
             <div class="formula-stack">
               <code>Score(A, B) = count(AB) / (count(A) * count(B))</code>
@@ -1021,18 +1040,70 @@
               </p>
             </div>
             <p>
-              Imagine you only have a strict budget of 30,000 "slots" to store the most useful chunks of language. <strong>BPE</strong> fills those slots by acting like a pure data-compression tool: it simply counts which letters or chunks sit next to each other most often (like `t` and `h`) and blindly merges them to save space. It doesn't care if the combination is meaningful; it only cares that it is frequent.
+              Imagine you only have a strict budget of 30,000 "slots" to store the most
+              useful chunks of language. <strong>BPE</strong> fills those slots by
+              acting like a pure data-compression tool: in our exercise, it simply
+              counts which letters or chunks sit next to each other most often (like
+              <code>t</code> and <code>h</code>) and merges the most frequent pair to
+              save space. It does not ask whether the combination carries clean
+              linguistic meaning; for this rule, raw frequency wins.
             </p>
             <p>
-            <strong>WordPiece</strong>, on the other hand, acts more like a linguist trying to maximize the actual *meaning* of each slot. It penalizes pairs made of letters that are incredibly common everywhere else. While `t` and `h` are common together, they also appear constantly on their own in other words, so WordPiece views their pairing as statistical noise. However, because `q` almost never appears without `u`, WordPiece prioritizes merging them. It makes this choice to avoid wasting precious vocabulary slots on frequent accidents of spelling, ensuring the model learns distinct, meaningful building blocks instead.
-
-              That example is why WordPiece is not just "BPE with a different
-              tie-breaker." It is trying to avoid wasting a merge on pieces that are
-              only frequent because their ingredients are frequent everywhere. That
-              makes it a natural fit for BERT-style masked-token prediction: the model
-              benefits from stable, distinctive pieces such as <code>play</code> +
-              <code>##ing</code>, not merely the most common neighboring letters.
+              <strong>WordPiece</strong>, on the other hand, acts more like a linguist
+              trying to make every vocabulary slot carry a useful, distinctive piece
+              of language. The analogy is not entirely fanciful. In a BERT-style
+              pipeline, a pre-tokenizer first draws boundaries using whitespace and
+              punctuation, with extra language- or script-aware handling where needed;
+              WordPiece then searches for reusable pieces within those boundaries.
+              <a href="https://research.google/blog/a-fast-wordpiece-tokenization-system/" target="_blank" rel="noreferrer">Google notes</a>
+              that subword units often retain linguistic meaning, such as morphemes.
+              But WordPiece itself is not reading a dictionary or understanding
+              meaning the way a human linguist does. The
+              <a href="https://research.google/pubs/japanese-and-korean-voice-search/" target="_blank" rel="noreferrer">original method</a>
+              chose vocabulary additions based on how much they improved the
+              likelihood of the training text.
             </p>
+            <p>
+              Our simplified teaching rule below gives us an intuitive way to see that
+              statistical preference. Imagine WordPiece choosing between
+              <code>th</code> and <code>qu</code> in an ordinary English corpus. A
+              raw-frequency rule may be drawn to <code>th</code> because
+              <code>t</code> and <code>h</code> are both common and appear together
+              frequently. WordPiece's score discounts a pair when its individual
+              pieces are already common everywhere else. By contrast, because
+              <code>q</code> appears far less often without <code>u</code>, the pair
+              <code>qu</code> can receive a stronger distinctive-association score:
+              their appearance together is harder to explain simply from the separate
+              frequencies of <code>q</code> and <code>u</code>. The exact result will
+              always depend on the corpus—WordPiece does not automatically declare
+              <code>th</code> statistical noise or always merge <code>qu</code>—but
+              the example captures the pressure created by its scoring rule.
+            </p>
+            <p>
+              That is why WordPiece is not merely "BPE with a different tie-breaker."
+              It tries to avoid spending a precious vocabulary slot on a pair whose
+              high count comes mainly from two ingredients that are already common
+              everywhere. This statistical pressure can produce stable, reusable
+              pieces that line up with stems, endings, and other meaningful
+              patterns—pieces such as <code>play</code> and <code>##ing</code> when
+              the learned vocabulary supports them—although that linguistic alignment
+              is an outcome, not a guarantee. Such pieces are useful for BERT-style
+              masked-token prediction because the model can work with recurring parts
+              of words rather than only isolated letters or memorized whole words. The
+              picture I keep in my head is this: a linguist sets the workspace, a
+              statistician chooses the pieces, and the resulting vocabulary can look
+              as though the two collaborated.
+            </p>
+            <p class="microcopy">
+              The score used in this lesson,
+              <code>count(AB) / (count(A) * count(B))</code>, is our simplified
+              teaching rule for making that association visible. Production WordPiece
+              training descriptions and implementations are not all identical, so keep
+              the comparison at the right level: BPE rewards raw pair frequency here;
+              our WordPiece exercise rewards a pair that occurs together more
+              specifically.
+            </p>
+            <br/>
             <p>
               <strong>SentencePiece (Unigram LM)</strong> is the trickly one. We have not covered all the math yet, we will do so in the next chapter. However, the key idea is that it uses a probabilistic approach to determine the best way to segment text. Do not picture a greedy merge. Picture a menu. The
               tokenizer begins with many candidate pieces, gives each piece a
@@ -1123,7 +1194,7 @@
           </p>
         </div>
 
-        <div class="code-quiz" data-quiz-type="predict" data-explain="WordPiece merges the pair with the highest count(AB) / (count(A) * count(B)). That rewards pairs that occur together more than their individual frequencies would predict, rather than the raw frequency BPE uses.">
+        <div class="code-quiz" data-quiz-type="predict" data-explain="In this lesson's simplified WordPiece score, the winner maximizes count(AB) / (count(A) * count(B)). That rewards pairs that occur together more than their individual frequencies would predict, rather than the raw frequency BPE uses.">
           <p class="quiz-prompt">Quick check: BPE merges the most <em>frequent</em> adjacent pair. WordPiece scans the same pairs but picks differently. What does WordPiece favor instead?</p>
           <div class="quiz-options" role="group" aria-label="What WordPiece maximizes">
             <button class="quiz-option" type="button" data-feedback="That would just be a longest-match rule; WordPiece scores pairs, it does not chase length.">The longest possible pair, regardless of frequency</button>
@@ -1214,20 +1285,22 @@ return { text: text, results: results };</textarea>
           <p class="eyebrow">5. Why models break: the tokenization quirks</p>
           <h2 id="edges-title">Many "the model is dumb" moments are really tokenizer moments.</h2>
           <p>
-            A startling number of an LLM's famous failures are not failures of the
-            neural network at all. They are failures of <em>tokenization</em>, hiding in
-            plain sight. You need to start by checking the tokens. The weirdness stops being mysterious and starts being almost obvious. Remember the bedrock fact - the
-            model never sees your letters, it sees chunks - so anything that depends on
-            the letters <em>inside</em> a chunk is hard for it, and anything that bloats
-            the <em>number</em> of chunks is expensive for it.
+            A startling number of an LLM's famous failures begin with, or are amplified
+            by, <em>tokenization</em>. That does not absolve the neural network, its
+            training data, or the rest of the system. It tells us where to inspect
+            first. Remember the bedrock fact: the model receives token chunks, not a
+            separate input slot for every visible letter. Tasks that need boundaries
+            hidden inside a chunk can therefore be harder, and text that becomes many
+            chunks is more expensive.
           </p>
           <p>
             Pick a case in the lab below and watch the token stream; sometimes the
             visible text and the
             <a href="https://tiktokenizer.vercel.app/" target="_blank" rel="noreferrer">tokenized input</a>
             are far less alike than they look. But first, let's make a little field
-            guide. Each quirk below is a real, documented behavior, and every one
-            traces straight back to how the bytes got grouped.
+            guide. Each quirk below has been observed in a named tokenizer or model
+            family. Token boundaries help explain the behavior, but they are one part
+            of the larger model and training system.
           </p>
           <div class="worked-example" aria-label="Token tax edge case by hand">
             <h3>A token tax is evidence, not destiny</h3>
@@ -1255,51 +1328,51 @@ return { text: text, results: results };</textarea>
 
         <div class="idea-flow quirk-flow" aria-label="Famous tokenization quirks">
           <div>
-            <strong>Can't spell or reverse words</strong>
-            <span>A word like <code>DefaultStyle</code> is one fat token, so its letters are hidden. Ask how many L's it has, or to reverse it, and the model fumbles.</span>
+            <strong>Spelling can become harder</strong>
+            <span>A tokenizer may package a word such as <code>DefaultStyle</code> into one or a few opaque chunks. Letter-level tasks then depend on the model reconstructing boundaries it was not given directly.</span>
           </div>
           <div>
             <strong>Shaky arithmetic</strong>
-            <span>Numbers chunk arbitrarily - <code>127</code> is one token, <code>677</code> is two - so digit-by-digit math has no steady digits to grab. Llama deliberately splits every digit.</span>
+            <span>Number boundaries depend on the encoding. OpenAI's <a href="https://github.com/openai/tiktoken/blob/main/tiktoken_ext/openai_public.py" target="_blank" rel="noreferrer"><i>cl100k_base</i> and <i>o200k_base</i></a> pre-tokenizers group digits in one-to-three-digit runs; other tokenizers make different choices.</span>
           </div>
           <div>
-            <strong>Non-English is expensive</strong>
+            <strong>Non-English can cost more</strong>
             <span>An English-dominated vocabulary may keep common English words whole while splitting basic Spanish, Hindi, Korean, or Thai words into many pieces. More pieces means more context budget and training compute for the same message.</span>
           </div>
           <div>
-            <strong>Python broke GPT-2</strong>
-            <span>Older GPT-style tokenizers often paid for indentation one space at a time, bloating code until it ran out of context. Newer encodings group whitespace more deliberately.</span>
+            <strong>Old tokenizers taxed Python</strong>
+            <span>Some older GPT-style encodings represented indentation inefficiently, making code consume more context. Newer encodings can group whitespace more deliberately.</span>
           </div>
           <div>
-            <strong>Trailing whitespace trips it</strong>
-            <span>A space is normally glued to the <em>front</em> of the next word (<code>&nbsp;of</code>), so a lone trailing space is out of distribution and worsens the completion.</span>
+            <strong>Trailing whitespace can surprise it</strong>
+            <span>Many GPT-style tokens include a leading space with the following word. A lone trailing space can therefore produce an unusual boundary, though the effect depends on the tokenizer and model.</span>
           </div>
           <div>
-            <strong>Special tokens are a trap</strong>
-            <span>Strings like <code>&lt;|endoftext|&gt;</code> are single special tokens; slipping one into a prompt can halt or derail the model - a genuine attack surface.</span>
+            <strong>Special tokens need care</strong>
+            <span>Reserved strings such as <code>&lt;|endoftext|&gt;</code> can carry control meaning when an application allows them to be encoded as special tokens. Robust tokenization APIs often reject or escape them by default.</span>
           </div>
           <div>
             <strong>SolidGoldMagikarp</strong>
-            <span>A Reddit username that earned its own token in the tokenizer's data but never appeared in the model's, so its embedding row stayed random. Mention it and the model babbles.</span>
+            <span>The famous Reddit username became an <a href="https://arxiv.org/abs/2405.05417" target="_blank" rel="noreferrer">under-trained “glitch token”</a>: it existed in a tokenizer vocabulary but was nearly or entirely absent during model training, leading to unreliable behavior.</span>
           </div>
           <div>
-            <strong>YAML beats JSON</strong>
-            <span>The same data costs fewer tokens in YAML than in JSON, so in a pay-per-token world YAML is literally cheaper to send.</span>
+            <strong>YAML can be shorter than JSON</strong>
+            <span>For some data and some tokenizers, YAML uses fewer pieces than equivalent JSON. It is not universal; choose “JSON versus YAML” in the lab and compare this toy tokenizer's actual counts.</span>
           </div>
         </div>
 
-        <div class="code-quiz" data-quiz-type="predict" data-explain="A whole word is often a single token, so the individual letters inside it are hidden from the model. Tasks that need those letters - counting them, reversing them, spelling - are hard, even though the model is otherwise very capable.">
+        <div class="code-quiz" data-quiz-type="predict" data-explain="A tokenizer can bundle several visible letters into one opaque chunk. Letter-level tasks then require the model to reconstruct boundaries that were not supplied as separate input positions. Tokenization is one contributing cause, not the whole capability story.">
           <p class="quiz-prompt">Quick check: an LLM struggles to count the letters in a word like <code>DefaultStyle</code>. The deepest reason is that&hellip;</p>
           <div class="quiz-options" role="group" aria-label="Why spelling is hard">
-            <button class="quiz-option" type="button" data-correct="true">The whole word is one token, so the letters inside are hidden from it</button>
+            <button class="quiz-option" type="button" data-correct="true">Its tokenizer may hide the relevant letter boundaries inside larger chunks</button>
             <button class="quiz-option" type="button" data-feedback="Models handle plenty of long words fine - the issue is not length, it is that the letters are bundled inside one token.">It is simply too long a word for any model</button>
-            <button class="quiz-option" type="button" data-feedback="Counting to twelve is easy; the trouble is the model cannot see the individual letters to count.">Counting that high is genuinely hard math</button>
+            <button class="quiz-option" type="button" data-feedback="The arithmetic is easy; the harder part is recovering the letter boundaries from the token chunks.">Counting that high is genuinely hard math</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
-        <div class="code-quiz" data-quiz-type="predict" data-explain="GPT-style tokenizers fold the leading space into the following word, so ' the' is one token and 'the' (no space) is a different token. That is why the same word can get different IDs depending on the space in front of it.">
-          <p class="quiz-prompt">Quick check: in a GPT-style byte-level tokenizer, <code>"the"</code> at the very start of a text and <code>" the"</code> (a leading space, then the word) mid-sentence usually become&hellip;</p>
+        <div class="code-quiz" data-quiz-type="predict" data-explain="GPT-2-style byte-level BPE vocabularies often include pieces whose decoded text begins with a space. That means ' the' and sentence-initial 'the' can map to different token IDs; the exact split still depends on the vocabulary and encoding.">
+          <p class="quiz-prompt">Quick check: in a GPT-2-style byte-level BPE tokenizer, <code>"the"</code> at the very start of a text and <code>" the"</code> (a leading space, then the word) mid-sentence can become&hellip;</p>
           <div class="quiz-options" role="group" aria-label="Same word with and without a leading space">
             <button class="quiz-option" type="button" data-feedback="The leading space is folded into the token, so the two are not identical.">The exact same single token, since it is the same word</button>
             <button class="quiz-option" type="button" data-correct="true">Two different tokens, because the leading space is folded into the word piece</button>
@@ -1321,6 +1394,7 @@ return { text: text, results: results };</textarea>
                 <option value="rare">Rare names</option>
                 <option value="domain">Domain vocabulary</option>
                 <option value="hidden">Hidden text</option>
+                <option value="format">JSON versus YAML</option>
               </select>
             </label>
             <div id="edgeCasePanel" class="edge-card" aria-live="polite"></div>
@@ -1328,8 +1402,9 @@ return { text: text, results: results };</textarea>
           <div class="panel">
             <div class="section-title-row">
               <h3>Tokenizer output</h3>
-              <span id="edgeCaseSummary" class="pill">edge case</span>
+              <span id="edgeCaseSummary" class="pill">Toy BPE tokenizer</span>
             </div>
+            <p class="microcopy">These counts come from the browser-trained teaching tokenizer in this chapter, not from a production model's tokenizer.</p>
             <div id="edgeCaseTokens" class="tokenizer-chip-rail" aria-live="polite"></div>
             <div id="edgeCaseWarnings" class="warning-list" aria-live="polite"></div>
           </div>
@@ -1337,7 +1412,7 @@ return { text: text, results: results };</textarea>
       </div>
     </section>
 
-    <section id="references" class="band band-muted" aria-labelledby="references-title" frozen="true">
+    <section id="references" class="band band-muted" aria-labelledby="references-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">6. Going deeper</p>
@@ -1430,7 +1505,7 @@ return { text: text, results: results };</textarea>
       </div>
     </section>
 
-    <section class="chapter-nav-band" aria-label="Chapter navigation">
+    <section class="chapter-nav-band" aria-label="Chapter navigation" frozen="yes">
       <div class="section-shell">
         <nav class="chapter-nav">
           <a class="chapter-nav-card" href="chapter-2.html">
@@ -1449,7 +1524,7 @@ return { text: text, results: results };</textarea>
   </main>
 
   <script src="corpora.js"></script>
-  <script src="chapter3.js"></script>
+  <script src="chapter3.js?v=20260726"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script defer src="code-highlight.js"></script>
   <script defer src="code-quiz.js"></script>
