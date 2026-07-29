@@ -1,5 +1,5 @@
 // Chapter 3: Tokenization. Self-contained logic for the boundary comparison,
-// trained tokenizer algorithms (BPE, WordPiece, SentencePiece-style Unigram LM, byte-level),
+// controlled tokenizer algorithms (character BPE, WordPiece, Unigram LM, byte reference),
 // and the edge-case inspector. Tokenizers are trained in the browser on a real
 // public-domain corpus so the merges and pieces are genuine, not faked.
 
@@ -88,23 +88,18 @@ const dom = {
   boundarySummary: document.getElementById("boundarySummary"),
   boundaryPanel: document.getElementById("boundaryPanel"),
   boundaryRunButton: document.getElementById("boundaryRunButton"),
-  tokenizerAlgorithmSelect: document.getElementById("tokenizerAlgorithmSelect"),
   tokenizerVocabSlider: document.getElementById("tokenizerVocabSlider"),
   tokenizerVocabLabel: document.getElementById("tokenizerVocabLabel"),
-  tokenizerTrainingPanel: document.getElementById("tokenizerTrainingPanel"),
-  algorithmSummary: document.getElementById("algorithmSummary"),
-  algorithmTokens: document.getElementById("algorithmTokens"),
+  tokenizerCompareButton: document.getElementById("tokenizerCompareButton"),
+  tokenizerCompareStatus: document.getElementById("tokenizerCompareStatus"),
+  tokenizerComparisonResults: document.getElementById("tokenizerComparisonResults"),
+  byteReference: document.getElementById("byteReference"),
   edgeCaseSelect: document.getElementById("edgeCaseSelect"),
   edgeCasePanel: document.getElementById("edgeCasePanel"),
   edgeCaseSummary: document.getElementById("edgeCaseSummary"),
   edgeCaseTokens: document.getElementById("edgeCaseTokens"),
   edgeCaseWarnings: document.getElementById("edgeCaseWarnings"),
-  bpeStepStage: document.getElementById("bpeStepStage"),
-  bpeStepStatus: document.getElementById("bpeStepStatus"),
-  bpeStepBack: document.getElementById("bpeStepBack"),
-  bpeStepPlay: document.getElementById("bpeStepPlay"),
-  bpeStepNext: document.getElementById("bpeStepNext"),
-  bpeStepReset: document.getElementById("bpeStepReset")
+  algorithmSteppers: Array.from(document.querySelectorAll("[data-algorithm-stepper]"))
 };
 
 const state = {
@@ -112,52 +107,132 @@ const state = {
   wordTokens: [],
   tokenizerModels: null,
   hasExploredBoundary: false,
-  bpeStep: -1,
-  bpeStepPlaying: false
+  hasComparedAlgorithms: false,
+  comparisonStale: false,
+  comparisonSnapshot: null,
+  algorithmSteps: { bpe: 0, wordpiece: 0, unigram: 0 }
 };
 
-let bpeStepTimer = null;
-
-const bpeReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-const bpeLessonSteps = [
-  {
-    title: "1. Start from the byte pieces",
-    description: "For readable ASCII, each letter below is exactly one UTF-8 byte.",
-    rows: [
-      ["hug ×10", ["h", "u", "g"]],
-      ["pug ×5", ["p", "u", "g"]],
-      ["pun ×12", ["p", "u", "n"]],
-      ["bun ×4", ["b", "u", "n"]],
-      ["hugs ×5", ["h", "u", "g", "s"]]
-    ]
-  },
-  {
-    title: "2. Count every adjacent pair",
-    description: "The count comes from the whole weighted toy corpus.",
-    counts: [["ug", 20], ["pu", 17], ["un", 16], ["hu", 15], ["gs", 5]]
-  },
-  {
-    title: "3. Choose the winner",
-    description: "BPE asks only for the largest raw count, so u + g wins with 20.",
-    winner: "u + g → ug"
-  },
-  {
-    title: "4. Mint token 256 and replace it",
-    description: "The new token is used everywhere the winning pair appears.",
-    rows: [
-      ["hug", ["h", "ug"]],
-      ["pug", ["p", "ug"]],
-      ["hugs", ["h", "ug", "s"]]
-    ],
-    winner: "token 256 = ug"
-  },
-  {
-    title: "5. Freeze the merge list",
-    description: "At runtime, the encoder does not recount your prompt. It replays the learned rule and emits token IDs.",
-    rows: [["new prompt: pug", ["p", "ug"]]],
-    winner: "replay u + g → ug → IDs [112, 256]"
-  }
+const toyCorpusRows = [
+  ["hug ×10", ["h", "u", "g"]],
+  ["pug ×5", ["p", "u", "g"]],
+  ["pun ×12", ["p", "u", "n"]],
+  ["bun ×4", ["b", "u", "n"]],
+  ["hugs ×5", ["h", "u", "g", "s"]]
 ];
+
+const algorithmLessonSteps = {
+  bpe: [
+    {
+      title: "1. Start from the byte pieces",
+      nextLabel: "Next: count pairs",
+      description: "For readable ASCII, each letter below is exactly one UTF-8 byte.",
+      rows: toyCorpusRows
+    },
+    {
+      title: "2. Count every adjacent pair",
+      nextLabel: "Next: choose the winner",
+      description: "The counts come from the whole weighted toy corpus.",
+      counts: [["u + g", "20"], ["p + u", "17"], ["u + n", "16"], ["h + u", "15"], ["g + s", "5"], ["b + u", "4"]],
+      highlight: 0
+    },
+    {
+      title: "3. Choose the largest raw count",
+      nextLabel: "Next: update the corpus",
+      description: "BPE asks only which adjacent pair appears most often.",
+      winner: "u + g wins with 20 appearances"
+    },
+    {
+      title: "4. Mint token 256 and replace it",
+      nextLabel: "Next: encode hugs",
+      description: "The new piece replaces the winning pair everywhere it occurs.",
+      rows: [["hug", ["h", "ug"]], ["pug", ["p", "ug"]], ["hugs", ["h", "ug", "s"]]],
+      winner: "token 256 = ug"
+    },
+    {
+      title: "5. Apply the frozen merge to hugs",
+      description: "The runtime encoder replays the learned rule. It does not recount the new text.",
+      rows: [["hugs", ["h", "ug", "s"]]],
+      winner: "hugs → h | ug | s"
+    }
+  ],
+  wordpiece: [
+    {
+      title: "1. Start from position-aware pieces",
+      nextLabel: "Next: count pieces",
+      description: "The first character is bare; later characters carry ## to mark continuation positions.",
+      rows: [
+        ["hug ×10", ["h", "##u", "##g"]],
+        ["pug ×5", ["p", "##u", "##g"]],
+        ["pun ×12", ["p", "##u", "##n"]],
+        ["bun ×4", ["b", "##u", "##n"]],
+        ["hugs ×5", ["h", "##u", "##g", "##s"]]
+      ]
+    },
+    {
+      title: "2. Count pieces and adjacent pairs",
+      nextLabel: "Next: score pairs",
+      description: "The association score needs both the pair count and each piece's count.",
+      counts: [["##u + ##g", "pair 20"], ["##g + ##s", "pair 5"], ["##u", "piece 36"], ["##g", "piece 20"], ["##s", "piece 5"]]
+    },
+    {
+      title: "3. Compare association scores",
+      nextLabel: "Next: update the vocabulary",
+      description: "A less frequent pair can win when its pieces are unusually attached.",
+      counts: [["Score(##u, ##g)", "20 / (36 × 20) = 1/36"], ["Score(##g, ##s)", "5 / (20 × 5) = 1/20"]],
+      highlight: 1,
+      winner: "1/20 > 1/36, so ##g + ##s wins"
+    },
+    {
+      title: "4. Add ##gs to the final vocabulary",
+      nextLabel: "Next: encode hugs",
+      description: "Training builds a vocabulary; it does not create a merge list for runtime replay.",
+      rows: [["new piece", ["##gs"]], ["available path", ["h", "##u", "##gs"]]],
+      winner: "vocabulary gains ##gs"
+    },
+    {
+      title: "5. Greedily encode hugs",
+      description: "Runtime takes the longest valid vocabulary piece from left to right inside the span.",
+      rows: [["hugs", ["h", "##u", "##gs"]]],
+      winner: "hugs → h | ##u | ##gs"
+    }
+  ],
+  unigram: [
+    {
+      title: "1. Start from learned piece probabilities",
+      nextLabel: "Next: calculate costs",
+      description: "Pretend training has finished. This illustrative probability table is the frozen model output that encoding will use.",
+      counts: [["h", "P=.12"], ["u", "P=.10"], ["g", "P=.11"], ["s", "P=.08"], ["hu", "P=.14"], ["ug", "P=.16"], ["hug", "P=.20"], ["hugs", "P=.01"], ["other pieces", "P=.08 total"]]
+    },
+    {
+      title: "2. Turn each learned probability into a cost",
+      nextLabel: "Next: price complete routes",
+      description: "Apply cost(piece) = -ln P(piece). The natural log turns multiplied piece probabilities into costs we can add.",
+      counts: [["h", "P=.12 → cost 2.12"], ["u", "P=.10 → cost 2.30"], ["g", "P=.11 → cost 2.21"], ["s", "P=.08 → cost 2.53"], ["hu", "P=.14 → cost 1.97"], ["ug", "P=.16 → cost 1.83"], ["hug", "P=.20 → cost 1.61"], ["hugs", "P=.01 → cost 4.61"]]
+    },
+    {
+      title: "3. Add route costs and choose the minimum",
+      nextLabel: "Next: prune the menu",
+      description: "Every route must cover all of hugs. Dynamic programming finds the minimum without enumerating every route on long text.",
+      counts: [["[h][u][g][s]", "9.16"], ["[hu][g][s]", "6.70"], ["[h][ug][s]", "6.48"], ["[hug][s]", "4.14"], ["[hugs]", "4.61"]],
+      highlight: 3,
+      winner: "[hug][s] wins: 1.61 + 2.53 ≈ 4.14"
+    },
+    {
+      title: "4. Keep useful pieces and prune weak ones",
+      nextLabel: "Next: encode hugs",
+      description: "During training, useful pieces keep stronger probabilities; weak candidates are lowered and eventually removed.",
+      rows: [["kept", ["h", "u", "g", "s", "hug"]], ["weak here", ["hugs"]]],
+      winner: "training updates probabilities, then repeats"
+    },
+    {
+      title: "5. Encode with the frozen probabilities",
+      description: "Runtime prices the available routes with the learned probabilities and chooses the cheapest full path.",
+      rows: [["hugs", ["hug", "s"]]],
+      winner: "hugs → hug | s"
+    }
+  ]
+};
 
 // --- tokenization helpers ---
 
@@ -232,6 +307,7 @@ function setActiveCorpus(id) {
   if (dom.corpusSelect) dom.corpusSelect.value = id;
   if (dom.buildCorpusSelect) dom.buildCorpusSelect.value = id;
   prepareCorpus();
+  if (state.hasComparedAlgorithms) state.comparisonStale = true;
   renderCorpusPreview();
   renderTokenizers();
   renderEdges();
@@ -292,7 +368,9 @@ function encodeBpe(text, model) {
 // pieces appear together more than their individual frequencies would predict, so
 // WordPiece's first merges genuinely differ from BPE's.
 function trainWordPieceModel(text, targetPieces) {
-  let sequences = wordTokensOnly(text).slice(0, 7000).map((word) => Array.from(word));
+  let sequences = wordTokensOnly(text).slice(0, 7000).map((word) => (
+    Array.from(word).map((char, index) => (index === 0 ? char : `##${char}`))
+  ));
   const basePieces = new Set(sequences.flat());
   const merges = [];
   const mergeLimit = Math.max(0, Math.min(160, Number(targetPieces) - basePieces.size));
@@ -316,13 +394,14 @@ function trainWordPieceModel(text, targetPieces) {
       }
     });
     if (!best) break;
-    const merged = `${best.left}${best.right}`;
-    merges.push({ left: best.left, right: best.right, merged, pair: `${best.left} + ${best.right} -> ${merged}`, count: best.count });
+    const prefix = best.left.startsWith("##") ? "##" : "";
+    const merged = `${prefix}${best.left.replace(/^##/, "")}${best.right.replace(/^##/, "")}`;
+    merges.push({ left: best.left, right: best.right, merged, pair: `${best.left} + ${best.right} -> ${merged}`, count: best.count, score: best.score });
     sequences = sequences.map((sequence) => mergePair(sequence, best.left, best.right, merged));
   }
   const vocab = new Set(["[UNK]"]);
-  basePieces.forEach((piece) => { vocab.add(piece); vocab.add(`##${piece}`); });
-  merges.forEach((merge) => { vocab.add(merge.merged); vocab.add(`##${merge.merged}`); });
+  basePieces.forEach((piece) => vocab.add(piece));
+  merges.forEach((merge) => vocab.add(merge.merged));
   return { vocab, merges };
 }
 
@@ -380,10 +459,11 @@ function viterbiSegment(chars, probs, maxLen = 8) {
   return pieces;
 }
 
-// SentencePiece-style Unigram LM: start from a big candidate set, then repeatedly
-// re-segment the corpus (Viterbi) and prune the least-used pieces until the vocabulary
-// reaches the target size. Single characters are always kept so every word stays
-// encodable, which is the whole point of "prune pieces whose removal barely hurts."
+// Controlled Unigram LM: a hard best-route approximation of full EM. Start from a
+// large candidate set, Viterbi-segment each word using only its single best route,
+// normalize the resulting piece counts, and prune the least-used pieces toward the
+// target size. Full EM would distribute expected counts across all plausible routes.
+// Single characters are always kept so every word stays encodable.
 function trainUnigramModel(text, targetPieces) {
   const words = wordTokensOnly(text).slice(0, 5000).map((word) => Array.from(word));
   const singles = new Set();
@@ -474,21 +554,21 @@ function ensureTokenizerModels() {
 
 function encodeAlgo(algorithm, text) {
   const models = ensureTokenizerModels();
-  if (algorithm === "bpe") return { tokens: encodeBpe(text, models.bpe), steps: models.bpe.merges, label: "BPE" };
-  if (algorithm === "wordpiece") return { tokens: encodeWordPiece(text, models.wordpiece), steps: models.wordpiece.merges, label: "WordPiece" };
+  if (algorithm === "bpe") return { tokens: encodeBpe(text, models.bpe), steps: models.bpe.merges, label: "Character BPE (controlled)" };
+  if (algorithm === "wordpiece") return { tokens: encodeWordPiece(text, models.wordpiece), steps: models.wordpiece.merges, label: "WordPiece (controlled)" };
   if (algorithm === "unigram") {
     const steps = Array.from(models.unigram.probs.entries())
       .filter(([piece]) => piece.length > 1)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 12)
       .map(([piece, prob]) => ({ pair: piece, detail: `p=${(prob * 100).toFixed(2)}%` }));
-    return { tokens: encodeUnigram(text, models.unigram), steps, label: "SentencePiece-style Unigram LM" };
+    return { tokens: encodeUnigram(text, models.unigram), steps, label: "Unigram LM (controlled)" };
   }
-  return { tokens: byteTokens(text), steps: [], label: "Byte-level UTF-8" };
+  return { tokens: byteTokens(text), steps: [], label: "UTF-8 bytes (reference)" };
 }
 
 function encodeWithCurrentAlgorithm(text) {
-  return encodeAlgo(dom.tokenizerAlgorithmSelect.value || "bpe", text);
+  return encodeAlgo("bpe", text);
 }
 
 function compareAlgorithms(text) {
@@ -500,7 +580,7 @@ function compareAlgorithms(text) {
 
 function renderTokenizers() {
   renderBoundaryComparison();
-  renderAlgorithm();
+  renderAlgorithmComparison();
 }
 
 function renderBoundaryComparison() {
@@ -537,37 +617,154 @@ function renderBoundaryComparison() {
   });
 }
 
-function renderAlgorithm() {
+function createComparisonSnapshot(text) {
+  const models = ensureTokenizerModels();
+  const unigramArtifacts = Array.from(models.unigram.probs.entries())
+    .filter(([piece]) => piece.length > 1)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([piece, probability]) => `${piece} · p=${(probability * 100).toFixed(2)}%`);
+  return {
+    text,
+    targetPieces: models.targetPieces,
+    corpusTitle: getActiveCorpus().title,
+    algorithms: [
+      {
+        key: "bpe",
+        name: "Character BPE",
+        rule: "Merge the adjacent pair with the largest raw count.",
+        artifacts: models.bpe.merges.slice(0, 5).map((merge) => `${merge.pair} · x${formatNumber(merge.count)}`),
+        tokens: encodeBpe(text, models.bpe),
+        explanation: "Frequent neighbors become longer pieces; runtime replays the frozen merge order."
+      },
+      {
+        key: "wordpiece",
+        name: "WordPiece",
+        rule: "Add the position-aware pair with the largest association score.",
+        artifacts: models.wordpiece.merges.slice(0, 5).map((merge) => `${merge.pair} · score ${merge.score.toPrecision(3)} · x${formatNumber(merge.count)}`),
+        tokens: encodeWordPiece(text, models.wordpiece),
+        explanation: "The final vocabulary is searched greedily from left to right; training merges are not replayed."
+      },
+      {
+        key: "unigram",
+        name: "Unigram LM",
+        rule: "Keep a scored piece menu and prune candidates that add the least value.",
+        artifacts: unigramArtifacts,
+        tokens: encodeUnigram(text, models.unigram),
+        explanation: "Runtime chooses the lowest-surprise complete route through the surviving pieces."
+      }
+    ],
+    bytes: byteTokens(text)
+  };
+}
+
+function appendArtifactList(container, artifacts) {
+  const list = document.createElement("div");
+  list.className = "comparison-artifacts";
+  artifacts.forEach((artifact) => {
+    const code = document.createElement("code");
+    code.textContent = artifact;
+    list.append(code);
+  });
+  if (!artifacts.length) list.append(notice("This training run did not add a multi-character piece at the selected budget."));
+  container.append(list);
+}
+
+function renderAlgorithmComparison() {
   const targetPieces = Number(dom.tokenizerVocabSlider.value);
   dom.tokenizerVocabLabel.textContent = String(targetPieces);
   dom.tokenizerVocabLabel.value = String(targetPieces);
-  if (!dom.tokenizerAlgorithmSelect.value) {
-    dom.algorithmSummary.textContent = "choose an algorithm";
-    dom.algorithmTokens.replaceChildren(notice("Choose a tokenizer algorithm above to see how it splits the text."));
-    dom.tokenizerTrainingPanel.replaceChildren(notice("Choose an algorithm to see the merge or vocabulary steps it learns."));
+  if (!dom.tokenizerComparisonResults || !dom.byteReference || !dom.tokenizerCompareStatus) return;
+
+  if (!state.hasComparedAlgorithms || !state.comparisonSnapshot) {
+    dom.tokenizerCompareStatus.textContent = "not trained";
+    dom.tokenizerComparisonResults.classList.remove("is-stale");
+    dom.tokenizerComparisonResults.replaceChildren(notice("Press Train and compare to build BPE, WordPiece, and Unigram together."));
+    dom.byteReference.replaceChildren(notice("The UTF-8 byte reference will appear after training; it does not learn pieces."));
     return;
   }
-  const encoded = encodeWithCurrentAlgorithm(dom.buildTokenizerInput ? dom.buildTokenizerInput.value : dom.tokenizerInput.value);
-  dom.algorithmSummary.textContent = `${encoded.label} | ${encoded.tokens.length} tokens`;
-  renderTokenChips(dom.algorithmTokens, encoded.tokens);
-  dom.tokenizerTrainingPanel.replaceChildren();
-  if (!encoded.steps.length) {
-    const note = document.createElement("div");
-    note.className = "detail-row";
-    note.append(document.createTextNode("Byte-level encoding uses the UTF-8 bytes directly, so there are no learned merge steps."));
-    dom.tokenizerTrainingPanel.append(note);
-    return;
-  }
-  encoded.steps.slice(0, 12).forEach((step, index) => {
-    const row = document.createElement("div");
-    row.className = "merge-row";
-    const label = document.createElement("span");
-    label.textContent = `${index + 1}. ${step.pair}`;
-    const count = document.createElement("strong");
-    count.textContent = step.detail || `x${formatNumber(step.count || 0)}`;
-    row.append(label, count);
-    dom.tokenizerTrainingPanel.append(row);
+
+  const snapshot = state.comparisonSnapshot;
+  dom.tokenizerCompareStatus.textContent = state.comparisonStale
+    ? "settings changed · rerun"
+    : `trained · ${snapshot.targetPieces} pieces`;
+  dom.tokenizerComparisonResults.classList.toggle("is-stale", state.comparisonStale);
+  dom.tokenizerComparisonResults.replaceChildren();
+  snapshot.algorithms.forEach((algorithm) => {
+    const card = document.createElement("article");
+    card.className = `algorithm-result algorithm-result-${algorithm.key}`;
+    const heading = document.createElement("div");
+    heading.className = "section-title-row";
+    const title = document.createElement("h4");
+    title.textContent = algorithm.name;
+    const count = document.createElement("span");
+    count.className = "pill";
+    count.textContent = `${algorithm.tokens.length} tokens`;
+    heading.append(title, count);
+    const rule = document.createElement("p");
+    rule.className = "algorithm-rule";
+    rule.textContent = algorithm.rule;
+    const artifactLabel = document.createElement("strong");
+    artifactLabel.textContent = algorithm.key === "unigram" ? "Highest-probability surviving pieces" : "First learned decisions";
+    const tokenLabel = document.createElement("strong");
+    tokenLabel.textContent = "Encoded text";
+    const rail = document.createElement("div");
+    rail.className = "tokenizer-chip-rail compact-token-rail";
+    renderTokenChips(rail, algorithm.tokens);
+    const explanation = document.createElement("p");
+    explanation.className = "microcopy";
+    explanation.textContent = algorithm.explanation;
+    card.append(heading, rule, artifactLabel);
+    appendArtifactList(card, algorithm.artifacts);
+    card.append(tokenLabel, rail, explanation);
+    dom.tokenizerComparisonResults.append(card);
   });
+
+  dom.byteReference.replaceChildren();
+  const byteHeading = document.createElement("div");
+  byteHeading.className = "section-title-row";
+  const byteTitle = document.createElement("strong");
+  byteTitle.textContent = "UTF-8 bytes · reference only";
+  const byteCount = document.createElement("span");
+  byteCount.className = "pill";
+  byteCount.textContent = `${snapshot.bytes.length} bytes`;
+  byteHeading.append(byteTitle, byteCount);
+  const byteRail = document.createElement("div");
+  byteRail.className = "tokenizer-chip-rail compact-token-rail";
+  renderTokenChips(byteRail, snapshot.bytes);
+  const byteNote = document.createElement("p");
+  byteNote.className = "microcopy";
+  byteNote.textContent = "Bytes guarantee coverage but learn nothing, so they stay below the three trained rules rather than posing as a fourth algorithm.";
+  dom.byteReference.append(byteHeading, byteRail, byteNote);
+}
+
+async function runAlgorithmComparison() {
+  if (!dom.tokenizerCompareButton || !dom.buildTokenizerInput) return;
+  dom.tokenizerCompareButton.disabled = true;
+  dom.tokenizerCompareButton.textContent = "Training all three...";
+  dom.tokenizerCompareStatus.textContent = "training...";
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+  const startedAt = performance.now();
+  try {
+    state.comparisonSnapshot = createComparisonSnapshot(dom.buildTokenizerInput.value);
+    state.hasComparedAlgorithms = true;
+    state.comparisonStale = false;
+    renderAlgorithmComparison();
+    const elapsed = Math.max(1, Math.round(performance.now() - startedAt));
+    dom.tokenizerCompareStatus.textContent = `trained in ${elapsed} ms`;
+  } catch (error) {
+    dom.tokenizerCompareStatus.textContent = "training failed";
+    dom.tokenizerComparisonResults.replaceChildren(notice(`Training failed: ${error.message}`));
+  } finally {
+    dom.tokenizerCompareButton.disabled = false;
+    dom.tokenizerCompareButton.textContent = "Train and compare";
+  }
+}
+
+function markAlgorithmComparisonStale() {
+  if (!state.hasComparedAlgorithms) return;
+  state.comparisonStale = true;
+  renderAlgorithmComparison();
 }
 
 function renderTokenChips(container, tokens) {
@@ -745,7 +942,7 @@ function renderCodeResult(output, result) {
     visual.append(rail);
     appendResultTable(visual, ["merge", "count"], (result.firstMerges || []).map((row) => [row.merge, row.count]));
   } else if (result && typeof result.text === "string" && Array.isArray(result.results)) {
-    const labels = { bpe: "BPE", wordpiece: "WordPiece", unigram: "SentencePiece Unigram LM", byte: "Byte-level UTF-8" };
+    const labels = { bpe: "Character BPE (controlled)", wordpiece: "WordPiece (controlled)", unigram: "Unigram LM (controlled)", byte: "UTF-8 bytes (reference)" };
     const header = document.createElement("p");
     header.className = "output-status";
     header.textContent = `Splitting this text into pieces: \u201c${result.text}\u201d`;
@@ -851,66 +1048,59 @@ function populateCorpusSelect() {
   fillCorpusSelect(dom.buildCorpusSelect);
 }
 
-function stopBpeStepPlayback() {
-  if (bpeStepTimer) window.clearInterval(bpeStepTimer);
-  bpeStepTimer = null;
-  state.bpeStepPlaying = false;
-}
-
-function appendBpePieceRail(container, pieces) {
+function appendAlgorithmPieceRail(container, pieces) {
   const rail = document.createElement("div");
-  rail.className = "bpe-piece-rail";
+  rail.className = "algorithm-piece-rail";
   pieces.forEach((piece) => {
     const chip = document.createElement("span");
     chip.textContent = piece;
-    if (piece === "ug") chip.classList.add("is-merged");
+    if (piece.length > 1 && !piece.startsWith("##")) chip.classList.add("is-learned");
+    if (piece.startsWith("##")) chip.classList.add("is-continuation");
     rail.append(chip);
   });
   container.append(rail);
 }
 
-function renderBpeStep() {
-  if (!dom.bpeStepStage) return;
-  dom.bpeStepStage.replaceChildren();
+function renderAlgorithmStepper(root) {
+  const algorithm = root.dataset.algorithmStepper;
+  const steps = algorithmLessonSteps[algorithm];
+  const stage = root.querySelector("[data-stepper-stage]");
+  const status = root.querySelector("[data-stepper-status]");
+  const back = root.querySelector("[data-stepper-back]");
+  const next = root.querySelector("[data-stepper-next]");
+  if (!steps || !stage || !status || !back || !next) return;
 
-  if (state.bpeStep < 0) {
-    dom.bpeStepStage.append(notice("Press Start or Next to begin with the byte pieces."));
-    dom.bpeStepStatus.textContent = "not started";
-    dom.bpeStepBack.disabled = true;
-    dom.bpeStepNext.disabled = false;
-    dom.bpeStepPlay.textContent = "Start";
-    return;
-  }
-
-  const step = bpeLessonSteps[state.bpeStep];
+  const currentIndex = clamp(state.algorithmSteps[algorithm] || 0, 0, steps.length - 1);
+  const step = steps[currentIndex];
+  stage.replaceChildren();
   const heading = document.createElement("p");
   heading.className = "sequence-beat";
   heading.textContent = step.title;
   const description = document.createElement("p");
   description.className = "sequence-description";
   description.textContent = step.description;
-  dom.bpeStepStage.append(heading, description);
+  stage.append(heading, description);
 
   if (Array.isArray(step.rows)) {
     const rows = document.createElement("div");
-    rows.className = "bpe-corpus-rows";
+    rows.className = "algorithm-corpus-rows";
     step.rows.forEach(([label, pieces]) => {
       const row = document.createElement("div");
       const strong = document.createElement("strong");
       strong.textContent = label;
       row.append(strong);
-      appendBpePieceRail(row, pieces);
+      appendAlgorithmPieceRail(row, pieces);
       rows.append(row);
     });
-    dom.bpeStepStage.append(rows);
+    stage.append(rows);
   }
 
   if (Array.isArray(step.counts)) {
     const counts = document.createElement("div");
-    counts.className = "bpe-count-grid";
+    counts.className = "algorithm-metric-grid";
     step.counts.forEach(([pair, count], index) => {
       const item = document.createElement("div");
-      if (index === 0) item.classList.add("is-winner");
+      if (index === step.highlight) item.classList.add("is-winner");
       const code = document.createElement("code");
       const strong = document.createElement("strong");
       code.textContent = pair;
@@ -918,66 +1108,46 @@ function renderBpeStep() {
       item.append(code, strong);
       counts.append(item);
     });
-    dom.bpeStepStage.append(counts);
+    stage.append(counts);
   }
 
   if (step.winner) {
     const winner = document.createElement("div");
-    winner.className = "bpe-winner";
+    winner.className = "algorithm-winner";
     winner.textContent = step.winner;
-    dom.bpeStepStage.append(winner);
+    stage.append(winner);
   }
 
   const progress = document.createElement("div");
   progress.className = "sequence-progress";
-  bpeLessonSteps.forEach((_, index) => {
+  steps.forEach((_, index) => {
     const marker = document.createElement("span");
-    if (index < state.bpeStep) marker.classList.add("is-complete");
-    if (index === state.bpeStep) {
+    if (index < currentIndex) marker.classList.add("is-complete");
+    if (index === currentIndex) {
       marker.classList.add("is-current");
       marker.setAttribute("aria-current", "step");
     }
     marker.textContent = String(index + 1);
     progress.append(marker);
   });
-  dom.bpeStepStage.append(progress);
+  stage.append(progress);
 
-  dom.bpeStepStatus.textContent = `step ${state.bpeStep + 1} of ${bpeLessonSteps.length}`;
-  dom.bpeStepBack.disabled = state.bpeStep === 0;
-  dom.bpeStepNext.disabled = state.bpeStep === bpeLessonSteps.length - 1;
-  dom.bpeStepPlay.textContent = state.bpeStepPlaying ? "Pause" : "Play";
+  status.textContent = `step ${currentIndex + 1} of ${steps.length}`;
+  back.disabled = currentIndex === 0;
+  next.disabled = currentIndex === steps.length - 1;
+  next.textContent = step.nextLabel || "Complete";
 }
 
-function stepBpeLesson(direction) {
-  stopBpeStepPlayback();
-  if (state.bpeStep < 0 && direction > 0) state.bpeStep = 0;
-  else state.bpeStep = clamp(state.bpeStep + direction, 0, bpeLessonSteps.length - 1);
-  renderBpeStep();
+function renderAlgorithmSteppers() {
+  dom.algorithmSteppers.forEach((root) => renderAlgorithmStepper(root));
 }
 
-function playBpeLesson() {
-  if (state.bpeStepPlaying) {
-    stopBpeStepPlayback();
-    renderBpeStep();
-    return;
-  }
-  if (bpeReducedMotion.matches) {
-    state.bpeStep = bpeLessonSteps.length - 1;
-    renderBpeStep();
-    return;
-  }
-  if (state.bpeStep < 0 || state.bpeStep === bpeLessonSteps.length - 1) state.bpeStep = 0;
-  state.bpeStepPlaying = true;
-  renderBpeStep();
-  bpeStepTimer = window.setInterval(() => {
-    if (state.bpeStep >= bpeLessonSteps.length - 1) {
-      stopBpeStepPlayback();
-      renderBpeStep();
-      return;
-    }
-    state.bpeStep += 1;
-    renderBpeStep();
-  }, 1500);
+function stepAlgorithmLesson(root, direction) {
+  const algorithm = root.dataset.algorithmStepper;
+  const steps = algorithmLessonSteps[algorithm];
+  if (!steps) return;
+  state.algorithmSteps[algorithm] = clamp((state.algorithmSteps[algorithm] || 0) + direction, 0, steps.length - 1);
+  renderAlgorithmStepper(root);
 }
 
 function wireEvents() {
@@ -998,28 +1168,31 @@ function wireEvents() {
     });
   }
   if (dom.buildTokenizerInput) {
-    dom.buildTokenizerInput.addEventListener("input", () => renderAlgorithm());
-  }
-  dom.tokenizerAlgorithmSelect.addEventListener("change", () => {
-    renderAlgorithm();
-    renderEdges();
-  });
-  dom.tokenizerVocabSlider.addEventListener("input", () => {
-    state.tokenizerModels = null;
-    renderTokenizers();
-    renderEdges();
-  });
-  dom.edgeCaseSelect.addEventListener("change", () => renderEdges());
-  if (dom.bpeStepStage) {
-    dom.bpeStepBack.addEventListener("click", () => stepBpeLesson(-1));
-    dom.bpeStepNext.addEventListener("click", () => stepBpeLesson(1));
-    dom.bpeStepPlay.addEventListener("click", () => playBpeLesson());
-    dom.bpeStepReset.addEventListener("click", () => {
-      stopBpeStepPlayback();
-      state.bpeStep = -1;
-      renderBpeStep();
+    dom.buildTokenizerInput.addEventListener("input", () => {
+      if (!state.hasComparedAlgorithms || state.comparisonStale || !state.tokenizerModels) return;
+      state.comparisonSnapshot = createComparisonSnapshot(dom.buildTokenizerInput.value);
+      renderAlgorithmComparison();
     });
   }
+  if (dom.tokenizerCompareButton) {
+    dom.tokenizerCompareButton.addEventListener("click", () => runAlgorithmComparison());
+  }
+  dom.tokenizerVocabSlider.addEventListener("input", () => {
+    dom.tokenizerVocabLabel.textContent = dom.tokenizerVocabSlider.value;
+    dom.tokenizerVocabLabel.value = dom.tokenizerVocabSlider.value;
+    state.tokenizerModels = null;
+    markAlgorithmComparisonStale();
+  });
+  dom.edgeCaseSelect.addEventListener("change", () => renderEdges());
+  dom.algorithmSteppers.forEach((root) => {
+    const algorithm = root.dataset.algorithmStepper;
+    root.querySelector("[data-stepper-back]")?.addEventListener("click", () => stepAlgorithmLesson(root, -1));
+    root.querySelector("[data-stepper-next]")?.addEventListener("click", () => stepAlgorithmLesson(root, 1));
+    root.querySelector("[data-stepper-reset]")?.addEventListener("click", () => {
+      state.algorithmSteps[algorithm] = 0;
+      renderAlgorithmStepper(root);
+    });
+  });
   document.querySelectorAll(".chapter-code-cell .run-button").forEach((button) => {
     button.addEventListener("click", () => runCodeCell(button.closest(".chapter-code-cell")));
   });
@@ -1050,7 +1223,7 @@ function init() {
   wireEvents();
   renderTokenizers();
   renderEdges();
-  renderBpeStep();
+  renderAlgorithmSteppers();
   setupSectionSpy();
 }
 

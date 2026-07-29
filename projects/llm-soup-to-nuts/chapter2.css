@@ -541,6 +541,245 @@
   font-size: 0.82rem;
 }
 
+#build .workbook-trace {
+  margin-bottom: 14px;
+}
+
+#build .algorithm-stepper {
+  margin: 16px 0;
+}
+
+#build .algorithm-step-stage {
+  min-height: 342px;
+}
+
+#build .manual-stepper-buttons {
+  display: grid;
+  grid-template-columns: minmax(84px, 0.65fr) minmax(84px, 0.65fr) minmax(180px, 1.7fr);
+  gap: 7px;
+}
+
+#build .manual-stepper-buttons button {
+  width: 100%;
+  min-width: 0;
+}
+
+#build .algorithm-piece-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+#build .algorithm-piece-rail span {
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.84rem;
+}
+
+#build .algorithm-piece-rail .is-learned,
+#build .algorithm-piece-rail .is-continuation {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-weight: 850;
+}
+
+#build .algorithm-piece-rail .is-continuation {
+  border-color: #e5b58e;
+}
+
+#build .algorithm-corpus-rows {
+  display: grid;
+  gap: 8px;
+}
+
+#build .algorithm-corpus-rows > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+#build .algorithm-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 8px;
+}
+
+#build .algorithm-metric-grid > div {
+  display: grid;
+  min-height: 78px;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  text-align: center;
+}
+
+#build .algorithm-metric-grid code {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+#build .algorithm-metric-grid strong {
+  color: var(--teal);
+}
+
+#build .algorithm-metric-grid .is-winner {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+#build .algorithm-winner {
+  margin-top: 13px;
+  padding: 11px 13px;
+  border: 1px solid var(--teal);
+  border-radius: 9px;
+  background: var(--teal-soft);
+  color: var(--ink);
+  font-weight: 850;
+  text-align: center;
+}
+
+#build .workbook-capstone {
+  margin: 24px 0 18px;
+}
+
+#build .workbook-capstone > .section-title-row {
+  align-items: end;
+  margin-bottom: 8px;
+}
+
+#build .workbook-capstone .eyebrow,
+#build .workbook-capstone h3 {
+  margin-bottom: 0;
+}
+
+#build .capstone-controls {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+#build .capstone-controls .range-row {
+  grid-template-columns: auto minmax(100px, 1fr) 48px;
+}
+
+#build .corpus-preview {
+  max-height: 150px;
+  margin: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+#build .compact-capstone-input {
+  min-height: 84px;
+}
+
+#build #tokenizerCompareButton {
+  justify-self: start;
+  min-width: 190px;
+}
+
+#build .algorithm-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  transition: opacity 160ms ease;
+}
+
+#build .algorithm-comparison-grid > .empty-state {
+  grid-column: 1 / -1;
+}
+
+#build .algorithm-comparison-grid.is-stale {
+  opacity: 0.55;
+}
+
+#build .algorithm-result {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--teal);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+#build .algorithm-result-wordpiece {
+  border-top-color: var(--coral);
+}
+
+#build .algorithm-result-unigram {
+  border-top-color: var(--gold);
+}
+
+#build .algorithm-result h4,
+#build .algorithm-result p {
+  margin: 0;
+}
+
+#build .algorithm-rule {
+  min-height: 66px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+#build .comparison-artifacts {
+  display: grid;
+  gap: 5px;
+  min-height: 126px;
+}
+
+#build .comparison-artifacts code {
+  display: block;
+  padding: 5px 7px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+#build .compact-token-rail {
+  min-height: 128px;
+  max-height: 220px;
+}
+
+#build .byte-reference {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px dashed #a9bfbd;
+  border-radius: 8px;
+  background: #edf8f6;
+}
+
+#build .byte-reference .empty-state {
+  min-height: 84px;
+}
+
+#build .decoding-epilogue {
+  margin-top: 18px;
+}
+
 .edge-sample {
   min-height: 120px;
   max-height: 220px;
@@ -585,6 +824,15 @@
   .chapter2-trainer .control-grid {
     grid-template-columns: 1fr;
   }
+
+  #build .algorithm-comparison-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #build .algorithm-rule,
+  #build .comparison-artifacts {
+    min-height: 0;
+  }
 }
 
 @media (max-width: 760px) {
@@ -604,6 +852,20 @@
 
   .real-map {
     min-height: 380px;
+  }
+
+  #build .algorithm-step-stage {
+    min-height: 390px;
+  }
+
+  #build .manual-stepper-buttons,
+  #build .algorithm-corpus-rows > div,
+  #build .capstone-controls .range-row {
+    grid-template-columns: 1fr;
+  }
+
+  #build #tokenizerCompareButton {
+    width: 100%;
   }
 }
 

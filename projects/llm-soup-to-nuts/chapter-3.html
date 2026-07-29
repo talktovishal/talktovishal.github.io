@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tokenization - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260726">
-  <link rel="stylesheet" href="chapter2.css?v=20260726">
+  <link rel="stylesheet" href="chapter2.css?v=20260728">
 </head>
 <body>
   <header class="topbar">
@@ -31,8 +31,8 @@
       <a href="#overview"><span>00</span>Overview</a>
       <a href="#why"><span>01</span>Why tokenization matters</a>
       <a href="#bytes"><span>02</span>Down to the bytes</a>
-      <a href="#algorithms"><span>03</span>Tokenizer algorithms</a>
-      <a href="#build"><span>04</span>Build the tokenizers</a>
+      <a href="#algorithms"><span>03</span>Tokenizer systems</a>
+      <a href="#build"><span>04</span>Build learning rules</a>
       <a href="#edges"><span>05</span>Why models break</a>
       <a href="#references"><span>06</span>Going deeper</a>
     </nav>
@@ -350,202 +350,102 @@
       </div>
     </section>
 
-    <section id="algorithms" class="band" aria-labelledby="algorithms-title"  frozen="yes">
+    <section id="algorithms" class="band" aria-labelledby="algorithms-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">3. Tokenizer algorithms</p>
-          <h2 id="algorithms-title">Let's dive in and become the expert :-).</h2>
+          <p class="eyebrow">3. Complete tokenizer systems</p>
+          <h2 id="algorithms-title">Four paths from raw text to tokens.</h2>
           <p>
-            Let's slow down to deeply understand the concepts. If this part feels fuzzy, and if it stays fuzzy a lot, then the understanding of how an LLM actually works will stay fuzzy too. To reiterate: a
-            tokenizer is a <em>separate</em> object from the language model. It
-            has its own training corpus, learns a vocabulary once, assigns integer IDs
-            to those pieces, and then freezes. Only after that does the giant neural
-            model train on the token IDs the tokenizer produces. The model does not get
-            to renegotiate the pieces later.
+            Let's slow down and get this right. If tokenization feels fuzzy, your understanding of how an LLM actually works will stay fuzzy, too. To reiterate: a tokenizer is a <em>separate</em> object from the language model. It has its own training corpus, learns a vocabulary once, assigns integer IDs to those pieces, and then freezes. The giant neural model only ever sees the integer IDs the tokenizer produces. It cannot renegotiate the pieces later.
           </p>
           <p>
-            That makes the tokenizer's choices matter: they decide how many tokens a
-            sentence costs, how much of your context window it eats, and whether a rare
-            word survives whole or shatters into fragments. Its job is also a budget
-            decision: which chunks of text
-            deserve their own row in the vocabulary? Make the chunks too big and the
-            vocabulary explodes. Make them too small and every sentence becomes a long,
-            expensive chain. Subword tokenization was invented to live in the middle.
+            This makes the tokenizer's choices critical: they decide how many tokens a sentence costs, how much of your context window is consumed, and whether a rare word survives intact or shatters into fragments. Its job is essentially a budget decision: which chunks of text deserve their own row in the vocabulary? Make the chunks too big, and the vocabulary explodes. Make them too small, and every sentence becomes a long, expensive chain. Subword tokenization was invented to live in the middle.
           </p>
           <div class="example-note">
             <strong>First, "word" is not a clean unit.</strong>
             <p>
-              Is <code>pool,</code> one word, or a word plus a comma? Is
-              <code>I'm</code> one word, or <code>I</code> plus <code>'m</code>?
-              Chinese, Japanese, and Thai do not always mark word boundaries with
-              spaces, and words like <code>longer</code> contain meaningful pieces
-              such as <code>long</code> and <code>-er</code>. So a tokenizer is never
-              merely "split on spaces"; it is choosing a boundary policy before the
-              model sees anything.
+              Is <code>pool,</code> one word, or a word plus a comma? Is <code>I'm</code> one word, or <code>I</code> plus <code>'m</code>? Chinese, Japanese, and Thai do not always mark word boundaries with spaces, and words like <code>longer</code> contain meaningful pieces such as <code>long</code> and <code>-er</code>. So a tokenizer is never merely "splitting on spaces"; it is actively choosing a boundary policy before the model sees anything.
             </p>
           </div>
-          <div style="overflow-x: auto;">
-            <table class="output-table">
-              <thead>
-                <tr>
-                  <th>Possible unit</th>
-                  <th>Why it is tempting</th>
-                  <th>What breaks</th>
-                  <th>How subwords use the good part</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><strong>Whole words</strong></td>
-                  <td>A 20-word sentence is about 20 tokens, which is short and readable.</td>
-                  <td>The vocabulary can climb toward 500k-1M entries. The embedding table has <code>V * d</code> learned numbers, and the output softmax must score all <code>V</code> choices. Rare words, typos, names, and new compounds fall into <code>[UNK]</code> unless they were memorized. They all get the same generic representation.</td>
-                  <td>Keep the efficiency of common whole words when they earn a vocabulary slot, but split rare words into familiar pieces.</td>
-                </tr>
-                <tr>
-                  <td><strong>Characters or bytes</strong></td>
-                  <td>The vocabulary is tiny: roughly 100 common characters, or exactly 256 UTF-8 byte values.</td>
-                  <td>Sequence length explodes. A 20-word sentence can become 120+ character tokens, which burns context window and makes attention's <code>T * T</code> table much larger. The model also has to rebuild meaning from tiny fragments.</td>
-                  <td>Keep the coverage idea: any text can still be spelled from small pieces, while common chunks collapse into shorter tokens.</td>
-                </tr>
-                <tr>
-                  <td><strong>Subwords</strong></td>
-                  <td>They are the compromise: common chunks like <code>do</code>, <code>n't</code>, <code>micro</code>, or <code>phobia</code> get their own IDs.</td>
-                  <td>The tokenizer has to learn which chunks are worth the limited vocabulary slots, and different algorithms make different choices.</td>
-                  <td>This is the compromise itself: a manageable vocabulary, which falls back to shorter sequences when needed, and no panic when a new word appears.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p class="microcopy">
-            To summarize, whole-word vocabularies also keep growing as you read more text. New
-            names, products, places, typos, and technical terms keep appearing; this
-            steady growth is the intuition behind Heaps' law (also called Herdan's
-            law). Subwords are attractive because they let the model reuse smaller
-            pieces instead of reserving a brand-new row for every new surface form.
+          <p>
+            We already felt the word-versus-byte tradeoff earlier. Now we can focus on the part that usually causes confusion: how four real tokenizer systems prepare text, learn pieces, and split new text in different ways.
           </p>
-          <p class="microcopy">
-            A useful summary number is the <strong>fertility rate</strong>: average
-            tokens per word. Treat it as a diagnostic, not a universal health score:
-            the useful range changes with the language, domain, boundary policy, and
-            job. A high rate can reveal a token tax. A very low rate may come from an
-            enormous vocabulary, which shifts the cost into parameters and output
-            scoring instead. Multilingual models often need larger vocabularies because
-            many scripts and word-building systems have to share the same budget.
-          </p>
-
-          <div class="code-quiz" data-quiz-type="predict" data-explain="Whole-word tokenization keeps sequences short, but the vocabulary gets huge. That means a huge embedding table and a huge output softmax, plus unknown-word trouble. Subwords are the middle ground.">
-            <p class="quiz-prompt">Quick check: if a tokenizer stores every unique word as its own token, what is the first big problem?</p>
-            <div class="quiz-options" role="group" aria-label="Whole word tokenizer problem">
-              <button class="quiz-option" type="button" data-feedback="Whole-word tokenization usually makes sequences shorter, not longer. The problem is the giant vocabulary and unknown words.">Every sentence becomes far too many tokens</button>
-              <button class="quiz-option" type="button" data-feedback="A whole-word tokenizer can read common words. It struggles with rare or unseen ones.">The model cannot read any common word</button>
-              <button class="quiz-option" type="button" data-correct="true">The vocabulary, embedding table, and output softmax become huge</button>
-            </div>
-            <p class="quiz-feedback" aria-live="polite" hidden></p>
-          </div>
           <div class="worked-example" aria-label="Tokenizer boundary policies and learning rules">
-            <h3>Separate the boundary policy from the learning rule.</h3>
+            <h3>First, separate the method from the software around it.</h3>
             <p>
-              Here is the distinction that trips up almost everyone, so let's nail it
-              down before going further: <strong>BPE</strong>,
-              <strong>WordPiece</strong>, and <strong>SentencePiece</strong> are not
-              three perfectly parallel things. BPE and WordPiece are vocabulary
-              learning rules. SentencePiece is a raw-text tokenizer system that can
-              train <em>either</em> a BPE model <em>or</em> a Unigram language-model
-              tokenizer. This is why papers and blog posts can sound slippery:
-              sometimes "SentencePiece" means the toolkit, and sometimes people use
-              it as shorthand for a SentencePiece Unigram model. So the better
-              question is not "BPE or SentencePiece?" It is:
-              <em>what does the tokenizer do before it learns pieces, and what rule
-              does it use to learn them?</em> That first job, how the raw text
-              is split and cleaned up before any pieces are learned, is called
-              the <strong>boundary policy</strong> (you will also see it called
-              pre-tokenization). The merge-or-score step that follows is the separate
-              <strong>learning rule</strong>.
+              Let's keep the names simple. <strong>BPE</strong>, <strong>WordPiece</strong>, and <strong>Unigram</strong> are three different <em>methods</em> for learning and using subword pieces. <strong>SentencePiece</strong> is <em>software</em> that can build a complete tokenizer using either the BPE method or the Unigram method. SentencePiece does <strong>not</strong> offer WordPiece as one of its methods. So <em>SentencePiece BPE</em> simply means: SentencePiece handles the raw text, spaces, and other setup, while BPE learns the pieces. A BERT WordPiece tokenizer follows a completely different path.
             </p>
-            <div class="math-note">
-              <strong>The Tokenizer System = Boundary Policy + Base Alphabet + Learning Rule + Runtime Encoder</strong>
-            </div>
-            <div class="formula-stack">
-              <code>GPT-style tokenizer system = regex chunks + UTF-8 bytes + BPE merges + replay merge list</code>
-              <code>WordPiece system = word + punctuation split + characters + association-score merges + longest-match</code>
-              <code>SentencePiece BPE system = raw text with visible spaces + BPE merges + replay merge list</code>
-              <code>SentencePiece Unigram system = raw text with visible spaces + scored pieces + Viterbi route</code>
-            </div>
+            <p>
+              Whichever complete system we choose, a finished tokenizer must answer the same four questions: <strong>How is the input prepared? What small pieces can it start or fall back to? How does it learn larger pieces? How does it split and rebuild text when we use it?</strong> We will ask those questions of each system in exactly that order.
+            </p>
           </div>
-            <figure class="intuition-figure">
-              <svg class="pipeline-svg" viewBox="0 0 920 350" role="img" aria-labelledby="front-door-title front-door-desc">
-                <title id="front-door-title">Different boundary policies before piece learning</title>
-                <desc id="front-door-desc">The same text can go through a GPT-style regex and byte-level path, a WordPiece (BERT-style) word and punctuation path, or a SentencePiece raw-text path before the vocabulary learning rule runs.</desc>
-                <defs>
-                  <marker id="front-door-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-                    <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
-                  </marker>
-                </defs>
-
-                <text x="32" y="34" class="svg-label">same raw text</text>
-                <rect x="24" y="50" width="230" height="48" rx="8" class="svg-box-soft"></rect>
-                <text x="139" y="80" class="svg-word" text-anchor="middle">Don't stop 123. 你好</text>
-
-                <line x1="256" y1="74" x2="304" y2="74" class="svg-arrow" marker-end="url(#front-door-arrow)"></line>
-
-                <text x="326" y="34" class="svg-label">boundary policy</text>
-                <rect x="314" y="50" width="248" height="72" rx="8" class="svg-box-soft"></rect>
-                <text x="338" y="78" class="svg-caption">GPT-style regex chunks</text>
-                <text x="338" y="104" class="svg-id">Don | 't | stop | 123 | . | 你好</text>
-
-                <rect x="314" y="142" width="248" height="72" rx="8" class="svg-box-soft"></rect>
-                <text x="338" y="170" class="svg-caption">WordPiece (BERT-style)</text>
-                <text x="338" y="196" class="svg-id" textLength="212" lengthAdjust="spacingAndGlyphs">don | ' | t | stop | 123 | . | 你 | 好</text>
-
-                <rect x="314" y="234" width="248" height="72" rx="8" class="svg-box-soft"></rect>
-                <text x="338" y="262" class="svg-caption">SentencePiece raw stream</text>
-                <text x="338" y="288" class="svg-id">▁Don't▁stop▁123.▁你好</text>
-
-                <line x1="566" y1="86" x2="616" y2="86" class="svg-arrow" marker-end="url(#front-door-arrow)"></line>
-                <line x1="566" y1="178" x2="616" y2="178" class="svg-arrow" marker-end="url(#front-door-arrow)"></line>
-                <line x1="566" y1="270" x2="616" y2="270" class="svg-arrow" marker-end="url(#front-door-arrow)"></line>
-
-                <text x="648" y="34" class="svg-label">learning rule</text>
-                <rect x="626" y="50" width="240" height="72" rx="8" class="svg-box-soft"></rect>
-                <text x="650" y="78" class="svg-caption">UTF-8 bytes + BPE merges</text>
-                <text x="650" y="104" class="svg-id">coverage for any Unicode string</text>
-
-                <rect x="626" y="142" width="240" height="72" rx="8" class="svg-box-soft"></rect>
-                <text x="650" y="170" class="svg-caption">WordPiece score + longest match</text>
-                <text x="650" y="196" class="svg-id">word starts + ##continuations</text>
-
-                <rect x="626" y="234" width="240" height="72" rx="8" class="svg-box-soft"></rect>
-                <text x="650" y="262" class="svg-caption">BPE or Unigram inside SentencePiece</text>
-                <text x="650" y="288" class="svg-id">spaces are learned pieces too</text>
-              </svg>
-              <figcaption>The confusing part is that the merge rule is only one layer. Thus, real tokenizers also choose a boundary policy: regex chunks, word/punctuation splitting, raw text with a visible space marker, and/or byte fallback.</figcaption>
-            </figure>
+          <div class="example-note">
+            <strong>One sentence, four complete paths.</strong>
             <p>
-              This is the place where WordPiece and SentencePiece part ways the most,
-              and it is worth slowing down for. <strong>WordPiece (the BERT-style
-              system) depends on a pre-tokenizer</strong>: a separate first pass
-              that splits the text into whole words by looking for spaces and
-              punctuation, and only then breaks each word into subwords
-              (<code>un</code> + <code>##friend</code> + <code>##ly</code>). The catch
-              is the hidden assumption that <em>spaces mark where words end</em>.
-              Languages like Chinese, Japanese, and Thai do not separate words with
-              spaces, so this path needs custom, language-specific rules just to prepare
-              the text, and because it discards spaces to find the word edges,
-              you cannot always rebuild the exact original string from the tokens. Hence, you need <strong>language-specific word breakers</strong> for these languages. That's a <strong>significant</strong> investment in maintaining and supporting these systems.
+              We will carry <code>playing cats!</code> through every system. To make the final cuts concrete, imagine each tokenizer has already trained on a corpus where pieces such as <code>play</code>, <code>ing</code>, <code>cat</code>, and <code>s</code> were highly useful. Real pieces depend on the training corpus; the path each system follows is the lesson here.
+            </p>
+          </div>
+
+            <h3>1. GPT-style byte BPE</h3>
+            <p>
+              A GPT-style tokenizer first uses a set of rules (regular expressions) to carve the text into isolated regions that BPE is not allowed to cross. For our example, a simplified view is <code>playing | &#9251;cats | !</code>, where <code>&#9251;</code> makes the leading space visible <em>in our notation</em>; it is not a special tokenizer character like SentencePiece's <code>&#9601;</code>. Each region is then converted to UTF-8 bytes. Because all 256 byte values are available from the start, any Unicode text can be represented without missing characters.
             </p>
             <p>
-              <strong>SentencePiece removes that first pass entirely.</strong> It feeds
-              the raw Unicode stream straight into the learning rule (BPE or Unigram)
-              and treats the space itself as an ordinary character, escaping it as the
-              visible marker <code>&#9601;</code> (U+2581). With nothing relying on
-              spaces to find word boundaries, the very same logic handles English,
-              Chinese, Python, and math notation with zero language-specific rules
-              (it is <strong>language-agnostic</strong>), and because the
-              space survives as a real token, the pieces merge back into the exact
-              original text, so decoding is <strong>lossless and reversible</strong>.
-              Bypassing language-specific pre-processing and making spaces ordinary
-              characters is the breakthrough that made SentencePiece the default
-              boundary policy for modern multilingual LLMs.
+              During tokenizer training, BPE repeatedly merges the most frequent adjacent pair and records the ordered merge rules. When new text arrives, the encoder starts from bytes and applies those learned rules in exact order. The final pieces map back to bytes, which decode to the original text.
+            </p>
+            <div class="formula-stack">
+              <code style="white-space: normal;">Input preparation: playing cats! -&gt; playing | &#9251;cats | ! -&gt; UTF-8 bytes</code>
+              <code style="white-space: normal;">Base and coverage: all 256 byte values; no unknown characters</code>
+              <code style="white-space: normal;">Learning: BPE repeatedly merges the most frequent adjacent pair and records the ordered merge rules</code>
+              <code style="white-space: normal;">Use: start from the base pieces and apply the learned BPE merge rules in order -&gt; play | ing | &#9251;cat | s | ! -&gt; decode bytes</code>
+            </div>
+
+            <h3>2. SentencePiece BPE</h3>
+            <p>
+              SentencePiece does not require a separate word splitter. It natively ingests raw text, applies its configured cleanup (normalization), and makes spaces visible as <code>&#9601;</code>. Our example becomes <code>&#9601;playing&#9601;cats!</code>. Its base vocabulary contains required Unicode characters; an optional byte fallback can be turned on to cover any character not in that base.
+            </p>
+            <p>
+              From there, this uses the <strong>same BPE method</strong> as the first path: it learns frequent adjacent-pair merges, records their order, and applies those rules to new text. Only the preparation around BPE has changed. Decoding simply joins the pieces and turns <code>&#9601;</code> back into standard spaces, reconstructing the normalized input.
+            </p>
+            <div class="formula-stack">
+              <code style="white-space: normal;">Input preparation: playing cats! -&gt; &#9601;playing&#9601;cats!</code>
+              <code style="white-space: normal;">Base and coverage: required Unicode characters; optional byte fallback</code>
+              <code style="white-space: normal;">Learning: BPE repeatedly merges the most frequent adjacent pair and records the ordered merge rules</code>
+              <code style="white-space: normal;">Use: start from the base pieces and apply the learned BPE merge rules in order -&gt; &#9601;play | ing | &#9601;cat | s | ! -&gt; decode normalized text</code>
+            </div>
+
+            <h3>3. BERT WordPiece</h3>
+            <p>
+              BERT first runs a <strong>BasicTokenizer</strong>: it cleans the text, applies the model's case and accent choices, separates punctuation, and creates spans. Our example becomes <code>playing | cats | !</code>. These spans act like fences, not guaranteed linguistic words. WordPiece may split words inside a fence, but it will never combine letters across two different spans.
+            </p>
+            <p>
+              In the standard teaching reconstruction, training starts a span such as <code>playing</code> as <code>p ##l ##a ##y ##i ##n ##g</code> and favors pairs with a strong association score. At runtime, it does not replay merge rules. Instead, it searches the final vocabulary from left to right and takes the longest valid piece at each position. If a complete path cannot be found, the entire span collapses into an unknown <code>[UNK]</code> token.
+            </p>
+            <div class="formula-stack">
+              <code style="white-space: normal;">Input preparation: playing cats! -&gt; playing | cats | !</code>
+              <code style="white-space: normal;">Base and coverage: first characters + ##continuations; [UNK] if a span has no complete path</code>
+              <code style="white-space: normal;">Learning: build a final vocabulary of start and continuation pieces</code>
+              <code style="white-space: normal;">Use: greedy longest-match inside each span -&gt; play | ##ing | cat | ##s | !</code>
+            </div>
+            <p class="microcopy">
+              The same BasicTokenizer treats scripts differently without running a full language-specific word breaker: <code>我喜欢猫。</code> becomes <code>我 | 喜 | 欢 | 猫 | 。</code>, while unspaced Thai such as <code>ฉันชอบแมว</code> is usually one long span whose success depends entirely on the learned vocabulary. Google released BERT's runtime tokenizer, but not its original trainer; the association-score rule used later in this chapter is the standard teaching reconstruction.
+            </p>
+
+            <h3>4. SentencePiece Unigram</h3>
+            <p>
+              This path begins with the exact same SentencePiece preparation as SentencePiece BPE: normalize the raw sentence and represent spaces with <code>&#9601;</code>. The difference begins at learning time. Unigram starts with a massive set of possible pieces, estimates a probability for each one, and prunes away the pieces that contribute the least value until it hits its target vocabulary size.
+            </p>
+            <p>
+              At runtime, all pieces that could theoretically cover the text form a web of possible routes. The encoder uses dynamic programming to choose the route with the lowest total "surprise" (the highest overall mathematical probability). It does not replay a BPE merge list, and it does not use WordPiece's greedy longest-match rule.
+            </p>
+            <div class="formula-stack">
+              <code style="white-space: normal;">Input preparation: playing cats! -&gt; &#9601;playing&#9601;cats!</code>
+              <code style="white-space: normal;">Base and coverage: a large seed set of characters and substrings; optional byte fallback</code>
+              <code style="white-space: normal;">Learning: estimate piece probabilities and prune pieces that add the least value</code>
+              <code style="white-space: normal;">Use: choose the lowest-surprise complete route -&gt; &#9601;playing | &#9601;cat | s | ! -&gt; decode normalized text</code>
+            </div>
+            <p>
+              That is the whole family. GPT-style byte BPE and SentencePiece BPE share the BPE algorithm but wrap it in different preparation and coverage choices. WordPiece uses a final vocabulary plus longest-match. SentencePiece Unigram uses scored alternatives plus a lowest-surprise route. Before the final side-by-side summary, the two optional notes trace where these systems came from and how current model families choose between them.
             </p>
             <details class="lesson-disclosure">
               <summary>Optional history: how these branches emerged</summary>
@@ -553,33 +453,20 @@
             <p>
               Let's see how these systems came to be.
               <a href="https://jacobfilipp.com/DrDobbs/articles/CUJ/1994/9402/gage/gage.htm" target="_blank" rel="noreferrer">Byte-pair encoding</a>
-              began back in 1994 as a data-compression trick: repeatedly fuse the most
-              common adjacent byte pair into a new symbol. Two decades later,
+              began back in 1994 as a data-compression trick: repeatedly fuse the most common adjacent byte pair into a new symbol. Two decades later,
               <a href="https://arxiv.org/abs/1508.07909" target="_blank" rel="noreferrer">Sennrich and colleagues</a>
-              reused that merge idea for machine translation, where a fixed vocabulary
-              keeps meeting rare names and compounds. Splitting them into
-              reusable subword pieces beats dropping them in an unknown bucket.
+              reused that merge idea for machine translation, where a fixed vocabulary keeps meeting rare names and compounds. Splitting them into reusable subword pieces beats dropping them into an unknown bucket.
               <a href="https://arxiv.org/abs/1609.08144" target="_blank" rel="noreferrer">Google's GNMT</a>
-              answered the same need with WordPiece, which favors pieces that are
-              distinctively paired rather than merely frequent, though it, like
-              BERT after it, still leaned on a <strong>language-specific</strong> pre-tokenizer to split
-              the words first. In 2018
+              answered the same need with WordPiece, which favors pieces that are distinctively paired rather than merely frequent, though it, like BERT after it, still segmented within boundaries prepared before the subword algorithm ran. In 2018,
               <a href="https://arxiv.org/abs/1808.06226" target="_blank" rel="noreferrer">SentencePiece</a>
-              dropped that assumption entirely, training straight from the raw
-              character stream (spaces kept as the visible marker <code>&#9601;</code>)
-              so space-free languages and mixed scripts can share one reversible
-              tokenizer with no custom pre-processing.
+              made that external word-boundary stage unnecessary: it trains directly from sentences after its own configurable normalization, with spaces kept as the visible marker <code>&#9601;</code>. Space-free languages and mixed scripts can therefore share one tokenizer without needing separate word segmentation software.
             </p>
             <p class="microcopy">
-              Now lets see why LLMs like
+              Now let's see why LLMs like
               <a href="https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf" target="_blank" rel="noreferrer">GPT-2</a>
-              start to leverage BPE. An open-ended web model has to give
-              <em>some</em> probability to <em>any</em> Unicode string, so it used
-              byte-level BPE: bytes guarantee coverage, BPE adds compression.
+              started to leverage BPE. An open-ended web model has to give <em>some</em> probability to <em>any</em> Unicode string, so it used byte-level BPE: bytes guarantee coverage, BPE adds compression.
               <a href="https://arxiv.org/abs/1810.04805" target="_blank" rel="noreferrer">BERT</a>'s
-              WordPiece fit a different job (distinctive subwords for masked-token
-              understanding), and SentencePiece fit yet another (raw multilingual text
-              with reversible spaces).
+              WordPiece fit a different job (distinctive subwords for masked-token understanding), and SentencePiece fit yet another (raw multilingual text with spaces represented in the model itself).
             </p>
             <p>
               This split is still how it works today.
@@ -587,150 +474,33 @@
               and <a href="https://arxiv.org/abs/2412.15115" target="_blank" rel="noreferrer">Qwen2.5</a>
               both use byte-level BPE with large (128K&ndash;150K) vocabularies, while
               <a href="https://ar5iv.labs.arxiv.org/html/2309.10305v4" target="_blank" rel="noreferrer">Baichuan 2</a>
-              runs BPE <em>inside</em> SentencePiece with UTF-8 byte fallback.
-              One more reminder that "SentencePiece BPE" is not a competitor to BPE,
-              just BPE trained in SentencePiece's raw-text machinery.
+              runs BPE <em>inside</em> SentencePiece with UTF-8 byte fallback. One more reminder that "SentencePiece BPE" is not a competitor to BPE, just BPE trained inside SentencePiece's raw-text machinery.
             </p>
               </div>
             </details>
-            <div style="overflow-x: auto;">
-              <table class="output-table">
-                <thead>
-                  <tr>
-                    <th>Tokenizer system</th>
-                    <th>Boundary policy before learning</th>
-                    <th>Vocabulary learning rule</th>
-                    <th>Runtime encoding</th>
-                    <th>Examples / why it fits</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong>GPT-style byte-level BPE</strong></td>
-                    <td>Split raw text into regex regions such as letters, numbers, punctuation, and whitespace. Convert to UTF-8 bytes.</td>
-                    <td>BPE: repeatedly merge the most frequent adjacent byte/token pair.</td>
-                    <td>Replay the learned merge list inside each allowed region.</td>
-                    <td>GPT-2, OpenAI tiktoken-style encodings, Qwen, DeepSeek-V3. The win is complete Unicode coverage plus compression.</td>
-                  </tr>
-                  <tr>
-                    <td><strong>WordPiece</strong></td>
-                    <td>Usually a basic tokenizer first: clean text, split punctuation, handle case/accent choices, and mark word starts vs continuations.</td>
-                    <td>WordPiece score: prefer pairs that co-occur more than their individual frequencies would predict.</td>
-                    <td>Greedy longest-match from left to right; continuation pieces usually get <code>##</code>. If no path exists, emit <code>[UNK]</code>.</td>
-                    <td>BERT and related encoder models. The win is stable, distinctive units for masked-token prediction.</td>
-                  </tr>
-                  <tr>
-                    <td><strong>SentencePiece BPE</strong></td>
-                    <td>No required external word tokenizer. Train from raw sentences; whitespace becomes a normal visible symbol such as <code>▁</code>. Normalization and byte fallback are configurable.</td>
-                    <td>BPE again: frequent adjacent pieces merge. The difference is the raw-text boundary policy, not the merge rule.</td>
-                    <td>Replay learned BPE merges over SentencePiece's pieces.</td>
-                    <td>LLaMA-style, Baichuan 2, InternLM-style tokenizers. The win is language-independent raw text plus BPE efficiency.</td>
-                  </tr>
-                  <tr>
-                    <td><strong>SentencePiece Unigram LM</strong></td>
-                    <td>Same raw-text SentencePiece boundary policy: spaces are part of the string, and languages without spaces do not need a separate word splitter.</td>
-                    <td>Unigram LM: start with many candidate pieces, estimate probabilities, prune pieces whose removal barely hurts the corpus.</td>
-                    <td>Lay possible pieces over the text as a lattice and choose the lowest-surprise route with dynamic programming.</td>
-                    <td>Useful when you want scored alternate segmentations and subword regularization. The win is probabilistic routing, not a merge list.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="code-quiz" data-quiz-type="predict" data-explain="SentencePiece is the raw-text tokenizer system. It can train a BPE model, so SentencePiece BPE means BPE merges running inside SentencePiece's spacing, normalization, and optional byte-fallback machinery.">
-              <p class="quiz-prompt">Quick check: what does <strong>SentencePiece BPE</strong> mean?</p>
-              <div class="quiz-options" role="group" aria-label="What SentencePiece BPE means">
-                <button class="quiz-option" type="button" data-correct="true">A BPE model trained inside the SentencePiece raw-text pipeline</button>
-                <button class="quiz-option" type="button" data-feedback="SentencePiece can run BPE. The phrase names the toolkit plus the BPE model type.">A completely different algorithm that replaced BPE</button>
-                <button class="quiz-option" type="button" data-feedback="SentencePiece can use Unigram LM, but SentencePiece BPE specifically means the BPE model type.">Always the Unigram LM tokenizer</button>
-              </div>
-              <p class="quiz-feedback" aria-live="polite" hidden></p>
-            </div>
             <details class="lesson-disclosure">
               <summary>Optional: how current model families make the tradeoff</summary>
               <div class="lesson-disclosure-body">
                 <p>
-                  Two of these systems now dominate many modern LLMs, so it is worth
-                  ending this section with the question every model builder actually
-                  faces: <strong>GPT-style byte-level BPE</strong> (OpenAI's
-                  <code>tiktoken</code>, encodings like <code>cl100k_base</code> and
-                  <code>o200k_base</code>) or <strong>SentencePiece</strong>? The honest
-                  answer is a tug-of-war between <em>multilingual purity</em> and
-                  <em>strict structural control</em> for math and code. But that is not
-                  the only axis: boundary policy, Unicode coverage, vocabulary size,
-                  compression on the actual training languages, and runtime packaging
-                  all pull on the decision. Following are the considerations:
+                  Two broad packaging styles appear often in modern LLMs, so it is worth asking how model builders choose between <strong>GPT-style byte-level BPE</strong> (OpenAI's <code>tiktoken</code>, encodings like <code>cl100k_base</code> and <code>o200k_base</code>) and a <strong>SentencePiece-based tokenizer</strong>. The honest answer is a tug-of-war between <em>multilingual purity</em> and <em>strict structural control</em> for math and code. But that is not the only axis: boundary policy, Unicode coverage, vocabulary size, compression on the actual training languages, and runtime packaging all pull on the decision. Following are the considerations:
                 </p>
                 <p>
                   <strong>1. Regex pre-splitting buys structural control.</strong>
-                  SentencePiece can train directly on raw text, without an external
-                  language-specific word splitter. In its BPE mode, it can therefore
-                  fuse whatever neighboring pieces are frequent and allowed by its
-                  learned representation: perhaps a comma near a word
-                  (<code>, The</code>), or a whole year such as <code>1999</code> or
-                  <code>2024</code>. GPT-style tokenizers often run a strict regex first
-                  (the pre-tokenization step we dissect in the next section), so BPE
-                  learns only inside the regions that regex creates. In particular,
-                  OpenAI's
+                  SentencePiece can train directly on raw text, without an external language-specific word splitter. In its BPE mode, it can therefore fuse whatever neighboring pieces are frequent and allowed by its learned representation: perhaps a comma near a word (<code>, The</code>), or a whole year such as <code>1999</code> or <code>2024</code>. GPT-style tokenizers often run a strict regex first (the pre-tokenization step we dissect in the next section), so BPE learns only inside the regions that regex creates. In particular, OpenAI's
                   <a href="https://github.com/openai/tiktoken/blob/main/tiktoken_ext/openai_public.py" target="_blank" rel="noreferrer"><i>cl100k_base</i> and <i>o200k_base</i> definitions</a>
-                  keep letters, punctuation, whitespace, and digits in deliberately
-                  shaped regions and group digits into one-to-three-digit runs. That
-                  consistency can be useful for <strong>math and code</strong>, where
-                  steady number and whitespace boundaries give the model more regular
-                  building blocks than a chaotic mix of lone digits and giant clumps.
-                  The one-to-three-digit rule is a documented property of those named
-                  encodings, not a rule every byte-level tokenizer must follow.
+                  keep letters, punctuation, whitespace, and digits in deliberately shaped regions and group digits into one-to-three-digit runs. That consistency can be useful for <strong>math and code</strong>, where steady number and whitespace boundaries give the model more regular building blocks than a chaotic mix of lone digits and giant clumps. The one-to-three-digit rule is a documented property of those named encodings, not a rule every byte-level tokenizer must follow.
                 </p>
                 <p>
-                  <strong>2. Bytes guarantee zero unknown characters.</strong> A
-                  character-based SentencePiece model without byte fallback starts
-                  from the Unicode characters covered during training, so a rare emoji
-                  or an unfamiliar script can fall through to an
-                  <code>&lt;unk&gt;</code> token and the model loses the original
-                  character. Modern SentencePiece can switch on byte fallback, so this
-                  is not an unavoidable SentencePiece weakness; it is a choice in the
-                  tokenizer configuration. GPT-style byte-level BPE converts everything
-                  to UTF-8 bytes <em>first</em>, with a base of exactly 256 byte values.
-                  So, as we saw down in the bytes section, every Unicode string has a
-                  byte representation and cannot hit an out-of-vocabulary
-                  <em>character</em>. This is why we have to compare complete tokenizer
-                  systems, not toolkit names alone.
+                  <strong>2. Bytes guarantee zero unknown characters.</strong> A character-based SentencePiece model without byte fallback starts from the Unicode characters covered during training, so a rare emoji or an unfamiliar script can fall through to an <code>&lt;unk&gt;</code> token and the model loses the original character. Modern SentencePiece can switch on byte fallback, so this is not an unavoidable SentencePiece weakness; it is a choice in the tokenizer configuration. GPT-style byte-level BPE converts everything to UTF-8 bytes <em>first</em>, with a base of exactly 256 byte values. So, as we saw down in the bytes section, every Unicode string has a byte representation and cannot hit an out-of-vocabulary <em>character</em>. This is why we have to compare complete tokenizer systems, not toolkit names alone.
                 </p>
                 <p>
-                  <strong>3. Raw text stays multilingual and
-                  self-contained.</strong> The same hand-designed regex that gives
-                  structural control is also a policy: its rules about spaces,
-                  punctuation, contractions, and digits can fit some languages and
-                  domains better than others. SentencePiece learns directly from raw
-                  sentences, treats whitespace as part of its representation, and does
-                  not require a language-specific word splitter. That made it a natural
-                  fit for systems such as T5 and the early Gemma tokenizers, and it
-                  remains attractive when many scripts and word-building systems have
-                  to share one vocabulary. It also commonly ships as a self-contained
-                  <code>.model</code> file, so an inference server can reproduce the
-                  exact normalization, vocabulary, and segmentation rules without
-                  separately re-matching an application regex.
+                  <strong>3. Raw text stays multilingual and self-contained.</strong> The same hand-designed regex that gives structural control is also a policy: its rules about spaces, punctuation, contractions, and digits can fit some languages and domains better than others. SentencePiece learns directly from raw sentences, treats whitespace as part of its representation, and does not require a language-specific word splitter. That made it a natural fit for systems such as T5 and the early Gemma tokenizers, and it remains attractive when many scripts and word-building systems have to share one vocabulary. It also commonly ships as a self-contained <code>.model</code> file, so an inference server can reproduce the exact normalization, vocabulary, and segmentation rules without separately re-matching an application regex.
                 </p>
                 <p>
-                  So which wins? For years SentencePiece was the open-source default:
-                  Llama 1 and 2 and T5 shipped SentencePiece-based systems, and Mistral
-                  documents Tokenizers V1, V2, and V3 as SentencePiece-based.
-                  Llama 3 then adopted a
-                  <code>tiktoken</code>-derived vocabulary:
+                  So which wins? For years SentencePiece was the open-source default: Llama 1 and 2 and T5 shipped SentencePiece-based systems, and Mistral documents Tokenizers V1, V2, and V3 as SentencePiece-based. Llama 3 then adopted a <code>tiktoken</code>-derived vocabulary:
                   <a href="https://arxiv.org/pdf/2407.21783" target="_blank" rel="noreferrer">Meta's Llama 3 report</a>
-                  documents 128K pieces—100K from the tiktoken3 tokenizer plus 28K
-                  added to better support non-English languages—and reports that its
-                  English sample improved from 3.17 to 3.94 characters per token
-                  compared with Llama 2. Mistral's naming needs extra care:
-                  <a href="https://docs.mistral.ai/resources/cookbooks/concept-deep-dive-tokenization-templates" target="_blank" rel="noreferrer">Tokenizer V3 remains SentencePiece, while V3-Tekken is the tiktoken-based branch</a>.
-                  Those sources document what shipped, the vocabulary sizes, and the
-                  measured compression. They do not say that one coding benchmark
-                  single-handedly caused the changes. The broader lesson is not that
-                  one family is simply better; it is that the tokenizer follows the
-                  job. SentencePiece is attractive when raw multilingual coverage and
-                  self-contained packaging lead. A regex-plus-byte design is attractive
-                  when explicit boundaries, complete byte coverage, and structural
-                  regularity lead. The actual winner still has to be measured on the
-                  languages and data the model will read.
+                  documents 128K pieces—100K from the tiktoken3 tokenizer plus 28K added to better support non-English languages—and reports that its English sample improved from 3.17 to 3.94 characters per token compared with Llama 2. Mistral's naming needs extra care:
+                  <a href="https://docs.mistral.ai/resources/cookbooks/concept-deep-dive-tokenization-templates" target="_blank" rel="noreferrer">Tokenizer V3 remains SentencePiece, while V3-Tekken is the tiktoken-based branch</a>. Those sources document what shipped, the vocabulary sizes, and the measured compression. They do not say that one coding benchmark single-handedly caused the changes. The broader lesson is not that one family is simply better; it is that the tokenizer follows the job. SentencePiece is attractive when raw multilingual coverage and self-contained packaging lead. A regex-plus-byte design is attractive when explicit boundaries, complete byte coverage, and structural regularity lead. The actual winner still has to be measured on the languages and data the model will read.
                 </p>
                 <div class="code-quiz" data-quiz-type="predict" data-explain="A tokenizer is the combination of boundary policy, base alphabet, vocabulary-learning rule, runtime encoder, and the corpus it learned from. Official reports can establish vocabulary size, compression, regex behavior, and which tokenizer shipped; they do not prove that one family is universally better or that one historical motive explains every design choice.">
                   <p class="quiz-prompt">Quick check: what is the safest way to compare two model families that chose different tokenizers?</p>
@@ -743,38 +513,97 @@
                 </div>
               </div>
             </details>
+            <div class="code-quiz" data-quiz-type="predict" data-explain="SentencePiece is software for a raw-text tokenizer pipeline. It can use the BPE method, so SentencePiece BPE means BPE merges running inside SentencePiece's spacing, normalization, and optional byte-fallback machinery.">
+              <p class="quiz-prompt">Quick check: what does <strong>SentencePiece BPE</strong> mean?</p>
+              <div class="quiz-options" role="group" aria-label="What SentencePiece BPE means">
+                <button class="quiz-option" type="button" data-correct="true">A BPE model trained inside the SentencePiece raw-text pipeline</button>
+                <button class="quiz-option" type="button" data-feedback="SentencePiece can run BPE. The phrase names the toolkit plus the BPE model type.">A completely different algorithm that replaced BPE</button>
+                <button class="quiz-option" type="button" data-feedback="SentencePiece can use Unigram LM, but SentencePiece BPE specifically means the BPE model type.">Always the Unigram LM tokenizer</button>
+              </div>
+              <p class="quiz-feedback" aria-live="polite" hidden></p>
+            </div>
+            <h3>Summary: ask the same four questions</h3>
+            <div style="overflow-x: auto;">
+              <table class="output-table">
+                <thead>
+                  <tr>
+                    <th>Tokenizer system</th>
+                    <th>Input preparation</th>
+                    <th>Base and coverage</th>
+                    <th>Learning</th>
+                    <th>Use on <code>playing cats!</code></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>GPT-style byte-level BPE</strong></td>
+                    <td>Make regex regions, then convert each region to UTF-8 bytes.</td>
+                    <td>All 256 byte values; every Unicode string is representable.</td>
+                    <td>BPE repeatedly merges the most frequent adjacent pair and records the ordered merge rules.</td>
+                    <td>Apply the learned BPE merge rules in order, then decode bytes: <code>play | ing | &#9251;cat | s | !</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>SentencePiece BPE</strong></td>
+                    <td>Normalize raw text and replace spaces with visible <code>&#9601;</code>.</td>
+                    <td>Required Unicode characters; optional byte fallback.</td>
+                    <td>BPE repeatedly merges the most frequent adjacent pair and records the ordered merge rules.</td>
+                    <td>Apply the learned BPE merge rules in order, then decode normalized text: <code>&#9601;play | ing | &#9601;cat | s | !</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>BERT WordPiece</strong></td>
+                    <td>BasicTokenizer cleans text and creates spans at whitespace and punctuation boundaries.</td>
+                    <td>First characters + <code>##</code> continuations; <code>[UNK]</code> if a span has no complete path.</td>
+                    <td>Build a final vocabulary of start and continuation pieces.</td>
+                    <td>Take the longest vocabulary match at each position: <code>play | ##ing | cat | ##s | !</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>SentencePiece Unigram LM</strong></td>
+                    <td>Normalize raw text and replace spaces with visible <code>&#9601;</code>.</td>
+                    <td>A large seed set of characters and substrings; optional byte fallback.</td>
+                    <td>Estimate piece probabilities and prune pieces that add the least value.</td>
+                    <td>Choose the lowest-surprise complete route, then decode normalized text: <code>&#9601;playing | &#9601;cat | s | !</code></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
         </div>
       </div>
     </section>
 
-    <section id="build" class="band band-muted" aria-labelledby="build-title"  frozen="yes">
+
+<section id="build" class="band band-muted" aria-labelledby="build-title"  frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">4. Build the tokenizers</p>
-          <h2 id="build-title">Let's build the tokenizers, one rule at a time.</h2>
+          <p class="eyebrow">4. Build the learning rules</p>
+          <h2 id="build-title">One corpus. Three rules. One decision at a time.</h2>
           <p>
-            Now let's look at BPE. We already know every string can fall
-            down to bytes, and the GPT-style version of
-            <a href="https://en.wikipedia.org/wiki/Byte_pair_encoding" target="_blank" rel="noreferrer">byte-pair encoding (BPE)</a>
-            starts exactly there: from the 256 UTF-8 byte values. The general BPE idea
-            is broader than bytes, though. Some BPE tokenizers start from characters or
-            SentencePiece pieces and only fall back to bytes for rare characters. In
-            all cases, the learning rule asks: which neighboring pair appears so often
-            that it deserves a shortcut? Merge that pair, mint a new token ID, replace
-            it everywhere, and count again.
+            Section 3 compared complete tokenizer systems: preparation, coverage,
+            learning, and runtime encoding. Here we hold the preparation still so you
+            can feel the one decision that changes. <strong>BPE</strong> rewards raw
+            pair frequency. <strong>WordPiece</strong> rewards distinctive
+            association. <strong>Unigram LM</strong> prices complete routes and prunes
+            pieces that add little value.
           </p>
           <div class="example-note">
-            <strong>BPE has a trainer and an encoder.</strong>
+            <strong>Our running corpus</strong>
             <p>
-              The <strong>trainer</strong> sees a training corpus, counts neighboring
-              pairs, learns a merge list, and freezes the vocabulary. At inference time, the
-              <strong>encoder</strong> later sees a new user prompt (text), starts from the same learned
-              base pieces, and replays that frozen merge list in order. It does
-              <em>not</em> recalculate which pairs are common in your one prompt.
+              We will use <code>hug &times;10, pug &times;5, pun &times;12,
+              bun &times;4, hugs &times;5</code> for all three walkthroughs, then apply
+              each frozen result to <code>hugs</code>. The numbers and example stay put;
+              only the algorithm's decision changes.
             </p>
           </div>
           <p>
-            Note, if we run BPE completely naively and it
+            Each walkthrough has the same five beats: inspect the starting pieces,
+            calculate the evidence, make one training decision, update what the
+            tokenizer knows, and encode <code>hugs</code>. Nothing advances until you
+            press Next.
+          </p>
+          <details class="lesson-disclosure">
+            <summary>Optional: how GPT-style regex boundaries prepare text for BPE</summary>
+            <div class="lesson-disclosure-body">
+          <p>
+            If we run BPE completely naively, it
             wastes vocabulary slots on near-duplicates like <code>dog</code>,
             <code>dog.</code>, <code>dog!</code>, and <code>dog?</code>. Hence, GPT-2 first
             splits text with a regular expression: contractions, Unicode letters,
@@ -900,100 +729,75 @@
             </div>
             <p class="quiz-feedback" aria-live="polite" hidden></p>
           </div>
+            </div>
+          </details>
+            <h3>Act 1: BPE builds upward from frequent neighbors</h3>
             <p>
-              Now let's finalize one tiny corpus for the rest of this section, so the differences come from the learning rule
-              itself:
-              <code>hug &times;10, pug &times;5, pun &times;12, bun &times;4, hugs &times;5</code>.
-              These letters are really bytes in the byte-level story. For plain ASCII,
-              <code>h</code>, <code>u</code>, and <code>g</code> each occupy one byte,
-              so I write the byte as the letter to keep the example readable.
+              In the GPT-style byte story, each plain ASCII letter below is exactly one
+              byte, so we write the byte as its readable letter <em>(If we had emojis or accented characters, they would first shatter into multiple raw bytes)</em>. BPE asks one question
+              during training: <strong>which adjacent pair appears most often?</strong>
+              Runtime later replays the frozen merge list; it never recounts the new
+              prompt.
             </p>
-            <div class="formula-stack">
-              <code>top pair counts: ug = 20, pu = 17, un = 16, hu = 15, gs = 5</code>
-              <code>top single-piece counts: u = 36, g = 20, s = 5</code>
+            <div class="formula-stack workbook-trace">
+              <code>Held fixed: the weighted corpus and target word hugs</code>
+              <code>Training evidence: raw adjacent-pair counts</code>
+              <code>Training decision: merge the pair with the largest count</code>
+              <code>Runtime rule: replay learned merges in order</code>
             </div>
-            <p>
-              <strong>BPE</strong> asks only, "which neighboring pair appears most?"
-              <code>u g</code> appears 20 times, so the first merge is
-              <code>u + g -&gt; ug</code>. It does not ask whether <code>u</code> also
-              appears in many other places. Raw count wins.
-            </p>
-            <div class="practice-card">
-              <h3>Exercise: do one BPE merge by hand</h3>
-              <p>
-                Start with the tiny corpus <code>hug x10, pug x5, pun x12, bun x4, hugs x5</code>.
-                Use the pair counts shown above and write the corpus after only the first
-                merge. Do not do the second merge yet.
-              </p>
-              <ol>
-                <li>Pick the winning pair.</li>
-                <li>Assign it the next token ID, <code>256</code>.</li>
-                <li>Rewrite <code>hug</code>, <code>pug</code>, and <code>hugs</code> using the new piece.</li>
-              </ol>
-              <p class="answer-strip">
-                Check: <code>u + g -&gt; ug</code>, so <code>hug</code> becomes
-                <code>h ug</code>, <code>pug</code> becomes <code>p ug</code>, and
-                <code>hugs</code> becomes <code>h ug s</code>. The merge list is now
-                frozen evidence the encoder can replay later.
-              </p>
-            </div>
-            <div class="code-quiz" data-quiz-type="predict" data-explain="BPE finds the single most frequent adjacent pair and mints one new token for it (id 256, then 257, ...), then repeats. It grows tokens by merging the commonest neighbors - it does not split rare words or store whole words.">
-              <p class="quiz-prompt">Quick check: on each step, byte-pair encoding looks across the whole corpus and&hellip;</p>
-              <div class="quiz-options" role="group" aria-label="What BPE does each step">
-                <button class="quiz-option" type="button" data-correct="true">Merges the single most frequent adjacent pair into one new token</button>
-                <button class="quiz-option" type="button" data-feedback="BPE grows tokens by merging, not splitting - and it acts on the most common pair, not the rarest.">Splits the rarest word into smaller characters</button>
-                <button class="quiz-option" type="button" data-feedback="A fixed list of whole words is exactly what BPE avoids: rare words would have no entry and break.">Adds every whole word it sees to the vocabulary</button>
-              </div>
-              <p class="quiz-feedback" aria-live="polite" hidden></p>
-            </div>
-          <figure class="intuition-figure intuition-figure-wide controlled-sequence bpe-stepper">
+          <figure class="intuition-figure intuition-figure-wide controlled-sequence algorithm-stepper" data-algorithm-stepper="bpe">
             <div class="section-title-row">
-              <h3>Take one BPE merge step by step</h3>
-              <span id="bpeStepStatus" class="pill">not started</span>
+              <h3>Build one BPE decision</h3>
+              <span class="pill" data-stepper-status>step 1 of 5</span>
             </div>
-            <div id="bpeStepStage" class="sequence-stage bpe-step-stage" aria-live="polite">
-              <div class="empty-state">Press Start or Next to begin with the byte pieces.</div>
-            </div>
+            <div class="sequence-stage algorithm-step-stage" data-stepper-stage aria-live="polite"></div>
             <div class="motion-control-bar">
               <div>
-                <strong>One corpus, one frozen merge</strong>
-                <span>Follow the exact <code>ug = 20</code> and token <code>256</code> example above.</span>
+                <strong>One click, one causal beat</strong>
+                <span>Count, choose, update, then apply the frozen result.</span>
               </div>
-              <div class="motion-button-row">
-                <button id="bpeStepBack" class="ghost-button" type="button">Back</button>
-                <button id="bpeStepPlay" class="primary-button" type="button">Start</button>
-                <button id="bpeStepNext" class="ghost-button" type="button">Next</button>
-                <button id="bpeStepReset" class="ghost-button" type="button">Reset</button>
+              <div class="manual-stepper-buttons">
+                <button class="ghost-button" type="button" data-stepper-back>Back</button>
+                <button class="ghost-button" type="button" data-stepper-reset>Reset</button>
+                <button class="primary-button" type="button" data-stepper-next>Next: count pairs</button>
               </div>
             </div>
-            <figcaption>BPE is a counting loop: find the most frequent neighboring byte pair, mint a token for it, replace it, and repeat until the vocabulary budget is full.</figcaption>
+            <figcaption>BPE builds pieces upward from the most frequent adjacent pair, then its encoder replays those frozen merges.</figcaption>
             <details class="motion-transcript">
-              <summary>Read the five-step transcript</summary>
+              <summary>Read the BPE transcript</summary>
               <ol>
                 <li>Start from readable ASCII byte pieces in the toy corpus.</li>
                 <li>Count every adjacent pair; <code>ug = 20</code> is the largest count.</li>
                 <li>Choose <code>u + g</code> as the winning pair.</li>
                 <li>Mint token ID <code>256 = ug</code> and replace the pair everywhere.</li>
-                <li>Freeze the merge list so the runtime encoder can replay it on new text.</li>
+                <li>Replay the frozen merge on <code>hugs</code>: <code>h | ug | s</code>.</li>
               </ol>
             </details>
           </figure>
+            <div class="code-quiz" data-quiz-type="predict" data-explain="BPE finds the single most frequent adjacent pair and mints one new token for it, then repeats. At runtime it replays the frozen merge list rather than counting the prompt.">
+              <p class="quiz-prompt">Quick check: what evidence chooses BPE's next vocabulary piece?</p>
+              <div class="quiz-options" role="group" aria-label="What BPE uses to choose a piece">
+                <button class="quiz-option" type="button" data-correct="true">The largest raw adjacent-pair count</button>
+                <button class="quiz-option" type="button" data-feedback="That is closer to WordPiece's teaching score. BPE uses raw pair frequency.">The pair with the strongest normalized association</button>
+                <button class="quiz-option" type="button" data-feedback="That is Unigram's runtime view. BPE builds upward with merges.">The cheapest complete route through the word</button>
+              </div>
+              <p class="quiz-feedback" aria-live="polite" hidden></p>
+            </div>
+
+            <h3>Act 2: WordPiece rewards distinctive neighbors</h3>
             <p>
-              <strong>WordPiece</strong> asks, "which pair is unusually attached?"
-              This is the key intuition. A pair can be common just because its two
-              parts are common. For this lesson, we make that association visible with
-              the following simplified score:
+              WordPiece starts each prepared span with a bare first character and marks all subsequent characters with <code>##</code> (meaning "this attaches to what came before"). This helps the model distinguish between an <code>s</code> at the start of a word (like <em>sun</em>) and an <code>##s</code> at the end of a word (like <em>hugs</em>). It then asks not merely "which pair is common?" but <strong>which pair occurs together more specifically than its separate piece counts would suggest?</strong>
             </p>
             <div class="formula-stack">
               <code>Score(A, B) = count(AB) / (count(A) * count(B))</code>
-              <code>Score(u, g) = 20 / (36 * 20) = 1/36</code>
-              <code>Score(g, s) = 5 / (20 * 5) = 1/20</code>
-              <code>1/20 &gt; 1/36, so WordPiece prefers g + s even though it appears less often</code>
+              <code>Score(##u, ##g) = 20 / (36 * 20) = 1/36</code>
+              <code>Score(##g, ##s) = 5 / (20 * 5) = 1/20</code>
+              <code>1/20 &gt; 1/36, so WordPiece first adds ##g + ##s -&gt; ##gs</code>
             </div>
             <figure class="intuition-figure intuition-figure-wide">
               <svg class="pipeline-svg" viewBox="0 0 920 330" role="img" aria-labelledby="wordpiece-score-title wordpiece-score-desc">
-                <title id="wordpiece-score-title">BPE raw counts versus WordPiece scores</title>
-                <desc id="wordpiece-score-desc">The pair u g has the highest raw count, so BPE chooses it. The pair g s has the higher WordPiece score because g and s are unusually attached to each other.</desc>
+                <title id="wordpiece-score-title">BPE raw counts versus position-aware WordPiece scores</title>
+                <desc id="wordpiece-score-desc">The byte pair u g has the highest raw count, so BPE chooses it. The continuation pair double-hash g double-hash s has the higher WordPiece score because those position-aware pieces are unusually attached to each other.</desc>
                 <text x="42" y="34" class="svg-label">same corpus, two different questions</text>
 
                 <rect x="42" y="58" width="386" height="222" rx="10" class="svg-box-soft"></rect>
@@ -1011,31 +815,96 @@
 
                 <rect x="492" y="58" width="386" height="222" rx="10" class="svg-box-soft"></rect>
                 <text x="520" y="88" class="svg-caption">WordPiece asks: which pair is unusually attached?</text>
-                <text x="522" y="130" class="svg-id">u + g</text>
+                <text x="522" y="130" class="svg-id">##u + ##g</text>
                 <rect x="628" y="112" width="210" height="22" rx="11" class="svg-bar-soft"></rect>
                 <rect x="628" y="112" width="112" height="22" rx="11" class="svg-bar-teal"></rect>
                 <text x="848" y="129" class="svg-id">1/36</text>
-                <text x="522" y="180" class="svg-id">g + s</text>
+                <text x="522" y="180" class="svg-id">##g + ##s</text>
                 <rect x="628" y="162" width="210" height="22" rx="11" class="svg-bar-soft"></rect>
                 <rect x="628" y="162" width="200" height="22" rx="11" class="svg-bar-coral"></rect>
                 <text x="848" y="179" class="svg-id">1/20</text>
                 <rect x="542" y="226" width="286" height="30" rx="15" class="svg-box-accent"></rect>
-                <text x="685" y="246" class="svg-model-text" text-anchor="middle">WordPiece first merge: g + s -> gs</text>
+                <text x="685" y="246" class="svg-model-text" text-anchor="middle">WordPiece first merge: ##g + ##s -> ##gs</text>
 
                 <text x="460" y="310" class="svg-caption" text-anchor="middle">Same data, different question. BPE rewards raw frequency; WordPiece rewards strong association.</text>
               </svg>
               <figcaption>This is the intuition I want you to keep: BPE is a raw-count shortcut maker; WordPiece tries to avoid spending a slot on a pair that is common only because its parts are common everywhere.</figcaption>
             </figure>
+            <div class="formula-stack workbook-trace">
+              <code>Held fixed: the weighted corpus and target word hugs</code>
+              <code>Training evidence: position-aware pair and piece counts</code>
+              <code>Training decision: add the largest association score</code>
+              <code>Runtime rule: greedy longest-match over the final vocabulary</code>
+            </div>
+          <figure class="intuition-figure intuition-figure-wide controlled-sequence algorithm-stepper" data-algorithm-stepper="wordpiece">
+            <div class="section-title-row">
+              <h3>Build one WordPiece decision</h3>
+              <span class="pill" data-stepper-status>step 1 of 5</span>
+            </div>
+            <div class="sequence-stage algorithm-step-stage" data-stepper-stage aria-live="polite"></div>
+            <div class="motion-control-bar">
+              <div>
+                <strong>Same corpus, different evidence</strong>
+                <span>Count position-aware pieces, compare scores, then use longest-match.</span>
+              </div>
+              <div class="manual-stepper-buttons">
+                <button class="ghost-button" type="button" data-stepper-back>Back</button>
+                <button class="ghost-button" type="button" data-stepper-reset>Reset</button>
+                <button class="primary-button" type="button" data-stepper-next>Next: count pieces</button>
+              </div>
+            </div>
+            <figcaption>WordPiece training builds a final vocabulary from association scores; runtime searches that vocabulary from left to right.</figcaption>
+            <details class="motion-transcript">
+              <summary>Read the WordPiece transcript</summary>
+              <ol>
+                <li>Represent each span with a bare first character and <code>##</code> continuations.</li>
+                <li>Count both adjacent pairs and individual pieces.</li>
+                <li>Compare <code>1/36</code> with <code>1/20</code>; <code>##g + ##s</code> wins.</li>
+                <li>Add <code>##gs</code> to the final vocabulary.</li>
+                <li>Greedily encode <code>hugs</code> as <code>h | ##u | ##gs</code>.</li>
+              </ol>
+            </details>
+          </figure>
+            <div class="code-quiz" data-quiz-type="predict" data-explain="In this lesson's simplified WordPiece reconstruction, the winner maximizes count(AB) / (count(A) * count(B)). Runtime then uses longest-match over the final vocabulary rather than replaying the training merge.">
+              <p class="quiz-prompt">Quick check: what makes <code>##g + ##s</code> win this WordPiece step?</p>
+              <div class="quiz-options" role="group" aria-label="What WordPiece rewards">
+                <button class="quiz-option" type="button" data-feedback="Its raw count is only 5; BPE instead chooses the pair with raw count 20.">It has the largest raw pair count</button>
+                <button class="quiz-option" type="button" data-correct="true">Its normalized association score, 1/20, is larger than 1/36</button>
+                <button class="quiz-option" type="button" data-feedback="Length is not the selection rule. The teaching score compares pair count with individual piece counts.">It makes the longest possible piece</button>
+              </div>
+              <p class="quiz-feedback" aria-live="polite" hidden></p>
+            </div>
+            <details class="lesson-disclosure">
+              <summary>Optional: the deeper WordPiece intuition and historical nuance</summary>
+              <div class="lesson-disclosure-body">
             <div class="practice-card">
               <h3>Exercise: predict the first merge</h3>
               <ol>
-                <li>Using only raw counts, which pair wins: <code>ug = 20</code> or <code>gs = 5</code>?</li>
-                <li>Using WordPiece's score, which pair wins: <code>1/36</code> or <code>1/20</code>?</li>
+                <li>Using BPE's raw byte counts, which pair wins: <code>u+g = 20</code> or <code>g+s = 5</code>?</li>
+                <li>Using WordPiece's position-aware pieces, which score wins: <code>Score(##u, ##g) = 1/36</code> or <code>Score(##g, ##s) = 1/20</code>?</li>
                 <li>Explain the difference in one sentence without using the formula.</li>
               </ol>
               <p class="answer-strip">
-                Check yourself: BPE picks <code>ug</code>. WordPiece picks <code>gs</code>
-                because <code>g</code> and <code>s</code> are more specifically tied to each other.
+                Check yourself: BPE adds <code>u+g -&gt; ug</code>. WordPiece adds
+                <code>##g+##s -&gt; ##gs</code> because those continuation pieces are
+                more specifically tied to each other.
+              </p>
+            </div>
+            <div class="worked-example">
+              <h3>Now use each learned result on <code>hugs</code>.</h3>
+              <p>
+                Stop training after that one addition. BPE starts from
+                <code>h u g s</code> and applies its learned priority
+                <code>u+g -&gt; ug</code>, producing <code>h | ug | s</code>. WordPiece
+                does not replay the training merge. It searches the final vocabulary
+                from left to right: take start piece <code>h</code>, then continuation
+                <code>##u</code>, then the longest available continuation
+                <code>##gs</code>. Its result is <code>h | ##u | ##gs</code>.
+              </p>
+              <p class="answer-strip">
+                Building differs: raw pair count versus association score. Breaking
+                new text differs too: ordered BPE merge priorities versus WordPiece
+                longest-match over a final vocabulary.
               </p>
             </div>
             <p>
@@ -1102,83 +971,297 @@
               our WordPiece exercise rewards a pair that occurs together more
               specifically.
             </p>
-            <br/>
+              </div>
+            </details>
+
+            <h3>Act 3: Unigram prices complete routes</h3>
             <p>
-              <strong>SentencePiece (Unigram LM)</strong> is the trickly one. We have not covered all the math yet, we will do so in the next chapter. However, the key idea is that it uses a probabilistic approach to determine the best way to segment text. Do not picture a greedy merge. Picture a menu. The
-              tokenizer begins with many candidate pieces, gives each piece a
-              probability, then asks which menu can explain the whole corpus with the
-              lowest total surprise - remember <strong>surprise</strong> from our previous chapter. A useful piece earns its spot; a redundant piece
-              gets pruned away.
+              Do not picture another greedy merge. Picture a menu of candidate pieces.
+              During training, Unigram learns one probability for every surviving
+              piece. Then, at encoding time, it uses those probabilities to choose a
+              complete route through new text. Let us first follow how training creates
+              that probability table, then freeze it and use it.
             </p>
+
+            <h4>How training learns the probability table</h4>
+            <p>
+              Training starts with an oversized <strong>candidate vocabulary</strong>:
+              every required character plus many frequent substrings such as
+              <code>hu</code>, <code>ug</code>, and <code>hug</code>. The core dilemma
+              is a chicken-and-egg problem: to know a piece's probability, we need to
+              know how often it is used. But to know how often it is used, we first need
+              to decide how to split the words!
+            </p>
+            <p>
+              The <strong>Expectation-Maximization (EM) algorithm</strong> solves this by
+              alternating between guessing and updating. In the <strong>Expectation step (E-step)</strong>,
+              the model uses its current baseline probabilities to score every valid way to split a word.
+              It scores a route by multiplying the probabilities of its individual pieces.
+            </p>
+
+            <div class="worked-example">
+              <strong>An E-step example with numbers</strong>
+              <p>
+                Imagine our toy model currently guesses <code>P(hug) = 0.20</code> and <code>P(s) = 0.08</code>.
+                The score for the route <code>[hug][s]</code> is <code>0.20 &times; 0.08 = 0.016</code>.
+              </p>
+              <p>
+                Instead of picking just one winner, the E-step shares the credit proportionally.
+                Suppose we calculate the scores for all five possible ways to split the word <code>hugs</code>,
+                and those scores add up to <code>0.0288736</code>. The route <code>[hug][s]</code>
+                accounts for about 55.4% of that total (<code>0.016 / 0.0288736 &approx; 0.554</code>).
+              </p>
+              <p>
+                If the word <code>hugs</code> appears 5 times in our training document, this route claims
+                55.4% of those occurrences. Therefore, it adds <code>5 &times; 0.554 &approx; 2.77</code> estimated uses
+                to the running tally for the piece <code>hug</code>, and about 2.77 uses to the tally for <code>s</code>.
+                The remaining 44.6% of the credit is distributed to the pieces in the other routes (like <code>h</code>, <code>ug</code>, etc.).
+              </p>
+            </div>
+
+            <p>
+              In the <strong>Maximization step (M-step)</strong>, the model takes those accumulated
+              estimated counts and updates its beliefs. It divides each piece's total estimated count
+              by the grand total of all pieces. For instance, if <code>hug</code> gathered 10.75 total uses
+              across the whole document, and the sum of all pieces everywhere was 100, the new
+              <code>P(hug)</code> becomes <code>0.1075</code>. Pieces that consistently help form high-scoring
+              routes see their probabilities rise, while unhelpful pieces drop.
+            </p>
+            <p>
+              The trainer repeats this E-step/M-step loop until the probabilities stop shifting.
+              Then, it tests the waters: how much would the corpus loss (total surprise) rise if each non-essential
+              piece disappeared? It prunes away a batch of the least helpful pieces (always keeping required
+              single characters so no text becomes un-encodable) and runs EM again. This prune-and-train
+              cycle repeats until the vocabulary shrinks to the target size.
+            </p>
+
             <div class="formula-stack">
-              <code>candidate routes for pug: [p][u][g], [pu][g], [p][ug], [pug]</code>
-              <code>route cost = -log P(piece1) - log P(piece2) - ...</code>
-              <code>training: estimate piece probabilities, prune weak pieces, repeat</code>
-              <code>encoding: choose the lowest-cost route through the lattice</code>
+              <code>initialize: large candidate vocabulary + initial probabilities</code>
+              <code>E-step: current probabilities score every valid route to share estimated counts</code>
+              <code>M-step: P(piece) = estimated count(piece) / total estimated count</code>
+              <code>prune the least harmful pieces, rerun EM, stop at the target vocabulary size</code>
             </div>
             <figure class="intuition-figure intuition-figure-wide">
-              <svg class="pipeline-svg" viewBox="0 0 920 350" role="img" aria-labelledby="sentencepiece-lattice-title sentencepiece-lattice-desc">
-                <title id="sentencepiece-lattice-title">SentencePiece Unigram chooses a lowest-cost route</title>
-                <desc id="sentencepiece-lattice-desc">The word pug can be covered by several candidate segmentations. The Unigram language model assigns costs to pieces and chooses the lowest total route.</desc>
-                <text x="42" y="34" class="svg-label">encoding time: choose a route through candidate pieces</text>
+              <svg class="pipeline-svg" viewBox="0 0 920 330" role="img" aria-labelledby="unigram-em-title unigram-em-desc">
+                <title id="unigram-em-title">The Unigram EM training loop</title>
+                <desc id="unigram-em-desc">Training initializes a large candidate vocabulary, uses the E-step to share responsibility across possible segmentations, uses the M-step to normalize expected counts into probabilities, prunes low-value pieces, and repeats.</desc>
+                <defs>
+                  <marker id="unigram-em-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                    <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                  </marker>
+                </defs>
 
-                <line x1="120" y1="176" x2="800" y2="176" class="svg-axis"></line>
-                <circle cx="120" cy="176" r="6" class="svg-bar-teal"></circle>
-                <circle cx="346" cy="176" r="6" class="svg-bar-teal"></circle>
-                <circle cx="574" cy="176" r="6" class="svg-bar-teal"></circle>
-                <circle cx="800" cy="176" r="6" class="svg-bar-teal"></circle>
-                <text x="120" y="206" class="svg-id" text-anchor="middle">start</text>
-                <text x="346" y="206" class="svg-id" text-anchor="middle">p</text>
-                <text x="574" y="206" class="svg-id" text-anchor="middle">pu</text>
-                <text x="800" y="206" class="svg-id" text-anchor="middle">pug</text>
+                <text x="38" y="30" class="svg-label">TRAINING TIME: ESTIMATE THE HIDDEN SPLITS, THEN UPDATE THE PROBABILITIES</text>
 
-                <path d="M120,176 C220,80 248,80 346,176" class="svg-route"></path>
-                <path d="M346,176 C446,80 474,80 574,176" class="svg-route"></path>
-                <path d="M574,176 C674,80 702,80 800,176" class="svg-route"></path>
-                <text x="232" y="82" class="svg-id" text-anchor="middle">p cost 2.5</text>
-                <text x="460" y="82" class="svg-id" text-anchor="middle">u cost 2.4</text>
-                <text x="688" y="82" class="svg-id" text-anchor="middle">g cost 2.2</text>
+                <rect x="38" y="56" width="184" height="92" rx="9" class="svg-box-soft"></rect>
+                <text x="130" y="82" class="svg-caption" text-anchor="middle">1. Initialize</text>
+                <text x="130" y="108" class="svg-id" text-anchor="middle">many candidate pieces</text>
+                <text x="130" y="130" class="svg-id" text-anchor="middle">+ starting probabilities</text>
 
-                <path d="M120,176 C300,292 394,292 574,176" class="svg-route"></path>
-                <path d="M346,176 C526,292 620,292 800,176" class="svg-route"></path>
-                <text x="346" y="300" class="svg-id" text-anchor="middle">pu cost 2.0</text>
-                <text x="574" y="300" class="svg-id" text-anchor="middle">ug cost 1.8</text>
+                <line x1="226" y1="102" x2="250" y2="102" class="svg-arrow" marker-end="url(#unigram-em-arrow)"></line>
 
-                <path d="M120,176 C330,122 590,122 800,176" class="svg-route-best"></path>
-                <rect x="400" y="116" width="120" height="30" rx="15" class="svg-box-accent"></rect>
-                <text x="460" y="136" class="svg-model-text" text-anchor="middle">pug cost 1.6</text>
+                <rect x="258" y="56" width="184" height="92" rx="9" class="svg-box-soft"></rect>
+                <text x="350" y="82" class="svg-caption" text-anchor="middle">2. E-step</text>
+                <text x="350" y="108" class="svg-id" text-anchor="middle">score every valid route</text>
+                <text x="350" y="130" class="svg-id" text-anchor="middle">share estimated counts</text>
 
-                <rect x="196" y="238" width="528" height="42" rx="8" class="svg-box-soft"></rect>
-                <text x="460" y="264" class="svg-caption" text-anchor="middle">Lowest total surprise wins. Training prunes pieces that rarely improve the route.</text>
+                <line x1="446" y1="102" x2="470" y2="102" class="svg-arrow" marker-end="url(#unigram-em-arrow)"></line>
+
+                <rect x="478" y="56" width="184" height="92" rx="9" class="svg-box-soft"></rect>
+                <text x="570" y="82" class="svg-caption" text-anchor="middle">3. M-step</text>
+                <text x="570" y="108" class="svg-id" text-anchor="middle">normalize estimated counts</text>
+                <text x="570" y="130" class="svg-id" text-anchor="middle">into new P(piece)</text>
+
+                <line x1="666" y1="102" x2="690" y2="102" class="svg-arrow" marker-end="url(#unigram-em-arrow)"></line>
+
+                <rect x="698" y="56" width="184" height="92" rx="9" class="svg-box-soft"></rect>
+                <text x="790" y="82" class="svg-caption" text-anchor="middle">4. Prune</text>
+                <text x="790" y="108" class="svg-id" text-anchor="middle">remove pieces whose loss</text>
+                <text x="790" y="130" class="svg-id" text-anchor="middle">increase is smallest</text>
+
+                <path d="M790,152 C790,184 130,184 130,152" class="svg-arrow" fill="none" marker-end="url(#unigram-em-arrow)"></path>
+                <text x="460" y="198" class="svg-caption" text-anchor="middle">repeat EM after pruning until the vocabulary reaches its target size</text>
+
+                <rect x="124" y="210" width="672" height="84" rx="9" class="svg-box-accent"></rect>
+                <text x="460" y="236" class="svg-model-text" text-anchor="middle">One E-step example on hugs</text>
+                <text x="460" y="260" class="svg-id" text-anchor="middle">[hug][s] score = 0.20 × 0.08 = 0.016 → 55.4% of this word's route probability</text>
+                <text x="460" y="282" class="svg-id" text-anchor="middle">hugs appears 5 times → about 2.77 estimated uses for hug and for s</text>
               </svg>
-              <figcaption>SentencePiece Unigram is easier to remember as a route problem: many possible cuts are available, each piece has a learned cost (the numbers here are illustrative), and encoding picks the cheapest full path.</figcaption>
+              <figcaption>EM alternates between estimating which hidden segmentations explain the corpus and updating the piece probabilities from those estimates. Pruning shrinks the menu; it does not change the E-step/M-step logic.</figcaption>
             </figure>
-            <div class="code-quiz" data-quiz-type="predict" data-explain="Unigram LM does not replay a merge list. It keeps scored candidate pieces and chooses the lowest-cost path that covers the text. Dynamic programming is the efficient way to find that path.">
-              <p class="quiz-prompt">Quick check: when a SentencePiece Unigram model encodes a word, what is it choosing?</p>
-              <div class="quiz-options" role="group" aria-label="What SentencePiece Unigram chooses at encoding time">
-                <button class="quiz-option" type="button" data-feedback="That is BPE's training rule. Unigram keeps scored candidate pieces and chooses a route.">The single most frequent adjacent pair</button>
-                <button class="quiz-option" type="button" data-correct="true">The lowest-cost route through candidate pieces</button>
-                <button class="quiz-option" type="button" data-feedback="It can choose a whole-word piece if that piece exists and has a good score, but it is not forced to use whole words.">Always exactly one whole word token</button>
+
+            <div class="worked-example">
+              <h4>From one learned probability to one piece cost</h4>
+              <p>
+                Why do we calculate cost with <code>-ln P(piece)</code>? Multiplying many small probabilities together (like <code>0.20 &times; 0.08</code>) creates tiny decimals that computers struggle to handle accurately. Taking the negative natural logarithm (<code>-ln</code>) safely converts these multiplying probabilities into positive, additive "costs". A high probability piece gets a low cost, while a rare piece carries a high cost (high surprise).
+              </p>
+              <p>
+                Our walkthrough starts <strong>after training</strong> with a small,
+                illustrative probability table. Suppose the frozen model has learned
+                <code>P(hug) = 0.20</code> and <code>P(s) = 0.08</code>. In the first step below,
+                <code>other pieces = 0.08 total</code> simply groups the rest of the toy
+                vocabulary so the probabilities add to 1.
+              </p>
+              <div class="formula-stack">
+                <code>cost(piece) = -ln P(piece)</code>
+                <code>cost(hug) = -ln(0.20) ≈ 1.61</code>
+                <code>cost(s) = -ln(0.08) ≈ 2.53</code>
+                <code>cost([hug][s]) = 1.61 + 2.53 ≈ 4.14</code>
+              </div>
+            </div>
+            <figure class="intuition-figure intuition-figure-wide">
+              <svg class="pipeline-svg" viewBox="0 0 920 390" role="img" aria-labelledby="unigram-routes-title unigram-routes-desc">
+                <title id="unigram-routes-title">Unigram encoding compares complete routes through hugs</title>
+                <desc id="unigram-routes-desc">A route lattice shows candidate pieces that can cover hugs. A bar chart compares five complete route costs and highlights hug plus s as the lowest-cost route at 4.14.</desc>
+
+                <text x="34" y="30" class="svg-label">ENCODING TIME: THE FROZEN PROBABILITIES PRICE EVERY COMPLETE ROUTE</text>
+
+                <rect x="28" y="52" width="414" height="288" rx="9" class="svg-box-soft"></rect>
+                <text x="235" y="80" class="svg-caption" text-anchor="middle">candidate pieces form a route lattice</text>
+
+                <line x1="66" y1="196" x2="404" y2="196" class="svg-axis"></line>
+                <circle cx="66" cy="196" r="6" class="svg-bar-teal"></circle>
+                <circle cx="150" cy="196" r="6" class="svg-bar-teal"></circle>
+                <circle cx="234" cy="196" r="6" class="svg-bar-teal"></circle>
+                <circle cx="318" cy="196" r="6" class="svg-bar-teal"></circle>
+                <circle cx="404" cy="196" r="6" class="svg-bar-teal"></circle>
+
+                <text x="66" y="222" class="svg-id" text-anchor="middle">start</text>
+                <text x="150" y="222" class="svg-id" text-anchor="middle">h</text>
+                <text x="234" y="222" class="svg-id" text-anchor="middle">hu</text>
+                <text x="318" y="222" class="svg-id" text-anchor="middle">hug</text>
+                <text x="404" y="222" class="svg-id" text-anchor="middle">hugs</text>
+
+                <text x="108" y="188" class="svg-id" text-anchor="middle">h 2.12</text>
+                <text x="192" y="188" class="svg-id" text-anchor="middle">u 2.30</text>
+                <text x="276" y="188" class="svg-id" text-anchor="middle">g 2.21</text>
+                <text x="361" y="188" class="svg-id" text-anchor="middle">s 2.53</text>
+
+                <path d="M66,196 C110,116 190,116 234,196" class="svg-route"></path>
+                <text x="150" y="116" class="svg-id" text-anchor="middle">hu 1.97</text>
+
+                <path d="M150,196 C194,274 274,274 318,196" class="svg-route"></path>
+                <text x="234" y="282" class="svg-id" text-anchor="middle">ug 1.83</text>
+
+                <path d="M66,196 C130,82 254,82 318,196" class="svg-route-best"></path>
+                <text x="192" y="100" class="svg-id" text-anchor="middle">hug 1.61</text>
+                <line x1="318" y1="196" x2="404" y2="196" class="svg-route-best"></line>
+
+                <path d="M66,196 C158,322 312,322 404,196" class="svg-route"></path>
+                <text x="235" y="318" class="svg-id" text-anchor="middle">hugs 4.61</text>
+
+                <rect x="470" y="52" width="422" height="288" rx="9" class="svg-box-soft"></rect>
+                <text x="681" y="80" class="svg-caption" text-anchor="middle">add the edge costs for each complete route</text>
+
+                <text x="492" y="116" class="svg-id">[h][u][g][s]</text>
+                <rect x="616" y="100" width="220" height="20" rx="10" class="svg-bar-soft"></rect>
+                <rect x="616" y="100" width="220" height="20" rx="10" class="svg-bar-coral"></rect>
+                <text x="850" y="116" class="svg-id">9.16</text>
+
+                <text x="492" y="158" class="svg-id">[hu][g][s]</text>
+                <rect x="616" y="142" width="220" height="20" rx="10" class="svg-bar-soft"></rect>
+                <rect x="616" y="142" width="161" height="20" rx="10" class="svg-bar-coral"></rect>
+                <text x="850" y="158" class="svg-id">6.70</text>
+
+                <text x="492" y="200" class="svg-id">[h][ug][s]</text>
+                <rect x="616" y="184" width="220" height="20" rx="10" class="svg-bar-soft"></rect>
+                <rect x="616" y="184" width="156" height="20" rx="10" class="svg-bar-coral"></rect>
+                <text x="850" y="200" class="svg-id">6.48</text>
+
+                <rect x="482" y="212" width="398" height="38" rx="8" class="svg-box-accent"></rect>
+                <text x="492" y="236" class="svg-model-text">[hug][s]</text>
+                <rect x="616" y="220" width="220" height="20" rx="10" class="svg-bar-soft"></rect>
+                <rect x="616" y="220" width="99" height="20" rx="10" class="svg-bar-teal"></rect>
+                <text x="850" y="236" class="svg-model-text">4.14</text>
+
+                <text x="492" y="278" class="svg-id">[hugs]</text>
+                <rect x="616" y="262" width="220" height="20" rx="10" class="svg-bar-soft"></rect>
+                <rect x="616" y="262" width="111" height="20" rx="10" class="svg-bar-coral"></rect>
+                <text x="850" y="278" class="svg-id">4.61</text>
+
+                <text x="681" y="318" class="svg-caption" text-anchor="middle">shortest bar = lowest surprise = chosen encoding</text>
+              </svg>
+              <figcaption>The lattice shows which pieces can connect character boundaries. The bars show the total cost of each complete route. With this frozen toy model, <code>[hug][s]</code> wins at <code>4.14</code>.</figcaption>
+            </figure>
+            <div class="formula-stack">
+              <code>illustrative routes for hugs: [h][u][g][s], [hu][g][s], [h][ug][s], [hug][s], [hugs]</code>
+              <code>route cost = -ln P(piece1) - ln P(piece2) - ...</code>
+              <code>training output: one learned probability for every surviving piece</code>
+              <code>encoding: choose the lowest-surprise complete route</code>
+            </div>
+            <div class="formula-stack workbook-trace">
+              <code>Held fixed: the weighted corpus and target word hugs</code>
+              <code>Frozen model: one learned probability per candidate piece</code>
+              <code>Training decision: keep useful pieces and prune weak ones</code>
+              <code>Runtime rule: choose the lowest-surprise route</code>
+            </div>
+          <figure class="intuition-figure intuition-figure-wide controlled-sequence algorithm-stepper" data-algorithm-stepper="unigram">
+            <div class="section-title-row">
+              <h3>Build one Unigram decision</h3>
+              <span class="pill" data-stepper-status>step 1 of 5</span>
+            </div>
+            <div class="sequence-stage algorithm-step-stage" data-stepper-stage aria-live="polite"></div>
+            <div class="motion-control-bar">
+              <div>
+                <strong>Same target, route thinking</strong>
+                <span>Turn learned probabilities into costs, then price each complete route.</span>
+              </div>
+              <div class="manual-stepper-buttons">
+                <button class="ghost-button" type="button" data-stepper-back>Back</button>
+                <button class="ghost-button" type="button" data-stepper-reset>Reset</button>
+                <button class="primary-button" type="button" data-stepper-next>Next: calculate costs</button>
+              </div>
+            </div>
+            <figcaption>Unigram starts with many candidates, learns their probabilities while pruning, and encodes by choosing the cheapest complete route.</figcaption>
+            <details class="motion-transcript">
+              <summary>Read the Unigram transcript</summary>
+              <ol>
+                <li>Start from the frozen probability table learned during training.</li>
+                <li>Compute each piece cost with <code>-ln P(piece)</code>.</li>
+                <li>Add complete-route costs; <code>[hug][s]</code> wins because <code>1.61 + 2.53 ≈ 4.14</code> is lowest.</li>
+                <li>Across the corpus, preserve useful pieces and prune weak candidates.</li>
+                <li>Encode <code>hugs</code> as <code>hug | s</code> with frozen probabilities.</li>
+              </ol>
+            </details>
+          </figure>
+            <div class="code-quiz" data-quiz-type="predict" data-explain="The frozen toy model gives P(hug)=0.20. Compute cost(hug)=-ln(0.20)≈1.61. Route costs add these calculated piece costs.">
+              <p class="quiz-prompt">Quick check: how does <code>hug</code> get its illustrated cost of about <code>1.61</code>?</p>
+              <div class="quiz-options" role="group" aria-label="How a Unigram piece gets its cost">
+                <button class="quiz-option" type="button" data-feedback="The cost is calculated from the learned probability, not copied from a frequency count.">Use the number of times <code>hug</code> appears as the cost</button>
+                <button class="quiz-option" type="button" data-correct="true">Take the learned <code>P(hug)=0.20</code>, then calculate <code>-ln(0.20)</code></button>
+                <button class="quiz-option" type="button" data-feedback="That is BPE's training rule. Unigram derives piece costs from learned probabilities.">Count how often <code>h</code> sits beside <code>u</code></button>
               </div>
               <p class="quiz-feedback" aria-live="polite" hidden></p>
             </div>
+            <details class="lesson-disclosure">
+              <summary>Optional: how dynamic programming avoids brute force</summary>
+              <div class="lesson-disclosure-body">
+                <p>
+                  A long word can have many possible cuts. Dynamic programming walks
+                  from left to right and stores only the cheapest known way to reach
+                  each character boundary. When a more expensive route reaches the
+                  same boundary, the encoder can discard it immediately because both
+                  routes face the same remaining suffix.
+                </p>
+                <div class="formula-stack">
+                  <code>best cost at h = min([h]) = 2.12</code>
+                  <code>best cost at hug = min([h][u][g], [hu][g], [h][ug], [hug]) = 1.61</code>
+                  <code>best cost at hugs = min(1.61 + 2.53, 4.61) = min(4.14, 4.61) = 4.14</code>
+                </div>
+                <p>
+                  The answer is still the same route you calculated above:
+                  <code>[hug][s]</code>. Dynamic programming changes the amount of
+                  search, not the scoring rule or the winner.
+                </p>
+              </div>
+            </details>
             <p class="microcopy">
               The dynamic programming part is just the efficient way to avoid trying
               every possible cut by brute force. The learner intuition is simpler:
               SentencePiece (Unigram LM) keeps a scored menu of plausible pieces, then
-              finds the cheapest path through the word or sentence. Its big practical
+              finds the lowest-surprise path through the word or sentence. Its big practical
               win is not "newer than WordPiece"; it is raw-text, language-independent
-              tokenization with reversible spaces.
-            </p>
-            <p>
-              At the end, we have the final piece: <strong>decoding</strong>. Encoding turned
-              text into token IDs; decoding just runs it backwards. The model emits
-              IDs, the tokenizer looks each one up in its frozen vocabulary, and the
-              pieces are glued back into text. This is where SentencePiece's visible
-              space marker earns its keep: because the space was stored as a real
-              symbol (<code>&#9601;</code>), turning <code>&#9601;new&#9601;words</code>
-              back into <code>new words</code> is exact and reversible, with no
-              guessing about where the spaces belonged.
+              tokenization with spaces preserved in its normalized representation.
             </p>
 
           <p class="example-note">
@@ -1186,72 +1269,58 @@
             not a clone of GPT-4, BERT, or SentencePiece. Each algorithm really runs:
             BPE merges by raw frequency, WordPiece merges by the
             <code>count(AB) / (count(A) &times; count(B))</code> score, and Unigram LM
-            starts from a big candidate set and prunes low-probability pieces. To stay
-            fast and readable it skips the production boundary-policy choices we just
-            discussed: regex chunks, raw SentencePiece spaces, byte fallback,
-            normalization, and special tokens.
+            starts from a big candidate set and prunes low-probability pieces. To compare
+            the learning rules fairly, the first three choices all use the same
+            lowercase word/punctuation spans and character base. The lab therefore
+            skips production regex chunks, raw SentencePiece spaces, byte fallback,
+            normalization, and special tokens. Its Unigram trainer also uses only each
+            word's single best Viterbi route as a faster hard approximation; full EM
+            shares credit across every plausible route as described above. The byte row
+            is a reference view, not a trained fourth algorithm.
           </p>
         </div>
 
-        <div class="code-quiz" data-quiz-type="predict" data-explain="In this lesson's simplified WordPiece score, the winner maximizes count(AB) / (count(A) * count(B)). That rewards pairs that occur together more than their individual frequencies would predict, rather than the raw frequency BPE uses.">
-          <p class="quiz-prompt">Quick check: BPE merges the most <em>frequent</em> adjacent pair. WordPiece scans the same pairs but picks differently. What does WordPiece favor instead?</p>
-          <div class="quiz-options" role="group" aria-label="What WordPiece maximizes">
-            <button class="quiz-option" type="button" data-feedback="That would just be a longest-match rule; WordPiece scores pairs, it does not chase length.">The longest possible pair, regardless of frequency</button>
-            <button class="quiz-option" type="button" data-feedback="Merging the rarest pair would waste vocabulary slots; WordPiece rewards strong co-occurrence, not rarity.">The rarest pair, to give rare words their own tokens</button>
-            <button class="quiz-option" type="button" data-correct="true">The pair whose count(AB) / (count(A) &times; count(B)) score is highest, rewarding above-chance co-occurrence</button>
-          </div>
-          <p class="quiz-feedback" aria-live="polite" hidden></p>
-        </div>
-
-        <div class="panel tokenizer-corpus-setup" style="margin-bottom: 14px;">
-          <label class="field-label" for="buildCorpusSelect">Training corpus: the real text the tokenizer counts its pieces from</label>
-          <select id="buildCorpusSelect" class="control-input"></select>
-          <div id="buildCorpusStats" class="stat-grid" aria-live="polite"></div>
-          <p class="microcopy">Every merge and count below comes from counting this one corpus. Here is a sample of it:</p>
-          <p id="buildCorpusPreview" aria-live="polite" style="margin: 10px 0 0; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: #fffefa; color: var(--muted); font-size: 0.86rem; font-style: italic; line-height: 1.5;"></p>
-        </div>
-
-        <div class="tokenizer-layout">
-          <div class="panel">
-            <div class="control-grid section-controls" style="grid-template-columns: 1fr;">
-              <label class="select-row" for="tokenizerAlgorithmSelect">
-                <span>Algorithm</span>
-                <select id="tokenizerAlgorithmSelect" class="control-input">
-                  <option value="" selected>Choose an algorithm…</option>
-                  <option value="bpe">BPE merges</option>
-                  <option value="wordpiece">WordPiece</option>
-                  <option value="unigram">SentencePiece-style Unigram LM</option>
-                  <option value="byte">Byte-level UTF-8</option>
-                </select>
-              </label>
-              <label class="range-row" for="tokenizerVocabSlider" style="grid-template-columns: auto minmax(60px, 1fr) 44px;">
-                <span>Target pieces</span>
-                <input id="tokenizerVocabSlider" type="range" min="40" max="180" step="10" value="90">
-                <output id="tokenizerVocabLabel" for="tokenizerVocabSlider">90</output>
-              </label>
+        <div class="workbook-capstone">
+          <div class="section-title-row">
+            <div>
+              <p class="eyebrow">Capstone</p>
+              <h3>Train all three rules on one real corpus</h3>
             </div>
-            <p class="microcopy">Each row is a learned step: <strong>piece A + piece B -> merged piece</strong>, with the count of how often that pair appeared in the corpus. More <em>target pieces</em> means more merges, so tokens grow longer and fewer. (Unigram LM lists its highest-probability surviving pieces instead; byte-level learns nothing, by design.)</p>
-            <div id="tokenizerTrainingPanel" class="algorithm-flow" aria-live="polite"></div>
+            <span id="tokenizerCompareStatus" class="pill">not trained</span>
           </div>
-          <div class="panel">
-            <div class="section-title-row">
-              <h3>Encoded output</h3>
-              <span id="algorithmSummary" class="pill">BPE</span>
-            </div>
-            <label class="field-label" for="buildTokenizerInput">Text to encode</label>
-            <textarea id="buildTokenizerInput" class="corpus-input" spellcheck="false" style="min-height: 64px;">Tokenization turns unfamiliar words like microtransformers into useful pieces.</textarea>
-            <p class="microcopy">Edit this sentence to encode it with the tokenizer trained on the corpus above. Try a rare word, a number, or a name and watch the pieces change.</p>
-            <div id="algorithmTokens" class="tokenizer-chip-rail" aria-live="polite"></div>
+          <p>
+            Choose one corpus, one vocabulary budget, and one sentence. Then train all
+            three controlled rules together. <em>(Note: Real LLMs use vocabularies of 30,000 to 150,000 pieces; we are using 40 to 180 here so you can feel the exact moment a word shatters.)</em> The repeated result panels keep the field
+            order identical so you can compare the learned artifacts and encoded text
+            without switching modes.
+          </p>
+          <div class="panel capstone-controls">
+            <label class="field-label" for="buildCorpusSelect">Training corpus</label>
+            <select id="buildCorpusSelect" class="control-input"></select>
+            <div id="buildCorpusStats" class="stat-grid" aria-live="polite"></div>
+            <p class="microcopy">A short sample of the exact text each rule will train on:</p>
+            <p id="buildCorpusPreview" class="corpus-preview" aria-live="polite"></p>
+            <label class="range-row" for="tokenizerVocabSlider">
+              <span>Target pieces</span>
+              <input id="tokenizerVocabSlider" type="range" min="40" max="180" step="10" value="90">
+              <output id="tokenizerVocabLabel" for="tokenizerVocabSlider">90</output>
+            </label>
+            <label class="field-label" for="buildTokenizerInput">Text to encode after training</label>
+            <textarea id="buildTokenizerInput" class="corpus-input compact-capstone-input" spellcheck="false">Tokenization turns unfamiliar words like microtransformers into useful pieces.</textarea>
+            <p class="microcopy">Corpus or target-piece changes mark the results stale. After training, editing only this sentence reuses the frozen models.</p>
+            <button id="tokenizerCompareButton" class="primary-button" type="button">Train and compare</button>
+          </div>
+          <div id="tokenizerComparisonResults" class="algorithm-comparison-grid" aria-live="polite">
+            <div class="empty-state">Press Train and compare to build BPE, WordPiece, and Unigram together.</div>
+          </div>
+          <div id="byteReference" class="byte-reference" aria-live="polite">
+            <div class="empty-state">The UTF-8 byte reference will appear after training; it does not learn pieces.</div>
           </div>
         </div>
 
         <article class="code-cell chapter-code-cell" data-chapter-output="tokenizer">
-          <div class="cell-head">
-            <h3>Compare tokenizers on one text</h3>
-            <button class="run-button" type="button">Run</button>
-          </div>
           <div class="code-quiz" data-quiz-type="predict" data-explain="Each learning rule carves text differently, so the same sentence becomes a different number of pieces. Production tokenizers also differ in their boundary policy before the learning rule starts.">
-            <p class="quiz-prompt">Predict first: you encode the <em>same</em> sentence with this toy BPE, WordPiece, SentencePiece-style Unigram LM, and byte-level view. Will they produce&hellip;</p>
+            <p class="quiz-prompt">Predict first: will the three frozen learning rules expose exactly the same raw piece arrays?</p>
             <div class="quiz-options" role="group" aria-label="Predict whether tokenizers agree">
               <button class="quiz-option" type="button">Exactly the same pieces every time</button>
               <button class="quiz-option" type="button">Always one piece per word</button>
@@ -1260,12 +1329,16 @@
             <p class="quiz-feedback" aria-live="polite" hidden></p>
             <button class="quiz-skip" type="button">Just show me the code</button>
           </div>
+          <div class="cell-head">
+            <h3>Inspect the raw token arrays</h3>
+            <button class="run-button" type="button">Run</button>
+          </div>
           <textarea class="code-input" spellcheck="false">// Tokenize ONE sentence four different ways, then compare the result.
 // Edit this text and press Run to tokenize your own words.
 const text = "Tokenization turns unfamiliar words like microtransformers into useful pieces.";
 
-// Each toy tokenizer splits the SAME text with the rule it learned from the
-// corpus above. encodeWith(name, text) returns the pieces that algorithm makes.
+// BPE, WordPiece, and Unigram use the SAME character-inside-span preparation.
+// The byte row is a reference. encodeWith(name, text) returns each result.
 const results = ["bpe", "wordpiece", "unigram", "byte"].map((name) => {
   const pieces = encodeWith(name, text);
   return { algorithm: name, pieces: pieces, count: pieces.length };
@@ -1275,10 +1348,26 @@ const results = ["bpe", "wordpiece", "unigram", "byte"].map((name) => {
 return { text: text, results: results };</textarea>
           <div class="code-output" aria-live="polite"></div>
         </article>
+
+        <div class="worked-example decoding-epilogue">
+          <h3>One shared way back: decode the IDs</h3>
+          <p>
+            Encoding maps text pieces to integer IDs. Decoding reverses that path: the
+            tokenizer looks up each emitted ID in its frozen vocabulary, recovers the
+            pieces, and joins them into text. SentencePiece turns <code>&#9601;</code>
+            back into spaces, reconstructing the normalized input; GPT-style byte BPE
+            maps pieces back to bytes before UTF-8 decoding.
+          </p>
+          <p class="answer-strip">
+            You have now made one training decision and one runtime decision for each
+            rule. Next, we will use those mechanics to explain why real tokenizers
+            produce surprising failures.
+          </p>
+        </div>
       </div>
     </section>
 
-    <section id="edges" class="band" aria-labelledby="edges-title" frozen="yes">
+<section id="edges" class="band" aria-labelledby="edges-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">5. Why models break: the tokenization quirks</p>
@@ -1343,20 +1432,20 @@ return { text: text, results: results };</textarea>
             <span>Some older GPT-style encodings represented indentation inefficiently, making code consume more context. Newer encodings can group whitespace more deliberately.</span>
           </div>
           <div>
-            <strong>Trailing whitespace can surprise it</strong>
-            <span>Many GPT-style tokens include a leading space with the following word. A lone trailing space can therefore produce an unusual boundary, though the effect depends on the tokenizer and model.</span>
+            <strong>Trailing whitespace can cause hiccups</strong>
+            <span>Many GPT-style tokens fold a leading space into the word that follows it. A lone trailing space at the end of your prompt can force the tokenizer to use a rare, fragmented boundary for the next word, disrupting the pattern the model expects to see.</span>
           </div>
           <div>
             <strong>Special tokens need care</strong>
             <span>Reserved strings such as <code>&lt;|endoftext|&gt;</code> can carry control meaning when an application allows them to be encoded as special tokens. Robust tokenization APIs often reject or escape them by default.</span>
           </div>
           <div>
-            <strong>SolidGoldMagikarp</strong>
-            <span>The famous Reddit username became an <a href="https://arxiv.org/abs/2405.05417" target="_blank" rel="noreferrer">under-trained “glitch token”</a>: it existed in a tokenizer vocabulary but was nearly or entirely absent during model training, leading to unreliable behavior.</span>
+            <strong>SolidGoldMagikarp and Glitch Tokens</strong>
+            <span>The famous Reddit username became an <a href="https://arxiv.org/abs/2405.05417" target="_blank" rel="noreferrer">under-trained “glitch token”</a>. It existed in the tokenizer's vocabulary (which was scraped from a massive dataset) but was virtually absent during the neural network's actual training. When asked to process this token, models produced bizarre, hallucinated outputs.</span>
           </div>
           <div>
             <strong>YAML can be shorter than JSON</strong>
-            <span>For some data and some tokenizers, YAML uses fewer pieces than equivalent JSON. It is not universal; choose “JSON versus YAML” in the lab and compare this toy tokenizer's actual counts.</span>
+            <span>Because JSON relies heavily on repeating braces and double quotes, it can fracture into more tokens. For some data structures, YAML uses fewer pieces. It is not a universal rule; choose “JSON versus YAML” in the lab and compare this toy tokenizer's actual counts.</span>
           </div>
         </div>
 
@@ -1523,7 +1612,7 @@ return { text: text, results: results };</textarea>
   </main>
 
   <script src="corpora.js"></script>
-  <script src="chapter3.js?v=20260726"></script>
+  <script src="chapter3.js?v=20260728h"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script defer src="code-highlight.js"></script>
   <script defer src="code-quiz.js"></script>
