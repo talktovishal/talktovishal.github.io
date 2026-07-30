@@ -48,7 +48,7 @@
       <span class="progress-banner-badge">In Progress</span>
       <p class="progress-banner-text">This chapter is still being written and reviewed, so it is not finished yet and parts may be rough or change. <a href="index.html#stay-notified">Get notified</a> when it is officially published.</p>
     </div>
-    <section id="overview" class="workbench-band" aria-labelledby="page-title" frozen="yes">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title" frozen="no">
       <div class="workbench">
         <article class="intro-copy">
           <p class="eyebrow">Learning by doing</p>
@@ -148,7 +148,7 @@
       </div>
     </section>
 
-    <section id="math-toolkit" class="band" aria-labelledby="math-title" frozen="yes">
+    <section id="math-toolkit" class="band" aria-labelledby="math-title" frozen="no">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">1. Surprise and the next word</p>
@@ -159,7 +159,8 @@
             equations. Do not let that scare you off. Every
             symbol gets explained in plain words right where it appears, and every formula
             is just a tidy way of writing a concept you will have already worked out by
-            hand a line above. Where a piece of calculus shows up, I will define it on . Read the words first and the symbols second, and it will all make sense.
+            hand a line above. Where a piece of calculus shows up, I will define it on
+            the spot. Read the words first and the symbols second, and it will all make sense.
           </p>
           <p>
             Let's begin with a feeling you already have: <em>surprise</em>. Read
@@ -170,7 +171,7 @@
             model to get less surprised and more confident at the words that really come next. So our very first
             job is to put a number on surprise.
           </p>
-<p>
+          <p>
             To make this concrete, let's start with a small pile of next-word counts
             for a specific context. Say that after the phrase <code>the cat</code>, we look at our training data and see
             the word <code>sat</code> 8 times, <code>ran</code> 3 times, and <code>slept</code>
@@ -489,7 +490,7 @@
           </p>
         </div>
 
-<div class="math-formal" aria-label="Comparison in symbols">
+        <div class="math-formal" aria-label="Comparison in symbols">
           <h3>The same comparison, in symbols</h3>
           <p>
             Why does multiplying and adding numbers measure meaning? Imagine each dimension in a word vector represents a hidden trait (like "furriness" or "royalty"). When you multiply matching components, you are checking for shared traits. If both <code>cat</code> and <code>dog</code> score high on "furry," multiplying those values produces a large number. Adding these up across all dimensions yields the <strong>dot product</strong>—a raw score of semantic overlap.
@@ -730,14 +731,14 @@
             Once we run the network to get its output, it will not naturally
             hand us neat percentages for the list of possible words. It will hand us a raw score for every word it
             could predict - a number called a
-            <strong>logit</strong>. But a logit can be 4.2 or -1.1 or anything at all. If we have negative logits, the math breaks. We promised the model would output <em>probabilities</em>: positive numbers between 0 and 1 that add up to 1.
+            <strong>logit</strong>. A logit can be 4.2 or -1.1 or anything at all, and that is perfectly legal. The problem is not the minus sign; logits are raw relative scores, not probabilities. They do not have to be positive or add up to 1. We promised the model would output <em>probabilities</em>: positive numbers between 0 and 1 that add up to 1.
           </p>
           <p>
             <a href="https://en.wikipedia.org/wiki/Softmax_function" target="_blank" rel="noreferrer">Softmax</a>
             is the elegant bridge that gets us from any-old-numbers to a clean distribution. It relies on a two-step trick: first, it <em>exponentiates</em> every score. This instantly turns every number (even negative ones) positive, and it stretches the gaps between close numbers so a clear winner emerges. Second, it divides each by the running total so the whole set perfectly sums to 1. <strong>Temperature</strong> is the dial
             that controls that stretching. Chapter 1 gave you a coarse version of this same
             choice - <em>top-pick</em> (always take the strongest word) versus <em>sampling</em>
-            (weighted random).Why does one dial do both? Because temperature acts <em>before</em> the
+            (weighted random). Why does one dial do both? Because temperature acts <em>before</em> the
             exponential: every score is divided by <code>T</code> first. Make <code>T</code>
             large and you squash all the scores toward zero, so after exponentiating they
             land near <code>e<sup>0</sup> = 1</code> - nearly equal, a flat tie where even
@@ -748,9 +749,9 @@
             exactly Chapter 1's top-pick, now recovered as one end of a continuous dial.
           </p>
           <p>
-            Now the satisfying part: assigning blame aka error calculation. Remember cross-entropy? Its the measure of the difference between the model's predicted probabilities and the actual outcomes. With probabilities in hand,
+            Now the satisfying part: assigning blame, aka error calculation. Remember cross-entropy? It's the measure of the difference between the model's predicted probabilities and the actual outcomes. With probabilities in hand,
             cross-entropy builds on that to measure how much confidence the model put on the word that actually
-            came next - little there means a lot of surprise, a high loss. To fix it, the model must hand each word its share of the blame. And here is the small miracle that makes the whole machine practical: for softmax paired with cross-entropy, that blame collapses to one of the simplest expressions in all of deep learning - <code>probability &minus; target</code>. Predicted minus wanted. If the model predicts <code>0.99</code> for the true word (target <code>1.0</code>), the blame is <code>-0.01</code>: just a tiny nudge. But if it predicts <code>0.01</code>, the blame is <code>-0.99</code>: a massive correction.
+            came next - little there means a lot of surprise, a high loss. To fix it, the model must hand each word its share of the blame. And here is the small miracle that makes the whole machine practical: for softmax paired with cross-entropy, the blame on each <em>temperature-scaled score</em> collapses to one of the simplest expressions in all of deep learning - <code>probability &minus; target</code>. Predicted minus wanted. At temperature 1, the scaled score and original logit are identical, so this is also the gradient on the logit: if the model predicts <code>0.99</code> for the true word (target <code>1.0</code>), the gradient is <code>-0.01</code>, just a tiny nudge. But if it predicts <code>0.01</code>, the gradient is <code>-0.99</code>, a massive correction. At any other temperature, one final chain-rule step divides that logit gradient by <code>T</code>.
           </p>
           <p>
             Why does it land on something so clean? Because the two halves are built from
@@ -759,13 +760,14 @@
             measures the loss with that exponential's exact mirror image, the natural log
             (<code>ln</code>). When we ask calculus how the loss shifts as one score moves, the
             <code>e</code> and the <code>ln</code> cancel and the messy middle terms fall away,
-            leaving nothing but the gap between what the model gave and what we wanted. There
+            leaving nothing but the gap between what the model gave and what we wanted on the scaled score. There
             is also a tidy intuition for the leftover: the loss only ever wants the true word's
             probability to climb toward 1 and every other word's to sink toward 0, so the
             steepest fix is simply <em>how far each probability still sits from its goal</em> -
-            which is exactly <code>probability &minus; target</code>. (The full line-by-line
-            cancellation is worked out in the symbols panel below.) Move the raw scores below
-            and watch that one difference become the exact error signal every weight will follow.
+            which is exactly <code>probability &minus; target</code>. To carry that blame back
+            through the temperature step and reach the original logit, we divide by <code>T</code>.
+            (The full line-by-line cancellation is worked out in the symbols panel below.) Move
+            the raw scores and temperature below and watch the exact logit gradient change.
           </p>
         </div>
 
@@ -774,7 +776,7 @@
             <source src="assets/videos/chapter4-softmax-loss.mp4" type="video/mp4">
           </video>
           <figcaption>
-            <strong>Softmax to blame.</strong> Raw scores become positive numbers, then probabilities; cross-entropy looks at the true word and turns the gap into <code>probability &minus; target</code>.
+            <strong>Softmax to blame.</strong> Raw scores become positive numbers, then probabilities; cross-entropy gives <code>probability &minus; target</code> on the scaled score, and dividing by <code>T</code> carries the gradient back to the original logit.
           </figcaption>
         </figure>
 
@@ -819,16 +821,17 @@
 
           <div class="panel">
             <div class="section-title-row">
-              <h3>Probabilities and blame</h3>
+              <h3>Probabilities and logit gradients</h3>
               <span id="softmaxLossLabel" class="pill">cross-entropy</span>
             </div>
             <div id="softmaxPanel" class="probability-panel" aria-live="polite"></div>
+            <p class="microcopy">The rows below show the gradient on each original score slider: \(\partial L/\partial z_i = (q_i-y_i)/T\). At temperature 1, this is the familiar \(q_i-y_i\).</p>
             <div id="backpropPanel" class="backprop-panel" aria-live="polite"></div>
           </div>
         </div>
 
         <div class="worked-example" aria-label="Softmax by hand">
-          <h3>Softmax, then blame, by hand</h3>
+          <h3>Softmax, then logit gradients, by hand</h3>
           <p>
             Take the three raw scores above - <code>sat 1.70, ran 0.80, slept -1.10</code>
             at temperature 1. Exponentiate each, then divide by the total so the
@@ -838,13 +841,16 @@
             <span>\(e^{1.70} \approx 5.47,\ e^{0.80} \approx 2.23,\ e^{-1.10} \approx 0.33 \quad (\text{total: } 8.03)\)</span>
             <span>\(\text{softmax: sat} = \tfrac{5.47}{8.03} \approx 0.681,\ \text{ran} = \tfrac{2.23}{8.03} \approx 0.277,\ \text{slept} = \tfrac{0.33}{8.03} \approx 0.041\)</span>
             <span>\(\text{if \textbf{sat} is true: loss} = -\ln(0.681) \approx 0.38 \text{ nats}\)</span>
-            <span>\(\text{blame } (q_i - y_i)\text{: sat } 0.681-1 = -0.319,\ \text{ran } +0.277,\ \text{slept } +0.041\)</span>
+            <span>\(\text{at } T=1,\ \dfrac{\partial L}{\partial z_i}=\dfrac{q_i-y_i}{1}\text{: sat } -0.319,\ \text{ran } +0.277,\ \text{slept } +0.041\)</span>
           </div>
           <p class="microcopy">
-            The live panel recomputes these as you drag the scores. The blame on the
+            The live panel recomputes these as you drag the scores or temperature. Because
+            this worked example uses \(T=1\), dividing by temperature changes nothing. At
+            any other temperature, the panel includes that final \(1/T\) chain-rule factor.
+            The gradient on the
             true word is negative (its score gets pushed up) while the others are
-            positive (pushed down): that single <code>probability − target</code>
-            vector is the exact starting error signal for the entire network.
+            positive (pushed down): this logit-gradient vector is the exact starting error
+            signal for the entire network.
           </p>
           <p class="microcopy">
             <em>Units note:</em> a <em>nat</em> is just a unit of surprise - the very same
@@ -856,49 +862,61 @@
           </p>
         </div>
 
-        <div class="math-formal" aria-label="Softmax and blame in symbols">
-          <h3>Softmax, loss, and blame, in symbols</h3>
+        <div class="math-formal" aria-label="Softmax and temperature-aware gradients in symbols">
+          <h3>Softmax, loss, and gradients, in symbols</h3>
           <p>
-            Softmax exponentiates each raw score \(z_i\) and divides by the total, so the
-            outputs are positive and sum to 1. Temperature \(T\) divides the scores first,
-            stretching or sharpening them. Cross-entropy then reads off the negative log
-            probability of the true word, and the gradient of that loss with respect to
-            each score collapses to one clean difference:
+            Temperature first turns each original logit \(z_i\) into a scaled score
+            \(s_i=z_i/T\). Softmax exponentiates those scaled scores and divides by the
+            total, so the outputs are positive and sum to 1. Cross-entropy then reads off
+            the negative log probability of the true word. The gradient on \(s_i\)
+            collapses to one clean difference; carrying it back to \(z_i\) contributes
+            the extra \(1/T\) from the chain rule:
           </p>
-          $$q_i = \frac{e^{z_i}}{\sum_{j} e^{z_j}} \qquad q_i^{(T)} = \frac{e^{z_i / T}}{\sum_{j} e^{z_j / T}}$$
-          $$L = -\sum_i y_i \ln q_i = -\ln q_{\text{true}} \qquad \frac{\partial L}{\partial z_i} = q_i - y_i$$
+          $$s_i = \frac{z_i}{T} \qquad q_i = \frac{e^{s_i}}{\sum_{j} e^{s_j}}$$
+          $$L = -\sum_i y_i \ln q_i = -\ln q_{\text{true}}$$
+          $$\frac{\partial L}{\partial s_i} = q_i-y_i \qquad \frac{\partial L}{\partial z_i} = \frac{q_i-y_i}{T}$$
           <ul class="symbol-glossary">
-            <li>\(z_i\): the raw score (logit) for word \(i\); \(q_i\): its softmax probability.</li>
+            <li>\(z_i\): the original raw score (logit) for word \(i\); \(s_i=z_i/T\): the score after temperature scales it.</li>
+            <li>\(q_i\): the softmax probability computed from the scaled scores.</li>
             <li>\(y_i\): the target, 1 for the true next word and 0 for every other word.</li>
             <li>\(T\): temperature; \(T{=}1\) leaves the scores unchanged.</li>
-            <li>\(\frac{\partial L}{\partial z_i} = q_i - y_i\): the blame, "probability minus target."</li>
+            <li>\(\frac{\partial L}{\partial s_i}=q_i-y_i\): the blame on the scaled score.</li>
+            <li>\(\frac{\partial L}{\partial z_i}=(q_i-y_i)/T\): the gradient on the original logit shown by the live panel.</li>
           </ul>
 
           <h3>Why does the blame collapse to that?</h3>
           <p>
             It looks too clean to be an accident, and it is not one: the \(\ln\) in
             cross-entropy and the \(e\) in softmax are near-inverses, so they cancel each
-            other's mess. Start from the loss for the true word \(c\), substitute the
-            softmax definition, and split the fraction with \(\ln\tfrac{a}{b} = \ln a - \ln b\):
+            other's mess. Work first with the scaled score \(s_i=z_i/T\). Start from the
+            loss for the true word \(c\), substitute the softmax definition, and split the
+            fraction with \(\ln\tfrac{a}{b} = \ln a - \ln b\):
           </p>
-          $$L = -\ln q_c = -\ln \frac{e^{z_c}}{\sum_j e^{z_j}} = -z_c + \ln\sum_j e^{z_j}$$
+          $$L = -\ln q_c = -\ln \frac{e^{s_c}}{\sum_j e^{s_j}} = -s_c + \ln\sum_j e^{s_j}$$
           <p>
-            Now take the derivative with respect to any single score \(z_i\). Each of the
-            two pieces has a tidy, intuitive job:
+            Now take the derivative with respect to any single scaled score \(s_i\). Each
+            of the two pieces has a tidy, intuitive job:
           </p>
           <ul class="symbol-glossary">
-            <li>\(\dfrac{\partial}{\partial z_i}\big(-z_c\big) = -y_i\): the \(-z_c\) term touches only the <em>true</em> word, pushing its score up. It contributes \(-1\) for the true word and \(0\) for every other.</li>
-            <li>\(\dfrac{\partial}{\partial z_i}\ln\sum_j e^{z_j} = \dfrac{e^{z_i}}{\sum_j e^{z_j}} = q_i\): the derivative of that running total is <em>the softmax all over again</em>, which pushes every word's score down in proportion to the probability it currently holds.</li>
+            <li>\(\dfrac{\partial}{\partial s_i}\big(-s_c\big) = -y_i\): the \(-s_c\) term touches only the <em>true</em> word, pushing its score up. It contributes \(-1\) for the true word and \(0\) for every other.</li>
+            <li>\(\dfrac{\partial}{\partial s_i}\ln\sum_j e^{s_j} = \dfrac{e^{s_i}}{\sum_j e^{s_j}} = q_i\): the derivative of that running total is <em>the softmax all over again</em>, which pushes every word's score down in proportion to the probability it currently holds.</li>
           </ul>
           <p>
-            Add the two together and the whole gradient is just \(q_i - y_i\). In plain
+            Add the two together and the scaled-score gradient is \(q_i-y_i\). One short
+            chain-rule step carries it back through \(s_i=z_i/T\) to the original logit:
+          </p>
+          $$\frac{\partial L}{\partial z_i} = \frac{\partial L}{\partial s_i}\frac{\partial s_i}{\partial z_i} = (q_i-y_i)\frac{1}{T}$$
+          <p>
+            In plain
             words: <strong>lift the true word's score, and shave a little off every word
             in proportion to how much probability it is currently hogging.</strong> The
-            size is self-correcting, too: the blame on the true word is \(q_c - 1\), a
+            scaled-score blame is self-correcting, too: on the true word it is \(q_c-1\), a
             feather-light nudge when the model is already confident (\(q_c \approx 1\)) but
-            a full \(-1\) shove when it is badly wrong (\(q_c \approx 0\)). Once the model
-            is perfect, every \(q_i - y_i = 0\) and the blame vanishes, which is exactly
-            when learning should stop.
+            full \(-1\) shove when it is badly wrong (\(q_c \approx 0\)); temperature then
+            scales the gradient that reaches the original logit by \(1/T\). The rest of
+            this chapter's training examples use \(T=1\), so there \(s_i=z_i\) and the
+            familiar \(q_i-y_i\) rule applies directly. Once the model is perfect, every
+            \(q_i-y_i=0\) and both gradients vanish, which is exactly when learning should stop.
           </p>
         </div>
 
@@ -912,11 +930,11 @@
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
-        <div class="code-quiz" data-quiz-type="predict" data-explain="Softmax paired with cross-entropy collapses to the gradient q_i minus y_i (probability minus target): push the true word's score up and the others down. That clean form is why the pair is everywhere in deep learning.">
-          <p class="quiz-prompt">Quick check: for softmax with cross-entropy loss, the gradient that flows back to each score <code>z_i</code> is famously simple. What is it?</p>
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Softmax paired with cross-entropy gives q_i minus y_i on the scaled score z_i/T. The chain rule then contributes 1/T, so the gradient on the original logit is (q_i minus y_i)/T. At T=1, the two are identical.">
+          <p class="quiz-prompt">Quick check: temperature first turns a logit into <code>z_i / T</code>. What gradient flows all the way back to the original logit <code>z_i</code>?</p>
           <div class="quiz-options" role="group" aria-label="The softmax cross-entropy gradient">
-            <button class="quiz-option" type="button" data-correct="true">The predicted probability minus the target, <code>q_i &minus; y_i</code></button>
-            <button class="quiz-option" type="button" data-feedback="The learning rate scales the whole update later; it is not the gradient on the score itself.">The raw score times the learning rate</button>
+            <button class="quiz-option" type="button" data-correct="true">The probability-target gap divided by temperature, <code>(q_i &minus; y_i) / T</code></button>
+            <button class="quiz-option" type="button" data-feedback="That is the gradient on the scaled score z_i/T, and it equals the original-logit gradient only when T is 1. The chain rule contributes one more factor of 1/T.">Just <code>q_i &minus; y_i</code> at every temperature</button>
             <button class="quiz-option" type="button" data-feedback="It is non-zero for the true word too: q_true minus 1, which still pushes its score up.">Always zero for the correct word</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
@@ -969,11 +987,11 @@
             <em><strong>Calculus Refreshers:</strong> If the \(\partial\) symbol looks unfamiliar, Wikipedia has excellent, visual primers on <u><a href="https://en.wikipedia.org/wiki/Partial_derivative" target="_blank" rel="noreferrer">Partial derivatives</a></u> and the <u><a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a></u>.</em>
           </p>
           <p>
-            How do we calculate that exact gradient number? We use the Chain Rule. Working from the outside in: the \(2\) from the squared error drops down to the front, and then we multiply by the inner variable attached to our knob. Because our prediction is \((\text{slope} \cdot x + \text{intercept})\), the variable attached to the slope is \(x\). The variable attached to the intercept is just \(1\).
+            How do we calculate that exact gradient number? We use the Chain Rule. For one data point, the \(2\) from the squared error drops down to the front, and then we multiply by the inner variable attached to our knob. Because our prediction is \((\text{slope} \cdot x + \text{intercept})\), the variable attached to the slope is \(x\). The variable attached to the intercept is just \(1\). Those are the per-point contributions. Because the loss above averages over \(N\) points, the full gradient adds all \(N\) contributions and divides by \(N\) too.
           </p>
 
           $$L = \frac{1}{N}\sum_{i=1}^{N}\big(\hat{y}_i - y_i\big)^2 \qquad (\text{where } \hat{y} = \text{slope} \cdot x + \text{intercept})$$
-          $$\frac{\partial L}{\partial\,\text{slope}} = 2(\hat{y}-y)\,x \qquad \frac{\partial L}{\partial\,\text{intercept}} = 2(\hat{y}-y)$$
+          $$\frac{\partial L}{\partial\,\text{slope}} = \frac{2}{N}\sum_{i=1}^{N}(\hat{y}_i-y_i)x_i \qquad \frac{\partial L}{\partial\,\text{intercept}} = \frac{2}{N}\sum_{i=1}^{N}(\hat{y}_i-y_i)$$
           $$w \leftarrow w - \eta\,\frac{\partial L}{\partial w}$$
 
           <ul class="symbol-glossary">
@@ -985,7 +1003,7 @@
             <li>\(\leftarrow\): "becomes" (we replace the old weight with its newly nudged value).</li>
           </ul>
           <p class="microcopy">
-            <strong>Walking through one step for the slope:</strong> For a single data point \((x{=}1,\ y{=}1)\) and a starting \(\text{slope}{=}0\), our prediction is \(\hat{y}=0\). The error is \(\hat{y}-y = -1\).
+            <strong>Walking through one step for the slope:</strong> This is the \(N=1\) special case, so the average contains one term and \(1/N=1\). For a single data point \((x{=}1,\ y{=}1)\) and a starting \(\text{slope}{=}0\), our prediction is \(\hat{y}=0\). The error is \(\hat{y}-y = -1\).
             <br><br>
             The gradient for the slope is \(2(-1)(1) = -2\). Now we use the update rule template, swapping \(w\) for the slope: \(\text{slope} \leftarrow 0 - 0.1(-2) = +0.2\). Subtracting the gradient ensures we step <em>downhill</em>, and \(\eta\) (set to \(0.1\) here) scales how big that step is.
           </p>
@@ -1024,7 +1042,7 @@
             </div>
             <p class="microcopy">
               That <strong>step size</strong> (<code>0.08</code>) is the
-              <strong>learning rate</strong>: each Step moves a knob by this fraction of its
+              <strong>learning rate</strong>: each step moves a knob by this fraction of its
               gradient. Small keeps training stable; larger takes bigger, riskier leaps.
             </p>
             <div class="stepper-row gradient-buttons">
@@ -1045,7 +1063,7 @@
           <div class="panel">
             <div class="section-title-row">
               <h3>The exact math, live</h3>
-              <span id="lossLabel" class="pill">recomputed each Step</span>
+              <span id="lossLabel" class="pill">recomputed each step</span>
             </div>
             <div id="gradientMetrics" class="metric-card-grid" aria-live="polite"></div>
             <div id="gradientExplanation" class="gradient-explanation" aria-live="polite"></div>
@@ -1327,7 +1345,7 @@
           </div>
         </div>
 
-<div class="math-formal" aria-label="Backpropagation in symbols">
+        <div class="math-formal" aria-label="Backpropagation in symbols">
           <h3>A Step-by-Step Backpropagation Walkthrough</h3>
           <p>
             To truly demystify backpropagation, we are going to start by ditching the abstract algebra and crunching real numbers step-by-step (an approach heavily inspired by <a href="https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/" target="_blank" rel="noreferrer">Matt Mazur's classic backpropagation tutorial</a>, but adapted for our language model). Once we prove the math works for a single weight, we will scale it up using matrices—revealing why operations like "transpose" are the secret weapons that make modern AI possible.
@@ -2282,7 +2300,7 @@ return {
     </section>
   </main>
 
-  <script src="chapter4.js?v=20260627b"></script>
+  <script src="chapter4.js?v=20260728"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>

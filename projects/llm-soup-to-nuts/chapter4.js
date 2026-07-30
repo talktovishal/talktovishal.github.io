@@ -584,7 +584,7 @@ function renderGradientDerivation({ w, b, lr, info, nextLoss }) {
   const container = dom.gradientExplanation;
   const n = lineData.length;
 
-  const intro = createElement("div", "step-lead", `Every Step is just this calculation, recomputed from all ${n} points for the current line. The prediction is \u0177 = slope\u00b7x + intercept and the error is e = \u0177 \u2212 y:`);
+  const intro = createElement("div", "step-lead", `Every step is just this calculation, recomputed from all ${n} points for the current line. The prediction is \u0177 = slope\u00b7x + intercept and the error is e = \u0177 \u2212 y:`);
 
   const wrap = createElement("div", "deriv-table-wrap");
   const table = createElement("table", "deriv-table");
@@ -640,7 +640,7 @@ function renderGradientDerivation({ w, b, lr, info, nextLoss }) {
   const reason = createElement("p");
   const settled = Math.abs(info.dw) < 0.01 && Math.abs(info.db) < 0.01;
   if (settled) {
-    reason.textContent = "The errors are tiny now, so the sums are near zero and each Step barely moves the line - it has essentially fit the dots.";
+    reason.textContent = "The errors are tiny now, so the sums are near zero and each step barely moves the line - it has essentially fit the dots.";
   } else {
     const heightReason = info.db < -0.01
       ? "sits a little below the dots, so the step lifts it"
@@ -787,18 +787,19 @@ function renderSoftmax() {
   dom.backpropPanel.replaceChildren();
   probabilities.forEach((probability, index) => {
     const target = index === correctIndex ? 1 : 0;
-    const gradient = probability - target;
-    const className = index === correctIndex ? "is-answer" : gradient > 0.2 ? "is-too-high" : "";
+    const scaledGradient = probability - target;
+    const logitGradient = scaledGradient / temperature;
+    const className = index === correctIndex ? "is-answer" : logitGradient > 0.2 ? "is-too-high" : "";
     const row = createElement("div", `blame-row ${className}`.trim());
     const track = createElement("div", "softmax-track");
     const fill = createElement("span");
-    fill.style.width = `${Math.min(Math.abs(gradient) * 100, 100)}%`;
+    fill.style.width = `${Math.min(Math.abs(logitGradient) * 100, 100)}%`;
     track.append(fill);
-    const direction = gradient < 0 ? "raise score" : gradient > 0 ? "lower score" : "leave alone";
+    const direction = logitGradient < 0 ? "raise score" : logitGradient > 0 ? "lower score" : "leave alone";
     row.append(
       createElement("strong", "", softmaxNames[index]),
       track,
-      createElement("em", "", `${formatNumber(gradient, 3)}: ${direction}`)
+      createElement("em", "", `${formatNumber(logitGradient, 3)}: ${direction}`)
     );
     dom.backpropPanel.append(row);
   });
