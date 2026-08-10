@@ -1,0 +1,238 @@
+/* Temporary author-review language. Link this file only while a chapter is under review. */
+
+.review-remove,
+.review-add {
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.review-remove {
+  background: #fff0eb;
+  color: #7d3023;
+  text-decoration-line: line-through;
+  text-decoration-color: #b03d28;
+  text-decoration-thickness: 2px;
+}
+
+.review-add {
+  border-bottom: 2px solid #2f7d52;
+  background: #eaf7ef;
+  color: #1f613f;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+del.review-remove,
+ins.review-add {
+  padding: 0.06em 0.2em;
+  border-radius: 3px;
+}
+
+.formula-stack code.review-remove {
+  border-color: #b03d28;
+  background: #fff0eb;
+  color: #7d3023;
+}
+
+.formula-stack code.review-add {
+  border-color: #2f7d52;
+  background: #eaf7ef;
+  color: #1f613f;
+}
+
+.review-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.review-heading > .review-remove,
+.review-heading > .review-add {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.review-block {
+  position: relative;
+  min-width: 0;
+  padding: 38px 16px 16px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+}
+
+.review-block::before {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.review-block.review-remove::before {
+  content: "PROPOSED FOR REMOVAL";
+}
+
+.review-block.review-add::before {
+  content: "PROPOSED";
+}
+
+.review-block.review-add {
+  border-left-width: 4px;
+  text-decoration: none;
+}
+
+.review-block.review-remove {
+  border-left-width: 4px;
+}
+
+.review-block > :last-child {
+  margin-bottom: 0;
+}
+
+.review-block.review-remove :is(button, input, select, textarea, a) {
+  pointer-events: none;
+}
+
+.review-diff-demo {
+  padding: 18px clamp(18px, 4vw, 44px) 22px;
+  border-bottom: 1px dashed #b8afa2;
+  background: #fbfaf7;
+}
+
+.review-diff-demo-inner {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.review-diff-demo .eyebrow {
+  margin: 0 0 4px;
+}
+
+.review-diff-demo h2 {
+  margin: 0 0 8px;
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  letter-spacing: 0;
+}
+
+.review-diff-demo p {
+  margin: 0 0 10px;
+}
+
+.review-diff-demo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.review-diff-demo .review-block p {
+  margin: 6px 0 12px;
+}
+
+.review-diff-demo .review-block button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.review-diff-demo-note {
+  margin-top: 12px !important;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.review-comparison {
+  margin: 16px 0;
+  padding: 14px 0;
+  border-top: 1px dashed #b8afa2;
+  border-bottom: 1px dashed #b8afa2;
+}
+
+.review-comparison > .eyebrow {
+  margin: 0 0 4px;
+}
+
+.review-comparison h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+}
+
+.review-comparison .review-block p {
+  margin: 6px 0 0;
+}
+
+.review-comparison-note {
+  margin: 10px 0 0 !important;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.review-queue {
+  padding: 22px clamp(18px, 4vw, 44px) 26px;
+  border-bottom: 1px solid var(--line);
+  background: #fbfaf7;
+}
+
+.review-queue-inner {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.review-queue .eyebrow {
+  margin: 0 0 4px;
+}
+
+.review-queue h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.4vw, 1.8rem);
+  letter-spacing: 0;
+}
+
+.review-queue-intro {
+  max-width: 820px;
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.review-comparison-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.review-comparison-meta strong {
+  font-size: 0.9rem;
+}
+
+.review-comparison-meta a {
+  color: var(--accent);
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 700px) {
+  .review-diff-demo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .review-comparison-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-remove,
+  .review-add {
+    transition: none;
+  }
+}

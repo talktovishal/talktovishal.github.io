@@ -74,9 +74,22 @@ const dom = {
   forwardCtxA: document.getElementById("forwardCtxA"),
   forwardCtxB: document.getElementById("forwardCtxB"),
   activationSelect: document.getElementById("activationSelect"),
+  forwardCtxAReadout: document.getElementById("forwardCtxAReadout"),
+  forwardCtxBReadout: document.getElementById("forwardCtxBReadout"),
+  forwardActivationReadout: document.getElementById("forwardActivationReadout"),
   networkSvg: document.getElementById("networkSvg"),
   forwardSummary: document.getElementById("forwardSummary"),
   forwardPanel: document.getElementById("forwardPanel"),
+  matrixMultiplyPanel: document.getElementById("matrixMultiplyPanel"),
+  forwardStepTitle: document.getElementById("forward-step-title"),
+  forwardStepCopy: document.getElementById("forwardStepCopy"),
+  forwardStepCount: document.getElementById("forwardStepCount"),
+  forwardDetailBadge: document.getElementById("forwardDetailBadge"),
+  forwardBackButton: document.getElementById("forwardBackButton"),
+  forwardPlayButton: document.getElementById("forwardPlayButton"),
+  forwardNextButton: document.getElementById("forwardNextButton"),
+  forwardReplayButton: document.getElementById("forwardReplayButton"),
+  forwardStepButtons: Array.from(document.querySelectorAll("[data-forward-step]")),
   backpropCtxA: document.getElementById("backpropCtxA"),
   backpropCtxB: document.getElementById("backpropCtxB"),
   backpropTrueWord: document.getElementById("backpropTrueWord"),
@@ -171,9 +184,16 @@ const probabilityPresets = {
   }
 };
 
+const probabilityWordColors = {
+  sat: "var(--teal)",
+  ran: "var(--green)",
+  slept: "var(--gold)",
+  saw: "var(--violet)"
+};
+
 const embeddingRows = {
-  cat: [0.70, 0.30],
-  dog: [0.60, 0.40],
+  cat: [0.70, -0.30],
+  dog: [0.60, -0.20],
   mat: [-0.30, 0.70],
   rug: [-0.20, 0.60]
 };
@@ -199,10 +219,13 @@ const state = {
   networkHistory: [],
   networkTrainingRun: 0,
   isNetworkTraining: false,
-  hasExploredProbability: false,
+  hasExploredProbability: true,
   hasExploredGradient: false,
   hasTrainedNetwork: false,
   forwardFocus: null,
+  forwardCandidateFocus: null,
+  forwardStep: 0,
+  forwardPlayTimer: null,
   backprop: null,
   byHand: { index: 0, hints: {}, solved: {}, revealed: {}, answers: {}, feedback: {} }
 };
@@ -291,15 +314,20 @@ function renderMetricCards(container, cards) {
   });
 }
 
-function probabilityRow(label, value, detail, className = "") {
+function probabilityRow(label, value, detail, className = "", color = "") {
   const row = createElement("div", `probability-row ${className}`.trim());
   const name = createElement("strong", "", label);
   const track = createElement("div", "probability-track");
   const fill = createElement("span");
   fill.style.width = `${clamp(value * 100, 0, 100)}%`;
+  if (color) fill.style.background = color;
   track.append(fill);
   row.append(name, track, createElement("em", "", detail));
   return row;
+}
+
+function probabilityWordColor(label) {
+  return probabilityWordColors[label] || "var(--teal)";
 }
 
 function applyProbabilityPreset() {
@@ -310,6 +338,9 @@ function applyProbabilityPreset() {
     dom.guessLabels[index].textContent = label;
     dom.countSliders[index].value = preset.counts[index];
     dom.guessSliders[index].value = preset.guesses[index];
+    const color = probabilityWordColor(label);
+    dom.countSliders[index].style.setProperty("--word-color", color);
+    dom.guessSliders[index].style.setProperty("--word-color", color);
   });
   renderProbability();
 }
@@ -345,7 +376,7 @@ function renderProbability() {
   dom.probabilityPanel.replaceChildren();
   preset.labels.forEach((label, index) => {
     const detail = `${counts[index]} / ${total || 0} = ${formatPercent(target[index])}`;
-    dom.probabilityPanel.append(probabilityRow(label, target[index], detail));
+    dom.probabilityPanel.append(probabilityRow(label, target[index], detail, "", probabilityWordColor(label)));
   });
 
   renderMetricCards(dom.entropyPanel, [
@@ -556,10 +587,10 @@ function renderGradient() {
     return;
   }
   const info = lineLossAndGradients(w, b);
-  dom.gradientStatus.textContent = `loss ${formatNumber(info.loss, 3)}`;
+  dom.gradientStatus.textContent = `MSE ${formatNumber(info.loss, 3)}`;
   renderLineFitSvg(w, b);
   renderMetricCards(dom.gradientMetrics, [
-    { label: "loss", value: formatNumber(info.loss, 4), note: "average squared gap (lower fits better)" },
+    { label: "MSE loss", value: formatNumber(info.loss, 4), note: "mean squared gap (lower fits better)" },
     { label: "slope", value: formatNumber(w, 2), note: "the line's tilt" },
     { label: "intercept", value: formatNumber(b, 2), note: "its height at the centre" }
   ]);
@@ -629,9 +660,9 @@ function renderGradientDerivation({ w, b, lr, info, nextLoss }) {
   const newB = b - lr * db;
   const stack = createElement("div", "formula-stack");
   [
-    `loss = (1/${n}) \u00d7 \u03a3e\u00b2 = (1/${n}) \u00d7 ${formatNumber(sumSq, 4)} = ${formatNumber(loss, 4)}`,
-    `\u2202loss/\u2202slope = (2/${n}) \u00d7 \u03a3(e\u00b7x) = ${formatNumber(dw, 3)}`,
-    `\u2202loss/\u2202intercept = (2/${n}) \u00d7 \u03a3e = ${formatNumber(db, 3)}`,
+    `MSE loss = (1/${n}) \u00d7 \u03a3e\u00b2 = (1/${n}) \u00d7 ${formatNumber(sumSq, 4)} = ${formatNumber(loss, 4)}`,
+    `\u2202(MSE loss)/\u2202slope = (2/${n}) \u00d7 \u03a3(e\u00b7x) = ${formatNumber(dw, 3)}`,
+    `\u2202(MSE loss)/\u2202intercept = (2/${n}) \u00d7 \u03a3e = ${formatNumber(db, 3)}`,
     `then nudge each knob by rate \u00d7 gradient:`,
     `new slope = ${formatNumber(w, 2)} \u2212 ${formatNumber(lr, 2)} \u00d7 ${signedFactor(dw, 3)} = ${formatNumber(newW, 3)}`,
     `new intercept = ${formatNumber(b, 2)} \u2212 ${formatNumber(lr, 2)} \u00d7 ${signedFactor(db, 3)} = ${formatNumber(newB, 3)}`
@@ -767,7 +798,7 @@ function renderSoftmax() {
   dom.logitCLabel.textContent = formatNumber(logits[2], 2);
   dom.temperatureLabel.textContent = formatNumber(temperature, 2);
   dom.softmaxTempLabel.textContent = `temp ${formatNumber(temperature, 2)}`;
-  dom.softmaxLossLabel.textContent = `loss ${formatNumber(loss, 3)}`;
+  dom.softmaxLossLabel.textContent = `cross-entropy ${formatNumber(loss, 3)} nats`;
 
   dom.softmaxPanel.replaceChildren();
   probabilities.forEach((probability, index) => {
@@ -833,6 +864,77 @@ const forwardW2 = [
 ];
 const forwardB2 = [0.1, 0.0, -0.1];
 
+const forwardStepMeta = [
+  {
+    title: "Look up and join the two embedding rows",
+    copy: "Start with the two context words. Each token ID selects one row from the embedding table; joining those rows gives the four-number input.",
+    badge: "embedding lookup"
+  },
+  {
+    title: "Compute one hidden neuron's dot product",
+    copy: "Follow one hidden neuron closely. Multiply each input by its connecting weight, add the four products, then add the neuron's bias.",
+    badge: "multiply + add"
+  },
+  {
+    title: "Bend all hidden values with the activation",
+    copy: "The activation bends each raw hidden value. This non-linear step is what prevents several layers from collapsing into one multiply-and-add.",
+    badge: "activation"
+  },
+  {
+    title: "Turn the hidden state into three logits",
+    copy: "Each candidate word has its own output weights and bias. One dot product per candidate produces three raw scores called logits.",
+    badge: "output scores"
+  },
+  {
+    title: "Pause at the logits before softmax",
+    copy: "The forward network has produced three legal raw scores, but they are not probabilities yet. The next section shows exactly how softmax converts them.",
+    badge: "handoff to softmax"
+  }
+];
+
+function stopForwardPlayback() {
+  if (state.forwardPlayTimer) {
+    clearInterval(state.forwardPlayTimer);
+    state.forwardPlayTimer = null;
+  }
+  if (dom.forwardPlayButton) dom.forwardPlayButton.textContent = "Play";
+}
+
+function setForwardStep(nextStep, { keepPlaying = false } = {}) {
+  state.forwardStep = clamp(nextStep, 0, forwardStepMeta.length - 1);
+  if (!keepPlaying) stopForwardPlayback();
+  renderForwardPass();
+}
+
+function toggleForwardPlayback() {
+  if (state.forwardPlayTimer) {
+    stopForwardPlayback();
+    return;
+  }
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setForwardStep(forwardStepMeta.length - 1);
+    return;
+  }
+  if (state.forwardStep >= forwardStepMeta.length - 1) state.forwardStep = 0;
+  dom.forwardPlayButton.textContent = "Pause";
+  renderForwardPass();
+  state.forwardPlayTimer = setInterval(() => {
+    if (state.forwardStep >= forwardStepMeta.length - 1) {
+      stopForwardPlayback();
+      return;
+    }
+    state.forwardStep += 1;
+    renderForwardPass();
+  }, 1600);
+}
+
+function resetForwardWalkthrough() {
+  stopForwardPlayback();
+  state.forwardStep = 0;
+  state.forwardCandidateFocus = null;
+  renderForwardPass();
+}
+
 function renderForwardPass() {
   const wordA = dom.forwardCtxA.value;
   const wordB = dom.forwardCtxB.value;
@@ -844,8 +946,12 @@ function renderForwardPass() {
   const z1 = forwardB1.map((bias, j) => bias + input.reduce((sum, value, i) => sum + value * forwardW1[i][j], 0));
   const hidden = z1.map((value) => activation(activationName, value));
   const logits = forwardB2.map((bias, k) => bias + hidden.reduce((sum, value, j) => sum + value * forwardW2[j][k], 0));
-  const probs = softmax(logits);
-  const bestIndex = probs.indexOf(Math.max(...probs));
+  const bestIndex = logits.indexOf(Math.max(...logits));
+  let candidateFocus = state.forwardCandidateFocus;
+  if (candidateFocus === null || candidateFocus === undefined) candidateFocus = bestIndex;
+  candidateFocus = clamp(candidateFocus, 0, forwardCandidates.length - 1);
+  state.forwardCandidateFocus = candidateFocus;
+  renderForwardCurrentState({ wordA, wordB, embA, embB, activationName });
 
   // Default focus = the hidden neuron that pushes hardest on the winning word.
   let focus = state.forwardFocus;
@@ -861,11 +967,35 @@ function renderForwardPass() {
   ));
   const hidContrib = hidden.map((value, j) => logits.map((_, k) => value * forwardW2[j][k]));
 
-  dom.forwardSummary.textContent = `predict "${forwardCandidates[bestIndex]}"`;
-  renderNetworkSvg([wordA, wordB], hidden, forwardCandidates, probs, { focus, bestIndex, inContrib, hidContrib });
-  dom.forwardPanel.replaceChildren(...buildForwardBreakdown({
-    wordA, wordB, embA, embB, input, inputLabels, activationName, z1, hidden, logits, probs, bestIndex, focus
+  const step = clamp(state.forwardStep, 0, forwardStepMeta.length - 1);
+  const meta = forwardStepMeta[step];
+  dom.forwardStepTitle.textContent = meta.title;
+  dom.forwardStepCopy.textContent = meta.copy;
+  dom.forwardStepCount.textContent = `step ${step + 1} of ${forwardStepMeta.length}`;
+  dom.forwardDetailBadge.textContent = meta.badge;
+  dom.forwardBackButton.disabled = step === 0;
+  dom.forwardNextButton.disabled = step === forwardStepMeta.length - 1;
+  dom.forwardStepButtons.forEach((button, index) => {
+    const active = index === step;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  dom.forwardSummary.textContent = `step ${step + 1}: ${meta.badge}`;
+  renderNetworkSvg([wordA, wordB], hidden, forwardCandidates, logits, {
+    step,
+    focus,
+    bestIndex,
+    inContrib,
+    hidContrib,
+    z1,
+    embeddings: [embA, embB],
+    activationName,
+    candidateFocus
+  });
+  dom.forwardPanel.replaceChildren(...buildForwardStep({
+    step, wordA, wordB, embA, embB, input, inputLabels, activationName, z1, hidden, logits, bestIndex, focus, candidateFocus
   }));
+  renderMatrixMultiplyPanel({ wordA, wordB, input, inputLabels, z1 });
 }
 
 function activationEffectTag(name, z) {
@@ -874,54 +1004,392 @@ function activationEffectTag(name, z) {
   return "squashed to (-1, 1)";
 }
 
+function activationControlDescription(name) {
+  if (name === "relu") return "ReLU -> keep positive, clip negative";
+  if (name === "sigmoid") return "sigmoid -> squeeze every value between 0 and 1";
+  return "tanh -> squeeze every value between -1 and 1";
+}
+
+function renderForwardCurrentState({ wordA, wordB, embA, embB, activationName }) {
+  const vectorText = (vector) => `[${vector.map((value) => formatNumber(value, 2)).join(", ")}]`;
+  dom.forwardCtxAReadout.textContent = `${wordA} -> ${vectorText(embA)}`;
+  dom.forwardCtxBReadout.textContent = `${wordB} -> ${vectorText(embB)}`;
+  dom.forwardActivationReadout.textContent = activationControlDescription(activationName);
+}
+
 function signedProduct(value, weight) {
   const v = formatNumber(value, 2);
   const w = formatNumber(weight, 2);
   return `${value < 0 ? `(${v})` : v}x${weight < 0 ? `(${w})` : w}`;
 }
 
+function sumTerm(value, digits = 3) {
+  const text = formatNumber(value, digits);
+  return value < 0 ? `(${text})` : text;
+}
+
 function forwardStepHead(text) {
   return createElement("p", "forward-step-head", text);
 }
 
-function buildForwardBreakdown(ctx) {
-  const { wordA, wordB, embA, embB, input, inputLabels, activationName, z1, hidden, logits, probs, bestIndex, focus } = ctx;
+function forwardExplanation(title, text) {
+  const block = createElement("div", "forward-explanation");
+  block.append(createElement("strong", "", title), createElement("p", "", text));
+  return block;
+}
+
+function forwardDefinition(symbol, name, text) {
+  const block = createElement("div", "forward-definition");
+  block.append(createElement("code", "", symbol), createElement("strong", "", name), createElement("p", "", text));
+  return block;
+}
+
+function forwardVectorCard(word, vector) {
+  const card = createElement("article", "forward-vector-card");
+  card.append(
+    createElement("span", "forward-card-kicker", `word: ${word}`),
+    createElement("h4", "", `Look up the row for “${word}”`),
+    createElement("p", "", `The token ID for “${word}” points to one row in the embedding table E. We write E_${word} to mean “the row in E selected for ${word}.”`),
+    createElement("code", "forward-vector-value", `E_${word} = [${vector.map((value) => formatNumber(value, 2)).join(", ")}]`)
+  );
+  const coordinates = createElement("div", "forward-coordinate-grid");
+  vector.forEach((value, index) => {
+    const item = createElement("div", "forward-coordinate-item");
+    item.append(createElement("strong", "", `coordinate ${index + 1}`), createElement("code", "", formatNumber(value, 2)));
+    coordinates.append(item);
+  });
+  card.append(coordinates);
+  return card;
+}
+
+function forwardSignClass(value) {
+  if (value > 0) return "is-positive";
+  if (value < 0) return "is-negative";
+  return "is-zero";
+}
+
+function forwardContributionLedger(rows) {
+  const ledger = createElement("div", "forward-ledger");
+  const header = createElement("div", "forward-ledger-row forward-ledger-head");
+  header.append(createElement("span", "", "source number"), createElement("span", "", "calculation: input × weight = contribution"));
+  ledger.append(header);
+  rows.forEach(({ source, input, weight, product }) => {
+    const row = createElement("div", "forward-ledger-row");
+    const equation = createElement("div", "forward-ledger-equation");
+    equation.append(
+      createElement("code", "", formatNumber(input, 3)),
+      createElement("span", "forward-operator", "×"),
+      createElement("code", "", formatNumber(weight, 3)),
+      createElement("span", "forward-operator", "="),
+      createElement("code", `forward-result ${forwardSignClass(product)}`, formatNumber(product, 3))
+    );
+    row.append(createElement("strong", "", source), equation);
+    ledger.append(row);
+  });
+  return ledger;
+}
+
+function forwardResultRow(label, expression, result, note = "") {
+  const row = createElement("div", "forward-result-row");
+  row.append(createElement("strong", "", label), createElement("code", "", expression), createElement("code", `forward-result ${forwardSignClass(result)}`, formatNumber(result, 3)));
+  if (note) row.append(createElement("small", "", note));
+  return row;
+}
+
+function activationRuleDescription(name) {
+  if (name === "relu") return "ReLU keeps a positive raw value and replaces a negative raw value with 0.";
+  if (name === "sigmoid") return "Sigmoid bends every raw value into the range from 0 to 1.";
+  return "tanh bends every raw value into the range from -1 to 1.";
+}
+
+function activationWorkedExpression(name, raw, result) {
+  if (name === "relu") return `max(0, ${formatNumber(raw, 3)}) = ${formatNumber(result, 3)}`;
+  return `${name}(${formatNumber(raw, 3)}) = ${formatNumber(result, 3)}`;
+}
+
+function forwardParameterRoute(word, vector, weights, focus) {
+  const route = createElement("div", "forward-parameter-route");
+  const source = createElement("div", "forward-parameter-source");
+  source.append(
+    createElement("strong", "", `Embedding row E_${word}`),
+    createElement("code", "", `[${vector.map((value) => formatNumber(value, 2)).join(", ")}]`),
+    createElement("small", "", "two source coordinates")
+  );
+  const connection = createElement("div", "forward-parameter-connection");
+  connection.append(
+    createElement("strong", "", `Weights on the connection to h${focus + 1}`),
+    createElement("code", "", `[${weights.map((value) => formatNumber(value, 2)).join(", ")}]`),
+    createElement("small", "", `coordinate 1 uses ${formatNumber(weights[0], 2)}; coordinate 2 uses ${formatNumber(weights[1], 2)}`)
+  );
+  const target = createElement("div", "forward-parameter-target");
+  target.append(createElement("strong", "", `hidden neuron h${focus + 1}`), createElement("small", "", "receives both weighted coordinates"));
+  route.append(source, createElement("span", "forward-route-arrow", "→"), connection, createElement("span", "forward-route-arrow", "→"), target);
+  return route;
+}
+
+function buildForwardParameterMap(wordA, wordB, embA, embB, focus) {
+  const map = createElement("section", "forward-parameter-map");
+  map.append(
+    createElement("h4", "", `Where the weights and bias for h${focus + 1} live`),
+    createElement("p", "", "Each line from a two-number embedding row to the selected neuron stands for two coordinate connections. Each coordinate connection owns one weight.")
+  );
+  const routes = createElement("div", "forward-parameter-routes");
+  routes.append(
+    forwardParameterRoute(wordA, embA, [forwardW1[0][focus], forwardW1[1][focus]], focus),
+    forwardParameterRoute(wordB, embB, [forwardW1[2][focus], forwardW1[3][focus]], focus)
+  );
+  const bias = createElement("div", "forward-parameter-bias");
+  bias.append(
+    createElement("strong", "", `Inside h${focus + 1}: bias`),
+    createElement("code", "", `b = ${formatNumber(forwardB1[focus], 2)}`),
+    createElement("span", "", "The bias belongs to the neuron itself, not to any one incoming connection.")
+  );
+  map.append(routes, bias);
+  return map;
+}
+
+function buildForwardCandidatePicker(candidateFocus, logits) {
+  const picker = createElement("div", "forward-candidate-picker");
+  picker.setAttribute("role", "group");
+  picker.setAttribute("aria-label", "Choose a candidate logit to inspect");
+  forwardCandidates.forEach((candidate, index) => {
+    const button = createElement("button", index === candidateFocus ? "is-active" : "");
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(index === candidateFocus));
+    button.append(createElement("strong", "", candidate), createElement("span", "", `logit ${formatNumber(logits[index], 3)}`));
+    button.addEventListener("click", () => {
+      state.forwardCandidateFocus = index;
+      state.forwardStep = 3;
+      renderForwardPass();
+    });
+    picker.append(button);
+  });
+  return picker;
+}
+
+function forwardOutputParameterRoute(hiddenIndex, hiddenValue, weight, candidate) {
+  const route = createElement("div", "forward-parameter-route");
+  const source = createElement("div", "forward-parameter-source");
+  source.append(
+    createElement("strong", "", `Hidden value h${hiddenIndex + 1}`),
+    createElement("code", "", formatNumber(hiddenValue, 3)),
+    createElement("small", "", "computed from this input; not a stored parameter")
+  );
+  const connection = createElement("div", "forward-parameter-connection");
+  connection.append(
+    createElement("strong", "", `Output weight on h${hiddenIndex + 1} → ${candidate}`),
+    createElement("code", "", `w = ${formatNumber(weight, 2)}`),
+    createElement("small", "", "trainable parameter stored on this edge")
+  );
+  const target = createElement("div", "forward-parameter-target");
+  target.append(createElement("strong", "", `“${candidate}” scorer`), createElement("small", "", "receives this weighted hidden value"));
+  route.append(source, createElement("span", "forward-route-arrow", "→"), connection, createElement("span", "forward-route-arrow", "→"), target);
+  return route;
+}
+
+function buildForwardOutputParameterMap(candidateIndex, hidden) {
+  const candidate = forwardCandidates[candidateIndex];
+  const map = createElement("section", "forward-parameter-map forward-output-parameter-map");
+  map.append(
+    createElement("h4", "", `Where the output weights and bias for “${candidate}” live`),
+    createElement("p", "", `The “${candidate}” scorer receives all three hidden values. Each incoming edge owns one output weight; the scorer itself owns one output bias.`)
+  );
+  const routes = createElement("div", "forward-parameter-routes");
+  hidden.forEach((value, hiddenIndex) => {
+    routes.append(forwardOutputParameterRoute(hiddenIndex, value, forwardW2[hiddenIndex][candidateIndex], candidate));
+  });
+  const bias = createElement("div", "forward-parameter-bias");
+  bias.append(
+    createElement("strong", "", `Inside the “${candidate}” scorer: output bias`),
+    createElement("code", "", `b = ${formatNumber(forwardB2[candidateIndex], 2)}`),
+    createElement("span", "", "This bias is added after the three weighted hidden contributions.")
+  );
+  map.append(routes, bias);
+  return map;
+}
+
+function forwardRecapCard(stepNumber, title, value, explanation) {
+  const card = createElement("article", "forward-recap-card");
+  card.append(
+    createElement("span", "forward-card-kicker", `completed in step ${stepNumber}`),
+    createElement("h4", "", title),
+    createElement("code", "", value),
+    createElement("p", "", explanation)
+  );
+  return card;
+}
+
+function buildForwardHandoffRecap({ wordA, wordB, embA, embB, input, activationName, z1, hidden, logits }) {
+  const recap = createElement("div", "forward-recap-grid");
+  const activationLabel = activationName === "relu" ? "ReLU" : activationName;
+  recap.append(
+    forwardRecapCard("1", "Embedding rows selected", `E_${wordA} = [${embA.map((value) => formatNumber(value, 2)).join(", ")}]; E_${wordB} = [${embB.map((value) => formatNumber(value, 2)).join(", ")}]`, "The two token IDs selected these rows from the embedding table."),
+    forwardRecapCard("1", "Joined input created", `e = [${input.map((value) => formatNumber(value, 2)).join(", ")}]`, "The rows were placed one after the other to make the network input."),
+    forwardRecapCard("2–3", "Hidden state computed", `raw = [${z1.map((value) => formatNumber(value, 3)).join(", ")}] → ${activationLabel} → h = [${hidden.map((value) => formatNumber(value, 3)).join(", ")}]`, "Dot products and biases produced raw hidden inputs; the activation bent them into the hidden state."),
+    forwardRecapCard("4", "Candidate logits produced", `z = [${logits.map((value) => formatNumber(value, 3)).join(", ")}]`, "One output-weight path produced one raw score for each candidate word.")
+  );
+  return recap;
+}
+
+function handoffEvidenceCard(title, evidence, explanation, className = "") {
+  const card = createElement("article", `forward-handoff-evidence ${className}`.trim());
+  card.append(createElement("strong", "", title), createElement("code", "", evidence), createElement("p", "", explanation));
+  return card;
+}
+
+function buildForwardHandoffEvidence(logits, bestIndex) {
+  const evidence = createElement("div", "forward-handoff-evidence-grid");
+  const negativeIndex = logits.findIndex((value) => value < 0);
+  const sum = logits.reduce((total, value) => total + value, 0);
+  const signEvidence = negativeIndex >= 0
+    ? `${forwardCandidates[negativeIndex]} logit = ${formatNumber(logits[negativeIndex], 3)}`
+    : `all three happen to be positive in this example`;
+  const signExplanation = negativeIndex >= 0
+    ? "A probability cannot be negative, so the logits cannot yet be probabilities."
+    : "Logits are allowed to be negative even though this particular set is positive; probabilities are never negative.";
+  evidence.append(
+    handoffEvidenceCard("Problem 1: raw scores may be negative", signEvidence, signExplanation, negativeIndex >= 0 ? "is-negative" : ""),
+    handoffEvidenceCard("Problem 2: the scores do not form a whole", `${logits.map((value) => sumTerm(value)).join(" + ")} = ${formatNumber(sum, 3)}`, "A probability distribution must add to exactly 1. These raw logits do not."),
+    handoffEvidenceCard("What the largest logit tells us", `${forwardCandidates[bestIndex]} is largest at ${formatNumber(logits[bestIndex], 3)}`, `This makes “${forwardCandidates[bestIndex]}” the current leader, but ${formatNumber(logits[bestIndex], 3)} does not mean ${formatNumber(logits[bestIndex] * 100, 1)}% confidence.`)
+  );
+  return evidence;
+}
+
+function buildForwardStep(ctx) {
+  const { step, wordA, wordB, embA, embB, input, inputLabels, activationName, z1, hidden, logits, bestIndex, focus, candidateFocus } = ctx;
   const nodes = [];
 
-  nodes.push(forwardStepHead("1 - Look up each word vector, then join them"));
-  nodes.push(lookupRow(`look up ${wordA}`, `[${embA.map((value) => formatNumber(value, 2)).join(", ")}]`));
-  nodes.push(lookupRow(`look up ${wordB}`, `[${embB.map((value) => formatNumber(value, 2)).join(", ")}]`));
-  nodes.push(lookupRow("join -> input", inputLabels.map((label, i) => `${label} ${formatNumber(input[i], 2)}`).join(",  ")));
-
-  nodes.push(forwardStepHead(`2 - Hidden neuron h${focus + 1}, multiply-and-add (click any neuron to switch)`));
-  const hiddenStack = createElement("div", "formula-stack");
-  const hiddenTerms = input.map((value, i) => signedProduct(value, forwardW1[i][focus])).join(" + ");
-  hiddenStack.append(
-    createElement("code", "", "z = bias + sum(input x weight)"),
-    createElement("code", "", `z = ${formatNumber(forwardB1[focus], 2)} + ${hiddenTerms}`),
-    createElement("code", "", `z = ${formatNumber(z1[focus], 2)}`),
-    createElement("code", "", `${activationName}(${formatNumber(z1[focus], 2)}) = ${formatNumber(hidden[focus], 2)}   (${activationEffectTag(activationName, z1[focus])})`)
-  );
-  nodes.push(hiddenStack);
-
-  nodes.push(forwardStepHead(`3 - What ${activationName} did to all three neurons`));
-  nodes.push(buildActivationTable(activationName, z1, hidden, focus));
-
-  nodes.push(forwardStepHead(`4 - Output score (logit) for "${forwardCandidates[bestIndex]}"`));
-  const logitStack = createElement("div", "formula-stack");
-  const logitTerms = hidden.map((value, j) => signedProduct(value, forwardW2[j][bestIndex])).join(" + ");
-  logitStack.append(
-    createElement("code", "", "logit = bias + sum(hidden x weight)"),
-    createElement("code", "", `logit = ${formatNumber(forwardB2[bestIndex], 2)} + ${logitTerms}`),
-    createElement("code", "", `logit = ${formatNumber(logits[bestIndex], 2)}`)
-  );
-  nodes.push(logitStack);
-
-  nodes.push(forwardStepHead("5 - Softmax turns the three logits into probabilities"));
-  nodes.push(buildForwardSoftmax(forwardCandidates, probs, bestIndex));
-
-  nodes.push(buildForwardReading(activationName, z1, forwardCandidates[bestIndex], probs[bestIndex]));
+  if (step === 0) {
+    nodes.push(forwardExplanation("Goal of this step", "Turn the two context words into the four input numbers that the first hidden layer can use."));
+    const definitions = createElement("div", "forward-definition-grid");
+    definitions.append(
+      forwardDefinition("E", "embedding table", "A table with one learned row of numbers for every word in this toy vocabulary."),
+      forwardDefinition("e", "joined input vector", "The new four-number vector made by placing the two selected embedding rows one after the other.")
+    );
+    nodes.push(definitions);
+    const vectors = createElement("div", "forward-vector-grid");
+    vectors.append(forwardVectorCard(wordA, embA), forwardVectorCard(wordB, embB));
+    nodes.push(vectors);
+    const join = createElement("div", "forward-join-card");
+    join.append(
+      createElement("h4", "", "Join the rows; do not add them"),
+      createElement("p", "", `Put E_${wordB} after E_${wordA}. Every coordinate is kept, in the same order.`)
+    );
+    const joinFlow = createElement("div", "forward-join-flow");
+    joinFlow.append(
+      createElement("code", "", `E_${wordA} [${embA.map((value) => formatNumber(value, 2)).join(", ")}]`),
+      createElement("span", "", "+ place after +"),
+      createElement("code", "", `E_${wordB} [${embB.map((value) => formatNumber(value, 2)).join(", ")}]`),
+      createElement("span", "", "→"),
+      createElement("code", "forward-join-result", `e = [${input.map((value) => formatNumber(value, 2)).join(", ")}]`)
+    );
+    join.append(joinFlow, createElement("p", "forward-takeaway", `What we learned: two 2-number embedding rows became one 4-number input vector e.`));
+    nodes.push(join);
+  } else if (step === 1) {
+    const products = input.map((value, i) => value * forwardW1[i][focus]);
+    const weightedTotal = products.reduce((sum, value) => sum + value, 0);
+    const sourceNames = [`${wordA}, coordinate 1`, `${wordA}, coordinate 2`, `${wordB}, coordinate 1`, `${wordB}, coordinate 2`];
+    nodes.push(forwardExplanation(`Goal of this step: calculate the raw input to h${focus + 1}`, `Hidden neuron h${focus + 1} gives each of the four input numbers its own importance, called a weight. Those weights live on the incoming connections shown in the picture. Click another hidden neuron to inspect a different set.`));
+    nodes.push(buildForwardParameterMap(wordA, wordB, embA, embB, focus));
+    nodes.push(forwardExplanation("What gets learned during training?", "The connection weights and the neuron bias are trainable parameters. They usually begin as small random values. Training repeatedly adjusts them so useful inputs push each neuron in useful ways. This walkthrough freezes one illustrative set of values so you can inspect the calculation."));
+    const definitions = createElement("div", "forward-definition-grid");
+    definitions.append(
+      forwardDefinition("e", "input vector", `The four numbers joined in Step 1: [${input.map((value) => formatNumber(value, 2)).join(", ")}].`),
+      forwardDefinition("w", "weight", "A trainable multiplier stored on one coordinate connection. It says how strongly that input coordinate pushes this neuron."),
+      forwardDefinition("b", "bias", `A trainable constant stored inside the neuron and added after all incoming contributions. For h${focus + 1}, b = ${formatNumber(forwardB1[focus], 2)}.`)
+    );
+    nodes.push(definitions);
+    nodes.push(forwardContributionLedger(input.map((value, index) => ({ source: sourceNames[index], input: value, weight: forwardW1[index][focus], product: products[index] }))));
+    const totals = createElement("div", "forward-result-stack");
+    totals.append(
+      forwardResultRow("1. Add the four contributions", products.map((value) => sumTerm(value)).join(" + "), weightedTotal, "This sum is the dot product e · w."),
+      forwardResultRow("2. Add the bias", `${formatNumber(weightedTotal, 3)} + ${sumTerm(forwardB1[focus], 2)}`, z1[focus], `This is the raw input to h${focus + 1}; the activation has not been applied yet.`)
+    );
+    nodes.push(totals, createElement("p", "forward-takeaway", `What we learned: h${focus + 1} compresses four input numbers into one raw value, ${formatNumber(z1[focus], 3)}.`));
+  } else if (step === 2) {
+    nodes.push(forwardExplanation("Goal of this step", `Pass each raw hidden value through ${activationName === "relu" ? "ReLU" : activationName}, the selected activation function. ${activationRuleDescription(activationName)}`));
+    nodes.push(forwardDefinition("activation", "the bend between layers", "Without this bend, stacking multiply-and-add layers would still behave like one large linear calculation."));
+    const activationGrid = createElement("div", "forward-activation-grid");
+    z1.forEach((raw, index) => {
+      const card = createElement("article", `forward-activation-card${index === focus ? " is-focus" : ""}`);
+      card.append(
+        createElement("span", "forward-card-kicker", `hidden neuron h${index + 1}`),
+        createElement("p", "", `Raw input from the dot product: ${formatNumber(raw, 3)}`),
+        createElement("code", "forward-activation-equation", activationWorkedExpression(activationName, raw, hidden[index])),
+        createElement("p", `forward-activation-effect ${forwardSignClass(hidden[index])}`, activationEffectTag(activationName, raw))
+      );
+      activationGrid.append(card);
+    });
+    nodes.push(activationGrid, createElement("p", "forward-takeaway", `What we learned: the hidden layer now holds [${hidden.map((value) => formatNumber(value, 3)).join(", ")}]. These three activated numbers form the hidden state sent to the output layer.`));
+  } else if (step === 3) {
+    const candidate = forwardCandidates[candidateFocus];
+    const products = hidden.map((value, hiddenIndex) => value * forwardW2[hiddenIndex][candidateFocus]);
+    const weightedTotal = products.reduce((sum, value) => sum + value, 0);
+    nodes.push(forwardExplanation("Goal of this step", "Give each candidate next word one raw score. Inspect one candidate path at a time, then compare the three finished logits in the summary."));
+    nodes.push(buildForwardCandidatePicker(candidateFocus, logits));
+    nodes.push(buildForwardOutputParameterMap(candidateFocus, hidden));
+    nodes.push(forwardExplanation("What is learned, and what is computed?", `The three hidden values change with the context, so they are computed signals, not stored parameters. The output weights and output bias are trainable parameters. They usually start as small random values and training adjusts them. This walkthrough freezes one illustrative set.`));
+    const definitions = createElement("div", "forward-definition-grid");
+    definitions.append(
+      forwardDefinition("h", "hidden state", `The three activated values from Step 3: [${hidden.map((value) => formatNumber(value, 3)).join(", ")}].`),
+      forwardDefinition("W₂", "output weights", `One trainable weight on each hidden-to-candidate edge. The selected “${candidate}” path uses [${forwardW2.map((row) => formatNumber(row[candidateFocus], 2)).join(", ")}].`),
+      forwardDefinition("b₂", "output bias", `One trainable constant inside each candidate scorer. For “${candidate}”, b₂ = ${formatNumber(forwardB2[candidateFocus], 2)}.`),
+      forwardDefinition("logit", "raw candidate score", "The weighted hidden-state total plus output bias, before softmax creates probabilities.")
+    );
+    nodes.push(definitions);
+    const card = createElement("article", `forward-candidate-card${candidateFocus === bestIndex ? " is-largest" : ""}`);
+    card.append(
+      createElement("span", "forward-card-kicker", "worked candidate path"),
+      createElement("h4", "", candidate),
+      createElement("p", "", `Multiply each hidden value by the weight on its edge into the “${candidate}” scorer.`),
+      forwardContributionLedger(hidden.map((value, hiddenIndex) => ({ source: `h${hiddenIndex + 1} → ${candidate}`, input: value, weight: forwardW2[hiddenIndex][candidateFocus], product: products[hiddenIndex] })))
+    );
+    const totals = createElement("div", "forward-result-stack");
+    totals.append(
+      forwardResultRow("1. Add the three contributions", products.map((value) => sumTerm(value)).join(" + "), weightedTotal, `This is the hidden-state dot product for “${candidate}”.`),
+      forwardResultRow("2. Add the output bias", `${formatNumber(weightedTotal, 3)} + ${sumTerm(forwardB2[candidateFocus], 2)}`, logits[candidateFocus], `Final raw logit for “${candidate}”.`)
+    );
+    card.append(totals);
+    nodes.push(card, buildLogitTable(logits, bestIndex), createElement("p", "forward-takeaway", `What we learned: the selected “${candidate}” path produces logit ${formatNumber(logits[candidateFocus], 3)}. Across all candidates, “${forwardCandidates[bestIndex]}” has the largest raw score, ${formatNumber(logits[bestIndex], 3)}. These scores are still not probabilities.`));
+  } else {
+    nodes.push(forwardExplanation("What is complete", "The neural network has finished its raw scoring work. It selected embeddings, built a hidden state, and produced one logit per candidate. Nothing in those four steps has converted the scores into probabilities."));
+    nodes.push(buildForwardHandoffRecap({ wordA, wordB, embA, embB, input, activationName, z1, hidden, logits }));
+    nodes.push(buildLogitTable(logits, bestIndex));
+    nodes.push(buildForwardHandoffEvidence(logits, bestIndex));
+    const nextProblem = createElement("section", "forward-next-problem");
+    nextProblem.append(
+      createElement("h4", "", "The next problem: turn scores into probabilities"),
+      createElement("p", "", "We need one operation that makes every value positive, makes the full set add to 1, and preserves the ranking so the strongest logit still receives the largest probability."),
+      createElement("p", "", "That operation is Softmax. The next section builds it from these exact three logits; no new network weights are involved in that conversion.")
+    );
+    nodes.push(nextProblem);
+    const link = createElement("a", "forward-next-link", "Continue to Softmax and assigning blame");
+    link.href = "#softmax";
+    nodes.push(link);
+  }
   return nodes;
+}
+
+function buildLogitTable(logits, bestIndex) {
+  const wrap = createElement("div", "deriv-table-wrap");
+  const table = createElement("table", "deriv-table forward-logit-table");
+  const thead = createElement("thead");
+  const headRow = createElement("tr");
+  ["candidate", "raw logit", "what it means now"].forEach((title) => headRow.append(createElement("th", "", title)));
+  thead.append(headRow);
+  const tbody = createElement("tbody");
+  logits.forEach((logit, index) => {
+    const row = createElement("tr", index === bestIndex ? "is-focus-row" : "");
+    row.append(
+      createElement("td", "row-label", forwardCandidates[index]),
+      createElement("td", "", formatNumber(logit, 3)),
+      createElement("td", "row-label", index === bestIndex ? "largest raw score" : "smaller raw score")
+    );
+    tbody.append(row);
+  });
+  table.append(thead, tbody);
+  wrap.append(table);
+  return wrap;
 }
 
 function buildActivationTable(name, z1, hidden, focus) {
@@ -929,7 +1397,7 @@ function buildActivationTable(name, z1, hidden, focus) {
   const table = createElement("table", "deriv-table forward-activation-table");
   const thead = createElement("thead");
   const headRow = createElement("tr");
-  ["neuron", "z (pre)", `${name}(z)`, "effect"].forEach((title) => headRow.append(createElement("th", "", title)));
+  ["neuron", "raw input", `${name}(raw)`, "effect"].forEach((title) => headRow.append(createElement("th", "", title)));
   thead.append(headRow);
   const tbody = createElement("tbody");
   z1.forEach((z, j) => {
@@ -947,113 +1415,236 @@ function buildActivationTable(name, z1, hidden, focus) {
   return wrap;
 }
 
-function buildForwardSoftmax(names, probs, bestIndex) {
-  const panel = createElement("div", "probability-panel forward-softmax");
-  names.forEach((name, i) => {
-    const row = createElement("div", `softmax-row${i === bestIndex ? " is-answer" : ""}`);
-    const track = createElement("div", "softmax-track");
-    const fill = createElement("span");
-    fill.style.width = `${probs[i] * 100}%`;
-    track.append(fill);
-    row.append(createElement("strong", "", name), track, createElement("em", "", formatPercent(probs[i])));
-    panel.append(row);
+function buildTeachingMatrix(title, subtitle, rows, options = {}) {
+  const block = createElement("div", "matrix-teaching-block");
+  block.append(createElement("strong", "matrix-teaching-title", title), createElement("span", "matrix-teaching-subtitle", subtitle));
+  const table = createElement("table", "matrix-number-table");
+  const tbody = createElement("tbody");
+  rows.forEach((rowValues, rowIndex) => {
+    const row = createElement("tr", rowIndex === options.highlightRow ? "is-highlight-row" : "");
+    if (options.rowLabels) row.append(createElement("th", "", options.rowLabels[rowIndex]));
+    rowValues.forEach((value) => row.append(createElement("td", options.highlightAll ? "is-highlight-cell" : "", formatNumber(value, options.digits ?? 2))));
+    tbody.append(row);
   });
-  return panel;
+  table.append(tbody);
+  block.append(table);
+  return block;
 }
 
-function buildForwardReading(name, z1, bestWord, bestProb) {
-  let effect;
-  if (name === "relu") {
-    const clipped = z1.filter((z) => z <= 0).length;
-    effect = clipped > 0
-      ? `ReLU clipped ${clipped} of the three neurons to zero, so they pass nothing forward.`
-      : "ReLU kept all three neurons positive, so each one feeds the output.";
-  } else if (name === "sigmoid") {
-    effect = "Sigmoid bent every neuron into the range (0, 1) before it reached the output.";
-  } else {
-    effect = "tanh bent every neuron into the range (-1, 1) before it reached the output.";
-  }
-  const note = createElement("p", "insight-note forward-reading");
-  note.textContent = `Read it as one chain: two vectors in, a hidden layer in the middle, three probabilities out. ${effect} The model leans toward "${bestWord}" at ${formatPercent(bestProb)} - change the context or activation above, or click a different neuron, and watch every number, edge, and bar move.`;
-  return note;
+function matrixShapeCard(symbol, shape, explanation, className = "") {
+  const card = createElement("div", `matrix-shape-card ${className}`.trim());
+  card.append(createElement("code", "", symbol), createElement("strong", "", shape), createElement("span", "", explanation));
+  return card;
 }
 
-function renderNetworkSvg(contextWords, hidden, candidates, probs, opts = {}) {
+function renderMatrixMultiplyPanel({ wordA, wordB, input, inputLabels, z1 }) {
+  if (!dom.matrixMultiplyPanel) return;
+  const weightRows = forwardB1.map((_, hiddenIndex) => forwardW1.map((row) => row[hiddenIndex]));
+  const weightedTotals = weightRows.map((weights) => weights.reduce((sum, weight, inputIndex) => sum + weight * input[inputIndex], 0));
+  const panel = dom.matrixMultiplyPanel;
+  const nodes = [];
+
+  nodes.push(forwardExplanation("Why matrix multiplication appears here", `Step 2 followed one hidden neuron. The full hidden layer repeats that same dot product for h1, h2, and h3. Matrix multiplication is the compact way to run all three row-by-column calculations together.`));
+
+  const shapes = createElement("div", "matrix-shape-check");
+  shapes.append(
+    matrixShapeCard("W₁", "3 × 4", "3 hidden-neuron rows; 4 weights in each row"),
+    matrixShapeCard("e", "4 × 1", `4 input numbers from “${wordA} ${wordB}”`, "is-input"),
+    matrixShapeCard("W₁e", "3 × 1", "1 weighted total for each hidden neuron", "is-output")
+  );
+  const compatibility = createElement("p", "matrix-shape-rule", "Shape check: (3 × 4)(4 × 1) → (3 × 1). The two inside 4s match, so every four-weight row can pair with the four-number input column.");
+  nodes.push(shapes, compatibility);
+
+  const equation = createElement("div", "matrix-equation-visual");
+  equation.append(
+    buildTeachingMatrix("W₁", "one row per hidden neuron", weightRows, { rowLabels: ["h1", "h2", "h3"], highlightRow: 0 }),
+    createElement("span", "matrix-equation-operator", "×"),
+    buildTeachingMatrix("e", `joined input for “${wordA} ${wordB}”`, input.map((value) => [value]), { rowLabels: inputLabels, highlightAll: true }),
+    createElement("span", "matrix-equation-operator", "="),
+    buildTeachingMatrix("weighted totals", "before bias and activation", weightedTotals.map((value) => [value]), { rowLabels: ["h1", "h2", "h3"], highlightRow: 0, digits: 3 })
+  );
+  nodes.push(equation);
+
+  nodes.push(forwardExplanation("Compute the first output cell: row h1 · column e", "Select the h1 weight row and the only input column. Multiply matching positions, add the four products, and place the result in the h1 output cell."));
+  const firstProducts = input.map((value, index) => value * weightRows[0][index]);
+  nodes.push(forwardContributionLedger(input.map((value, index) => ({
+    source: `${inputLabels[index]} with h1 weight`,
+    input: value,
+    weight: weightRows[0][index],
+    product: firstProducts[index]
+  }))));
+  const firstResult = createElement("div", "forward-result-stack");
+  firstResult.append(
+    forwardResultRow("Add the four products", firstProducts.map((value) => sumTerm(value)).join(" + "), weightedTotals[0], "Place this value in output cell h1."),
+    forwardResultRow("Repeat with row h2", "row h2 · column e", weightedTotals[1], "This fills output cell h2."),
+    forwardResultRow("Repeat with row h3", "row h3 · column e", weightedTotals[2], "This fills output cell h3.")
+  );
+  nodes.push(firstResult);
+
+  const biasStep = createElement("section", "matrix-bias-step");
+  biasStep.append(
+    createElement("h4", "", "Bias is a separate step after the matrix multiplication"),
+    createElement("p", "", "Matrix multiplication produced the three weighted totals. Now add one learned bias to each matching hidden neuron."),
+    createElement("code", "", `[${weightedTotals.map((value) => formatNumber(value, 3)).join(", ")}] + [${forwardB1.map((value) => formatNumber(value, 2)).join(", ")}] = [${z1.map((value) => formatNumber(value, 3)).join(", ")}]`),
+    createElement("p", "", "Only after this bias addition does the activation function bend the three raw hidden values.")
+  );
+  nodes.push(biasStep, createElement("p", "forward-takeaway", `What we learned: W₁e is not new arithmetic. It repeats the dot product from Step 2 once for each hidden-neuron row, producing [${weightedTotals.map((value) => formatNumber(value, 3)).join(", ")}].`));
+
+  panel.replaceChildren(...nodes);
+}
+
+function renderNetworkSvg(contextWords, hidden, candidates, logits, opts = {}) {
   const svg = dom.networkSvg;
+  const step = opts.step ?? 4;
   const focus = opts.focus ?? null;
-  const bestIndex = opts.bestIndex ?? probs.indexOf(Math.max(...probs));
+  const bestIndex = opts.bestIndex ?? logits.indexOf(Math.max(...logits));
   const inContrib = opts.inContrib ?? null;
   const hidContrib = opts.hidContrib ?? null;
+  const z1 = opts.z1 ?? [];
+  const embeddings = opts.embeddings ?? [];
+  const activationName = opts.activationName ?? "activation";
+  const candidateFocus = opts.candidateFocus ?? bestIndex;
+  const activationLabel = activationName === "relu" ? "ReLU" : activationName;
   svg.replaceChildren();
   const inputNodes = contextWords.map((word, index) => ({
     x: 88,
     y: 95 + index * 110,
     label: word,
-    value: index === 0 ? "context 1" : "context 2",
-    isWord: true
+    value: embeddings[index]
+      ? `E [${embeddings[index].map((value) => formatNumber(value, 2)).join(", ")}]`
+      : (index === 0 ? "context 1" : "context 2"),
+    isWord: true,
+    width: 116
   }));
   const hiddenNodes = hidden.map((value, index) => ({
     x: 280,
     y: 60 + index * 90,
     label: `h${index + 1}`,
-    value: formatNumber(value, 2),
+    value: step < 1
+      ? "pending"
+      : step === 1
+        ? (index === focus ? `raw ${formatNumber(z1[index], 2)}` : "pending")
+        : formatNumber(value, 2),
     index
   }));
   const outputNodes = candidates.map((word, index) => ({
     x: 474,
     y: 60 + index * 90,
     label: word,
-    value: formatPercent(probs[index]),
+    value: step >= 3 ? `z ${formatNumber(logits[index], 2)}` : "pending",
     isWord: true,
-    isBest: index === bestIndex
+    isBest: index === bestIndex,
+    isSelected: index === candidateFocus,
+    index,
+    width: 88
   }));
   const edgeWidth = (magnitude) => clamp(1 + magnitude * 3.4, 1, 6).toFixed(2);
-  const edgeClass = (weight, hiddenIndex) => {
+  const edgeClass = (weight, hiddenIndex, phase, candidateIndex = null) => {
     const sign = weight >= 0 ? "is-pos" : "is-neg";
-    if (focus === null) return `network-edge ${sign}`;
-    return `network-edge ${sign} ${hiddenIndex === focus ? "is-focus" : "is-muted"}`;
+    if (phase === "input") {
+      if (step !== 1) return `network-edge ${sign} is-muted`;
+      return `network-edge ${sign} ${hiddenIndex === focus ? "is-focus" : "is-muted"}`;
+    }
+    if (step < 3) return `network-edge ${sign} is-muted`;
+    if (step === 3) return `network-edge ${sign} ${candidateIndex === candidateFocus ? "is-focus" : "is-muted"}`;
+    return `network-edge ${sign} is-focus`;
   };
+  const inputLayerLabel = createSvgElement("text", { class: "network-layer-label", x: 88, y: 22 });
+  inputLayerLabel.textContent = "context embeddings";
+  const hiddenLayerLabel = createSvgElement("text", { class: "network-layer-label", x: 280, y: 22 });
+  hiddenLayerLabel.textContent = `hidden layer - ${activationLabel}`;
+  const outputLayerLabel = createSvgElement("text", { class: "network-layer-label", x: 474, y: 22 });
+  outputLayerLabel.textContent = "candidate logits";
+  svg.append(inputLayerLabel, hiddenLayerLabel, outputLayerLabel);
+  const parameterLabels = [];
   inputNodes.forEach((source, i) => {
     hiddenNodes.forEach((target, j) => {
       const contribution = inContrib ? inContrib[i][j] : 0;
+      const x1 = source.x + (source.width ?? 80) / 2;
+      const x2 = target.x - 24;
       svg.append(createSvgElement("line", {
-        class: edgeClass(contribution, j),
-        x1: source.x + 40,
+        class: edgeClass(contribution, j, "input"),
+        x1,
         y1: source.y,
-        x2: target.x - 24,
+        x2,
         y2: target.y,
         "stroke-width": edgeWidth(Math.abs(contribution))
       }));
+      if (step === 1 && j === focus) {
+        const weights = [forwardW1[i * 2][j], forwardW1[i * 2 + 1][j]];
+        const label = createSvgElement("text", {
+          class: "network-weight-label",
+          x: (x1 + x2) / 2,
+          y: (source.y + target.y) / 2 - 7
+        });
+        label.textContent = `${contextWords[i]} w [${weights.map((value) => formatNumber(value, 2)).join(", ")}]`;
+        parameterLabels.push(label);
+      }
     });
   });
+  const outputParameterLabels = [];
   hiddenNodes.forEach((source, j) => {
     outputNodes.forEach((target, k) => {
       const contribution = hidContrib ? hidContrib[j][k] : 0;
+      const x1 = source.x + 24;
+      const x2 = target.x - (target.width ?? 80) / 2;
       svg.append(createSvgElement("line", {
-        class: edgeClass(contribution, j),
-        x1: source.x + 24,
+        class: edgeClass(contribution, j, "output", k),
+        x1,
         y1: source.y,
-        x2: target.x - 40,
+        x2,
         y2: target.y,
         "stroke-width": edgeWidth(Math.abs(contribution))
       }));
+      if (step === 3 && k === candidateFocus) {
+        const label = createSvgElement("text", {
+          class: "network-output-weight-label",
+          x: (x1 + x2) / 2,
+          y: (source.y + target.y) / 2 - 7
+        });
+        label.textContent = `w = ${formatNumber(forwardW2[j][k], 2)}`;
+        outputParameterLabels.push(label);
+      }
     });
   });
+  parameterLabels.forEach((label) => svg.append(label));
+  outputParameterLabels.forEach((label) => svg.append(label));
+  if (step === 1 && focus !== null) {
+    const selectedNode = hiddenNodes[focus];
+    const biasLabel = createSvgElement("text", {
+      class: "network-bias-label",
+      x: selectedNode.x,
+      y: selectedNode.y + 39
+    });
+    biasLabel.textContent = `bias b = ${formatNumber(forwardB1[focus], 2)}`;
+    svg.append(biasLabel);
+  }
+  if (step === 3) {
+    const selectedOutput = outputNodes[candidateFocus];
+    const outputBiasLabel = createSvgElement("text", {
+      class: "network-output-bias-label",
+      x: selectedOutput.x,
+      y: selectedOutput.y + 39
+    });
+    outputBiasLabel.textContent = `output bias = ${formatNumber(forwardB2[candidateFocus], 2)}`;
+    svg.append(outputBiasLabel);
+  }
   const drawNode = (node, kind) => {
     const group = createSvgElement("g");
-    const isFocusNode = kind === "is-hidden" && node.index === focus;
+    const isFocusNode = kind === "is-hidden" && node.index === focus && step >= 1;
     if (node.isWord) {
+      const width = node.width ?? 80;
       group.append(createSvgElement("rect", {
-        class: `network-node ${kind}${node.isBest ? " is-best" : ""}`,
-        x: node.x - 40,
+        class: `network-node ${kind}${node.isBest && step >= 3 ? " is-best" : ""}${node.isSelected && kind === "is-output" && step === 3 ? " is-selected" : ""}${kind === "is-output" && step < 3 ? " is-muted-node" : ""}`,
+        x: node.x - width / 2,
         y: node.y - 21,
-        width: 80,
+        width,
         height: 42,
         rx: 11
       }));
     } else {
       group.append(createSvgElement("circle", {
-        class: `network-node ${kind}${isFocusNode ? " is-focus" : ""}`,
+        class: `network-node ${kind}${isFocusNode ? " is-focus" : ""}${kind === "is-hidden" && step < 1 ? " is-muted-node" : ""}`,
         cx: node.x,
         cy: node.y,
         r: 25
@@ -1068,6 +1659,14 @@ function renderNetworkSvg(contextWords, hidden, candidates, probs, opts = {}) {
       group.style.cursor = "pointer";
       group.addEventListener("click", () => {
         state.forwardFocus = node.index;
+        if (state.forwardStep < 1) state.forwardStep = 1;
+        renderForwardPass();
+      });
+    } else if (kind === "is-output") {
+      group.style.cursor = "pointer";
+      group.addEventListener("click", () => {
+        state.forwardCandidateFocus = node.index;
+        state.forwardStep = 3;
         renderForwardPass();
       });
     }
@@ -1188,7 +1787,7 @@ function renderBackpropMetrics(pass) {
   renderMetricCards(dom.backpropMetrics, [
     {
       value: formatNumber(pass.loss, 3),
-      label: "loss (nats)",
+      label: "cross-entropy loss (nats)",
       note: lossDelta === null ? "press Step" : (lossDelta <= 0 ? `down ${formatNumber(Math.abs(lossDelta), 3)}` : `up ${formatNumber(lossDelta, 3)}`)
     },
     {
@@ -2149,7 +2748,7 @@ function setTrainingProgress(done, total, phase = "ready") {
   dom.trainingProgress.classList.toggle("is-complete", phase === "complete");
   if (phase === "running") {
     dom.trainingProgress.querySelector("strong").textContent = "Training in progress";
-    dom.trainingProgressText.textContent = `Epoch ${done} of ${total}. Loss, accuracy, and the decision map update as the network learns.`;
+    dom.trainingProgressText.textContent = `Epoch ${done} of ${total}. Cross-entropy, accuracy, and the decision map update as the network learns.`;
   } else if (phase === "complete") {
     dom.trainingProgress.querySelector("strong").textContent = "Training complete";
     dom.trainingProgressText.textContent = `Finished ${total} epochs. Click once again when you want another run.`;
@@ -2275,7 +2874,7 @@ function renderNetworkLab() {
     dom.networkStatus.textContent = "untrained";
     dom.networkEpochLabel.textContent = "0 epochs";
     dom.networkMetrics.replaceChildren(createElement("div", "empty-state", "Press \u201cTrain selected epochs\u201d to train the network and reveal its metrics."));
-    dom.lossHistory.replaceChildren(createElement("div", "empty-state", "Loss history appears once training starts."));
+    dom.lossHistory.replaceChildren(createElement("div", "empty-state", "Cross-entropy history appears once training starts."));
     dom.generalizationPanel.replaceChildren(createElement("p", "", "Train the network to compare train and test accuracy."));
     drawDecisionMapPlaceholder();
     return;
@@ -2285,9 +2884,9 @@ function renderNetworkLab() {
   dom.networkEpochLabel.textContent = `${state.network.epochs} epochs`;
   renderMetricCards(dom.networkMetrics, [
     {
-      label: "train loss",
+      label: "train cross-entropy",
       value: formatNumber(summary.trainLoss, 3),
-      note: "cross-entropy"
+      note: "nats per example"
     },
     {
       label: "train accuracy",
@@ -2515,7 +3114,7 @@ const NW_END = ".";
 const NW_DIM = 12;
 const NW_HIDDEN = 24;
 const NW_CONTEXT = 2;
-const NW_RATE = 0.2;
+const NW_RATE = 0.02;
 const NW_DEFAULT_BUDGET_MS = 30000;
 
 let nwData = buildNextWordData();
@@ -2569,6 +3168,18 @@ function makeNextWordModel(seed) {
   ));
   const b2 = Array.from({ length: V }, () => 0);
   return { V, emb, w1, b1, w2, b2, epochs: 0 };
+}
+
+function cloneNextWordModel(model) {
+  return {
+    V: model.V,
+    emb: model.emb.map((row) => row.slice()),
+    w1: model.w1.map((row) => row.slice()),
+    b1: model.b1.slice(),
+    w2: model.w2.map((row) => row.slice()),
+    b2: model.b2.slice(),
+    epochs: model.epochs
+  };
 }
 
 function nwForward(model, context) {
@@ -2703,8 +3314,12 @@ async function trainNextWordTimed(budgetMs) {
   const start = performance.now();
   let elapsed = 0;
   let converged = false;
-  let plateau = 0;
-  let lastLoss = Infinity;
+  let diverged = false;
+  let checksWithoutImprovement = 0;
+  const startingLoss = nwEvaluate(nwModel).loss;
+  let bestLoss = startingLoss;
+  let bestModel = cloneNextWordModel(nwModel);
+  let bestEpoch = nwModel.epochs;
   try {
     setNwProgress(0, "running", "Training in progress", `0s of ${budgetS}s - warming up...`);
     await wait(16);
@@ -2714,6 +3329,23 @@ async function trainNextWordTimed(budgetMs) {
       do {
         nwTrainEpochs(1);
         elapsed = performance.now() - start;
+        const epochLoss = nwHistory[nwHistory.length - 1];
+        if (!Number.isFinite(epochLoss) || epochLoss > bestLoss + 0.5) {
+          diverged = true;
+          break;
+        }
+        if (epochLoss < bestLoss - 5e-4) {
+          bestLoss = epochLoss;
+          bestModel = cloneNextWordModel(nwModel);
+          bestEpoch = nwModel.epochs;
+          checksWithoutImprovement = 0;
+        } else {
+          checksWithoutImprovement += 1;
+        }
+        if (checksWithoutImprovement >= 12 && elapsed > 2500) {
+          converged = true;
+          break;
+        }
       } while (performance.now() - sliceStart < 45 && elapsed < budget);
       const loss = nwHistory[nwHistory.length - 1];
       const ppl = Math.exp(loss);
@@ -2722,21 +3354,31 @@ async function trainNextWordTimed(budgetMs) {
         elapsed / budget,
         "running",
         "Training in progress",
-        `${(elapsed / 1000).toFixed(0)}s of ${budgetS}s - epoch ${nwModel.epochs}, loss ${loss.toFixed(3)}, perplexity ${ppl.toFixed(1)}`
+        `${(elapsed / 1000).toFixed(0)}s of ${budgetS}s - epoch ${nwModel.epochs}, cross-entropy ${loss.toFixed(3)} nats, perplexity ${ppl.toFixed(1)}`
       );
-      if (lastLoss - loss < 5e-4) plateau += 1; else plateau = 0;
-      lastLoss = loss;
-      if (plateau >= 6 && elapsed > 2500) { converged = true; break; }
+      if (diverged || converged) break;
       await wait(16);
     }
     if (nwState.run === runId) {
-      const finalLoss = nwHistory[nwHistory.length - 1];
+      const attemptedEpoch = nwModel.epochs;
+      nwModel = cloneNextWordModel(bestModel);
+      const finalLoss = nwEvaluate(nwModel).loss;
       const finalPpl = Math.exp(finalLoss);
+      const laterEpochs = Math.max(0, attemptedEpoch - bestEpoch);
+      const lossSummary = finalLoss < startingLoss - 1e-6
+        ? `Cross-entropy fell from ${startingLoss.toFixed(3)} to ${finalLoss.toFixed(3)} nats.`
+        : `Cross-entropy stayed at ${finalLoss.toFixed(3)} nats.`;
+      const keptSummary = laterEpochs > 0
+        ? `Epoch ${bestEpoch} was best; ${laterEpochs} later pass${laterEpochs === 1 ? "" : "es"} did not beat it, so the model kept epoch ${bestEpoch}.`
+        : "The final epoch was also the lowest-loss result.";
+      nwHistory.push(finalLoss);
+      if (nwHistory.length > 200) nwHistory.shift();
+      renderNextWordLab();
       setNwProgress(
         1,
         "complete",
-        converged ? "Converged - it has learned all it can from this corpus" : "Training complete",
-        `${nwModel.epochs} epochs in ${(elapsed / 1000).toFixed(0)}s - perplexity ${finalPpl.toFixed(1)}. Pick a context or generate a sentence.`
+        diverged ? "Training stopped safely" : "Training complete",
+        `${lossSummary} ${keptSummary} Perplexity is ${finalPpl.toFixed(1)}.`
       );
     }
   } finally {
@@ -2864,7 +3506,7 @@ function renderNextWordLab() {
   if (!nwState.hasTrained) {
     dom.nwStatus.textContent = "untrained";
     dom.nwMetrics.replaceChildren(createElement("div", "empty-state", "Press Train next-word model to train the model and reveal its metrics."));
-    dom.nwLossHistory.replaceChildren(createElement("div", "empty-state", "Loss history appears once training starts."));
+    dom.nwLossHistory.replaceChildren(createElement("div", "empty-state", "Cross-entropy history appears once training starts."));
     renderNwPrediction();
     renderNwWatch();
     return;
@@ -2872,9 +3514,9 @@ function renderNextWordLab() {
   const evaluation = nwEvaluate(nwModel);
   dom.nwStatus.textContent = nwModel.epochs === 0 ? "untrained" : `${nwModel.epochs} epochs`;
   renderMetricCards(dom.nwMetrics, [
-    { label: "train loss", value: formatNumber(evaluation.loss, 3), note: "cross-entropy in nats" },
+    { label: "train cross-entropy", value: formatNumber(evaluation.loss, 3), note: "nats per prediction" },
     { label: "perplexity", value: formatNumber(evaluation.perplexity, 2), note: "effective word choices" },
-    { label: "epochs", value: String(nwModel.epochs), note: "passes over the corpus" },
+    { label: "epochs", value: String(nwModel.epochs), note: "epoch of the current weights" },
     { label: "vocabulary", value: String(nwModel.V), note: "words it can predict" },
     { label: "parameters", value: String(nextWordParamCount()), note: "weights it tunes" },
     { label: "context", value: `${NW_CONTEXT} words`, note: "fixed window" }
@@ -3026,9 +3668,16 @@ function wireEvents() {
   });
   dom.correctClassSelect.addEventListener("change", renderSoftmax);
   [dom.forwardCtxA, dom.forwardCtxB].forEach((select) => {
-    select.addEventListener("change", renderForwardPass);
+    select.addEventListener("change", resetForwardWalkthrough);
   });
-  dom.activationSelect.addEventListener("change", renderForwardPass);
+  dom.activationSelect.addEventListener("change", resetForwardWalkthrough);
+  dom.forwardBackButton.addEventListener("click", () => setForwardStep(state.forwardStep - 1));
+  dom.forwardNextButton.addEventListener("click", () => setForwardStep(state.forwardStep + 1));
+  dom.forwardPlayButton.addEventListener("click", toggleForwardPlayback);
+  dom.forwardReplayButton.addEventListener("click", resetForwardWalkthrough);
+  dom.forwardStepButtons.forEach((button) => {
+    button.addEventListener("click", () => setForwardStep(Number(button.dataset.forwardStep)));
+  });
   [dom.backpropCtxA, dom.backpropCtxB, dom.backpropTrueWord, dom.backpropActivation].forEach((select) => {
     select.addEventListener("change", restartBackpropRun);
   });

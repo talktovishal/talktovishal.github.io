@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260726">
-  <link rel="stylesheet" href="chapter4.css?v=20260627c">
+  <link rel="stylesheet" href="chapter4.css?v=20260809k">
+  <link rel="stylesheet" href="review-diff.css?v=20260808b">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -48,6 +49,32 @@
       <span class="progress-banner-badge">In Progress</span>
       <p class="progress-banner-text">This chapter is still being written and reviewed, so it is not finished yet and parts may be rough or change. <a href="index.html#stay-notified">Get notified</a> when it is officially published.</p>
     </div>
+    <aside class="review-queue" aria-labelledby="review-queue-title">
+      <div class="review-queue-inner">
+        <p class="eyebrow">Changes awaiting review</p>
+        <h2 id="review-queue-title">Chapter 4 review queue</h2>
+        <p class="review-queue-intro">Proposals are listed here in the order their affected material appears in the chapter. Each item links to its live location.</p>
+        <article id="item-8-review" class="review-comparison" aria-labelledby="item-8-review-title">
+          <div class="review-comparison-meta">
+            <strong>Affected area: 3. Build the forward pass</strong>
+            <a href="#matrix-multiplication">Jump to the proposed matrix walkthrough</a>
+          </div>
+          <p class="eyebrow">Item 8 proposal - matrix multiplication by hand</p>
+          <h4 id="item-8-review-title">Show that a matrix multiply repeats the dot product the learner already did</h4>
+          <div class="review-diff-demo-grid">
+            <div class="review-block review-remove" inert>
+              <strong>Earlier behavior</strong>
+              <p>The walkthrough calculates one hidden neuron carefully, but the symbolic panel later jumps to <code>W1 × e</code> without showing how that operation computes all three neurons.</p>
+            </div>
+            <div class="review-block review-add">
+              <strong>Proposed behavior</strong>
+              <p>Use the current live context to check compatible shapes, multiply one weight row by the input column, place that dot product in one output cell, repeat for the other rows, then add the bias separately.</p>
+            </div>
+          </div>
+          <p class="review-comparison-note">The panel updates when the context changes and uses the exact same <code>W1</code>, embedding rows, bias, and hidden raw values as the reversible walkthrough.</p>
+        </article>
+      </div>
+    </aside>
     <section id="overview" class="workbench-band" aria-labelledby="page-title" frozen="no">
       <div class="workbench">
         <article class="intro-copy">
@@ -66,12 +93,38 @@
             numbers so the next guess is a little better. We will progressively build the math to gain a full understanding of how LLMs work under the hood.
           </p>
           <p>
-            We keep the example deliberately tiny, because a tiny model lets you watch
-            the <em>whole</em> loop: words become numbers, numbers become next-word
-            probabilities, a loss is measured, and the parameters shuffle a little closer
-            to right. A modern LLM is a much, much larger version of this exact loop -
-            same four beats, just billions of numbers instead of a handful.
+            We still keep the example deliberately tiny, because a tiny model lets you watch the <em>whole</em> loop. Chapter 3 showed what happens first: text is split into tokens, each token receives an integer ID, and that ID selects a row from the embedding table. Real tokenizers often split words into subword pieces. This browser model deliberately treats each whole word as one token so every number remains easy to inspect. From that simplified starting point, token IDs select embedding rows, those rows flow through the network to produce next-word probabilities, a loss is measured, and the parameters move a little closer to right. A modern LLM uses far more tokens and parameters, but the training beats are the same.
           </p>
+          <div class="token-id-bridge" aria-label="The representation path used by the browser model">
+            <p class="token-id-bridge-title">The exact path into this chapter's tiny network</p>
+            <div class="token-id-bridge-flow">
+              <div class="token-id-stage">
+                <strong>Text</strong>
+                <code>the cat</code>
+              </div>
+              <span class="token-id-arrow" aria-hidden="true">&rarr;</span>
+              <div class="token-id-stage">
+                <strong>Toy word tokens</strong>
+                <code>["the", "cat"]</code>
+              </div>
+              <span class="token-id-arrow" aria-hidden="true">&rarr;</span>
+              <div class="token-id-stage">
+                <strong>Token IDs</strong>
+                <code>[2, 3]</code>
+              </div>
+              <span class="token-id-arrow" aria-hidden="true">&rarr;</span>
+              <div class="token-id-stage">
+                <strong>Embedding rows</strong>
+                <code>E[2], E[3]</code>
+              </div>
+              <span class="token-id-arrow" aria-hidden="true">&rarr;</span>
+              <div class="token-id-stage">
+                <strong>Network</strong>
+                <span>the math we build here</span>
+              </div>
+            </div>
+            <p class="token-id-bridge-note">The IDs 2 and 3 are the positions of <code>the</code> and <code>cat</code> in this toy vocabulary. Production tokenizers use much larger vocabularies and often split a word into several tokens.</p>
+          </div>
           <figure class="diagram-figure">
             <svg class="pipeline-svg" viewBox="0 0 600 168" role="img" aria-labelledby="loop-title loop-desc">
               <title id="loop-title">The four-beat training loop</title>
@@ -97,7 +150,7 @@
                 </marker>
               </defs>
             </svg>
-            <figcaption>Every section of this chapter builds one beat of this loop; the last section runs the whole thing.</figcaption>
+            <figcaption>Every section of this chapter builds one beat of this loop; the last section runs the whole thing. This loop begins after tokenization: the context token IDs have already selected their embedding rows.</figcaption>
           </figure>
           <p class="example-note">
             <em>Guiding question:</em> how can a pile of numbers learn to finish your
@@ -123,7 +176,7 @@
             </div>
           </div>
           <div class="example-note prereq-note">
-            <p><em>Before we dive in, a few needed prerequisites are in order.</em> This chapter leans on Chapters 1 and 2, and it builds every piece of math slowly, the moment we actually need it. A little comfort with the following will make the ride smoother - use the links as quick refreshers if anything feels new.</p>
+            <p><em>Before we dive in, a few needed prerequisites are in order.</em> This chapter leans on Chapters 1, 2, and 3, and it builds every piece of math slowly, the moment we actually need it. A little comfort with the following will make the ride smoother - use the links as quick refreshers if anything feels new.</p>
             <ul>
               <li>
                 <strong><a href="chapter-1.html">Chapter 1</a>.</strong> We reuse next-word
@@ -136,6 +189,9 @@
                 big idea that each word is a short <em>row of numbers</em> (a vector), and
                 that a <a href="https://en.wikipedia.org/wiki/Dot_product" target="_blank" rel="noreferrer">dot product</a>
                 compares two of them.
+              </li>
+              <li>
+                <strong><a href="chapter-3.html">Chapter 3</a>.</strong> We reuse the path from text to token IDs to embedding rows. Real tokenizers often produce subword pieces; this chapter deliberately uses one whole word per token so the network math stays easy to inspect.
               </li>
               <li>
                 <strong>Multiply, add, compare.</strong> That is the entire math
@@ -163,6 +219,9 @@
             the spot. Read the words first and the symbols second, and it will all make sense.
           </p>
           <p>
+            In Chapter 1, we learnt how to calculate perplexity from probability. To remind ourselves, perplexity is just a formulation of surprise. Now we will use it again to compare the evidence with a neural network's guesses.
+          </p>
+          <p>
             Let's begin with a feeling you already have: <em>surprise</em>. Read
             "the cat ___" and your mind quietly bets on a couple of words -
             <code>sat</code>, maybe <code>ran</code>. End the sentence on <code>sat</code>
@@ -179,12 +238,15 @@
             stays clean; the real corpus we actually train on at the end of the chapter is
             larger and messier, but the core idea is identical.) We can express the chance of
             <code>sat</code> coming next as
-            <code>P(sat | the cat) = 8 / 12 &approx; 0.67</code> (or 67%). That vertical bar means "given": we are not asking how common
+            <code>P(sat | the cat) = 8 / 12 &approx; 0.67</code> (or 67%). The other two probabilities come from the same count-over-total calculation: <code>P(ran | the cat) = 3 / 12 = 0.25</code> (25%), and <code>P(slept | the cat) = 1 / 12 &approx; 0.083</code> (about 8%; the panel rounds to whole percentages). The exact fractions add up to <code>12 / 12 = 1</code>, or 100%. That vertical bar means "given": we are not asking how common
             the word <code>sat</code> is everywhere, only how common it is <em>right after</em>
             <code>the cat</code>. This represents the <strong>true distribution</strong> of our data.
           </p>
           <p>
             When training a language model, we want its predictions to match this reality as closely as possible. To measure how well it's doing, we rely on three heavily connected concepts from Information Theory. All three answer one fundamental question: <em>is the model confident, or flailing?</em> Let's look at them through the lens of "surprise."
+          </p>
+          <p>
+            To keep the two sides straight, we will call the true distribution in the evidence <code>p</code>. In the same order as the words above - <code>sat</code>, <code>ran</code>, then <code>slept</code> - <code>p = (8/12, 3/12, 1/12) &approx; (0.67, 0.25, 0.083)</code>. This answers, "What actually happened in the evidence?" We will call the model's current guess <code>q = (0.55, 0.30, 0.15)</code>. This answers, "What does the model currently believe?" The two distributions cover the same three words, but they are supposed to differ before training: <code>p</code> is the target and <code>q</code> is the imperfect guess. Entropy asks how much uncertainty remains even if we know <code>p</code> perfectly. Cross-entropy asks how surprised the model actually is while it uses <code>q</code>. Training nudges <code>q</code> toward <code>p</code>; when they match, cross-entropy reaches the entropy floor.
           </p>
           <p>
             <a href="https://en.wikipedia.org/wiki/Entropy_(information_theory)" target="_blank" rel="noreferrer">Entropy</a>
@@ -195,8 +257,8 @@
             is the model's <em>actual</em> average surprise when it uses its own internal, imperfect probabilities to predict the real next words. If our model incorrectly thinks <code>slept</code> is the most likely next word, it will incur a massive "surprise penalty" every time <code>sat</code> repeatedly shows up in the training data. The closer the model's predictions match the true distribution, the lower the cross-entropy gets, eventually bottoming out exactly at the true Entropy floor. In machine learning, minimizing cross-entropy is the standard way we teach models to predict text.
           </p>
           <p>
-            Finally, <a href="https://en.wikipedia.org/wiki/Perplexity" target="_blank" rel="noreferrer">perplexity</a>
-            rewrites this cross-entropy metric on a much friendlier, intuitive scale. While "bits of surprise" can feel abstract, perplexity translates those bits back into an effective vocabulary size. Mathematically, it is simply the exponentiation of cross-entropy (e.g., 2<sup>cross-entropy</sup>). If a model has a perplexity of 4 on a given text, it means that, on average, the model felt as confused as if it were choosing blindly between 4 equally likely words. A perfect model that knows exactly what comes next has a perplexity of 1.
+            As you saw in Chapter 1, <a href="https://en.wikipedia.org/wiki/Perplexity" target="_blank" rel="noreferrer">perplexity</a>
+            rewrites this cross-entropy metric on a much friendlier, intuitive scale. While "bits of surprise" can feel abstract, perplexity translates those bits back into an effective vocabulary size. Mathematically, it is simply the exponentiation of cross-entropy (e.g., 2<sup>cross-entropy</sup>). If a model has a perplexity of 4 on a given text, it means that, on average, the model felt as confused as if it were choosing blindly between 4 equally likely words. A perfect model that knows exactly what comes next has a perplexity of 1. In this chapter, it stays beside cross-entropy as a readable translation of the same surprise, not as a separate training objective.
           </p>
           <p class="example-note">
             <em>Now feel it for yourself.</em> The left sliders are the evidence - how
@@ -211,7 +273,7 @@
         <div class="math-lab-grid">
           <div class="panel">
             <div class="section-title-row">
-              <h3>Next-word counts</h3>
+              <h3>Evidence <code>p</code>: what happened</h3>
               <span id="probabilityContextLabel" class="pill">the cat</span>
             </div>
             <label class="select-row probability-context-row" for="probabilityContextSelect">
@@ -244,7 +306,7 @@
 
           <div class="panel">
             <div class="section-title-row">
-              <h3>Model's guessed probabilities</h3>
+              <h3>Model <code>q</code>: what it believes</h3>
               <span id="entropyLabel" class="pill">entropy</span>
             </div>
             <div class="slider-stack" aria-label="Model guesses">
@@ -272,20 +334,18 @@
         <div class="worked-example" aria-label="Cross-entropy by hand">
           <h3>Cross-entropy by hand</h3>
           <p>
-            With the evidence <code>sat 8, ran 3, slept 1</code> and a model that
-            guesses <strong>sat 55% <u>(0.55)</u>, ran 30% <u>(0.30)</u>, slept 15% <u>(0.15)</u></strong>, the surprise at each
-            real word is <code>-log2(model probability)</code>, weighted by how often
-            that word actually happened:
+            Now use those same two distributions together. Evidence <code>p</code> says how often each word actually happened: <code>sat 8/12</code>, <code>ran 3/12</code>, <code>slept 1/12</code>. Model <code>q</code> says what the model currently believes: <code>sat 0.55</code>, <code>ran 0.30</code>, <code>slept 0.15</code>. Cross-entropy goes row by row: <code>p</code> supplies how heavily that row counts, while <code>-log2(q)</code> supplies how surprised the model is on that row.
           </p>
           <div class="formula-stack">
-            <code>P(sat) = 8/12 ≈ 0.67, P(ran) = 3/12 = 0.25, P(slept) = 1/12 ≈ 0.083</code>
-            <code>cross-entropy = 0.67·(-log2 <u>0.55</u>) + 0.25·(-log2  <u>0.30</u>) + 0.083·(-log2 <u>0.15</u>)</code>
-            <code>≈ 0.58 + 0.43 + 0.23 = 1.24 bits → perplexity = 2^1.24 ≈ 2.4 words</code>
+            <code>evidence p: p(sat) = 8/12 ≈ 0.67, p(ran) = 3/12 = 0.25, p(slept) = 1/12 ≈ 0.083</code>
+            <code>H(p,q) = p(sat)·[-log2 q(sat)] + p(ran)·[-log2 q(ran)] + p(slept)·[-log2 q(slept)]</code>
+            <code>H(p,q) = 0.67·[-log2 0.55] + 0.25·[-log2 0.30] + 0.083·[-log2 0.15]</code>
+            <code>≈ 0.58 + 0.43 + 0.23 = 1.24 bits → perplexity = 2^1.24 ≈ 2.36 effective choices</code>
           </div>
           <p class="microcopy">
             The live panel recomputes these as you drag. A perfect model would reach
             the entropy floor of about 1.19 bits; the gap above it is the model's
-            avoidable surprise, and training exists to shrink it.
+            avoidable surprise, and training exists to shrink it. In our notation, that floor is reached when <code>q = p</code>.
           </p>
         </div>
 
@@ -305,15 +365,18 @@
             <li>\(p(w)\): The <strong>true distribution</strong> &mdash; how often word \(w\) actually follows this context in the data.</li>
             <li>\(q(w)\): The <strong>model's prediction</strong> &mdash; the probability the model assigns to word \(w\).</li>
             <li>\(\sum_{w}\): The sum over the entire vocabulary. We add up the probability-weighted surprise for every candidate next word.</li>
-            <li>\(\log_2\): Measures the surprise in <strong>bits</strong>, framing the prediction as binary choices. Perplexity turns those abstract bits back into an intuitive word count.</li>
+            <li>\(\log_2\): Measures the surprise in <strong>bits</strong>, framing the prediction as binary choices. Perplexity turns those abstract bits back into an intuitive effective choice count; perplexity itself has no unit.</li>
           </ul>
           
+          <details class="math-number-check">
+            <summary>Check the live numbers against the formulas</summary>
+            <div class="math-number-check-body">
+              <p><strong>Checking the math:</strong> Let's plug in the numbers from our live panel. Our true data is \(p = (\tfrac{8}{12}, \tfrac{3}{12}, \tfrac{1}{12})\) and our model's guesses are \(q = (0.55, 0.30, 0.15)\).</p>
+              <p>The true Entropy floor is \(H(p) = 1.19\) bits. The model's Cross-Entropy is \(H(p,q) = 1.24\) bits, and its Perplexity is \(2^{1.24} \approx 2.36\) effective choices.</p>
+            </div>
+          </details>
           <p class="microcopy">
-            <strong>Checking the math:</strong> Let's plug in the numbers from our live panel. Our true data is \(p = (\tfrac{8}{12}, \tfrac{3}{12}, \tfrac{1}{12})\) and our model's guesses are \(q = (0.55, 0.30, 0.15)\). 
-            <br><br>
-            The true Entropy floor is \(H(p) = 1.19\) bits. The model's Cross-Entropy is \(H(p,q) = 1.24\) bits, and its Perplexity is \(2^{1.24} \approx 2.36\) words. 
-            <br><br>
-            <em>A note on actual training:</em> Later sections (and ML frameworks like PyTorch) switch to using the natural log \(\ln\). This measures the exact same surprise, but in <em>nats</em> instead of bits. In that environment, cross-entropy is often just called your "Loss," and perplexity is calculated as \(e^{\text{loss}}\).
+            <em>A note on actual training:</em> Later sections (and ML frameworks like PyTorch) switch to using the natural log \(\ln\). This measures the exact same surprise, but in <em>nats</em> instead of bits. In that environment, the displayed loss is cross-entropy in nats, and perplexity is calculated as \(e^{\text{loss}}\).
           </p>
         </div>
         
@@ -328,7 +391,9 @@
         </div>
 
 
-        <div class="math-formal" aria-label="Intuition and Reasoning">
+        <details class="math-depth-disclosure">
+          <summary>Go deeper: why logarithms? The compression view</summary>
+          <div class="math-depth-body" aria-label="Intuition and Reasoning">
           <h3>Why \(-\log_2(q)\)? The Four Rules of Surprise</h3>
           <p>
             The formula \(-\log_2(q)\) wasn't chosen randomly. Claude Shannon formulated it in 1948 because it is the <em>only</em> mathematical function that perfectly matches how our common-sense concept of "surprise" works:
@@ -377,7 +442,8 @@
           <p>
             When we train an LLM to "minimize cross-entropy loss," we are literally forcing it to rearrange its internal probabilities so its coding rulebook wastes as few bits as possible compared to the true distribution of the text.
           </p>
-        </div>
+          </div>
+        </details>
 
 
       </div>
@@ -389,7 +455,7 @@
           <p class="eyebrow">2. Words as vectors</p>
           <h2 id="vectors-title">Representing words as vectors - a list of numbers.</h2>
           <p>
-            We used surprise to tell us <em>how wrong</em> our guess was. But before the model can
+            Entrophy tells us <em>how wrong</em> our guess was. But before the model can
             guess at all, it needs a way to tell words apart - and, more usefully, to
             notice when two words are <em>alike</em>. You already do this without
             thinking: <code>cat</code> and <code>dog</code> feel like cousins, while
@@ -404,7 +470,7 @@
             and actually see what the model sees.
           </p>
           <p>
-            Why arrows? Because the model compares words with one humble operation: the
+            Why arrows? Because we can compare two word vectors with one humble operation: the
             <a href="https://en.wikipedia.org/wiki/Dot_product" target="_blank" rel="noreferrer">dot product</a>.
             Multiply the matching numbers of two vectors, add the results, done. If
             that feels too small to power a language model, good - hold on to the
@@ -413,9 +479,63 @@
             when they point in opposite directions.
             <a href="https://en.wikipedia.org/wiki/Cosine_similarity" target="_blank" rel="noreferrer">Cosine similarity</a>
             is the same idea stripped down to direction alone, and
-            <strong>distance</strong> just asks how far apart the tips sit. Hold on to
-            that humble dot product: it is exactly how the model will rank every
-            candidate next word - and, much later, how attention will rank everything.
+            <strong>distance</strong> just asks how far apart the tips sit. Cosine tells us whether these two embedding rows point alike. In the next section, we will reuse the dot product inside the network itself.
+          </p>
+        </div>
+
+        <div id="number-shapes" class="math-formal" aria-labelledby="number-shapes-title">
+          <p class="eyebrow">A quick map of number arrangements</p>
+          <h3 id="number-shapes-title">One number, one row, one table, one batch.</h3>
+          <p>
+            Before we use these words in formulas, let us attach each one to something
+            already on the page. Each object below is a different <strong>number
+            arrangement</strong>. We describe that arrangement by counting along each
+            axis: how many rows, how many numbers per row, and, when we stack several
+            tables, how many tables. Code libraries call that list of counts the array's
+            <strong>shape</strong>. So <code>4 x 2</code> means four rows with two numbers
+            in each row.
+          </p>
+          <ul class="symbol-glossary">
+            <li><strong>Scalar:</strong> one number on its own, such as the cross-entropy loss <code>1.24</code>. It tells us how wrong one result is.</li>
+            <li><strong>Vector:</strong> one ordered row of numbers, such as the <code>cat</code> embedding <code>[0.70, -0.30]</code>. Its number arrangement is one axis of length <code>2</code> because this teaching vector holds two numbers.</li>
+            <li><strong>Matrix:</strong> vectors stacked into a rectangular table. The four embedding rows for <code>cat</code>, <code>dog</code>, <code>mat</code>, and <code>rug</code> form a <code>4 x 2</code> matrix: four rows, two numbers per row. The network's layer weights are matrices too.</li>
+          </ul>
+          <h4>Why do we need a tensor?</h4>
+          <p>
+            A model rarely processes only one training example at a time. Suppose we
+            send it these two contexts together: <code>the cat</code> and
+            <code>the dog</code>. Each word already has a two-number embedding:
+          </p>
+          <div class="formula-stack" aria-label="Two context matrices stacked into one tensor">
+            <code>example 1, "the cat" = [[0.20, 0.10], [0.70, -0.30]]</code>
+            <code>example 2, "the dog" = [[0.20, 0.10], [0.60, -0.20]]</code>
+            <code>batch = [ example 1, example 2 ]</code>
+          </div>
+          <p>
+            Each example is a <code>2 x 2</code> matrix: two context words, with two
+            embedding numbers for each word. Stacking the two matrices gives the
+            computer one object with three axes. Machine-learning libraries call that
+            object a <strong>tensor</strong>. Its code-library shape is
+            <code>2 x 2 x 2</code>, and now each <code>2</code> has a concrete job:
+          </p>
+          <ol class="symbol-glossary">
+            <li><strong>First axis - 2 examples:</strong> should I read <code>the cat</code> or <code>the dog</code>?</li>
+            <li><strong>Second axis - 2 context positions:</strong> should I read the first word or the second word in that example?</li>
+            <li><strong>Third axis - 2 embedding numbers:</strong> which coordinate of that word's vector should I read?</li>
+          </ol>
+          <p>
+            That is the motivation for a tensor: it keeps several related tables in one
+            organized object without losing which example, word position, or vector
+            coordinate each number belongs to. <strong>Tensor</strong> is also the umbrella
+            term used by machine-learning libraries: a scalar is a zero-axis tensor, a
+            vector is a one-axis tensor, a matrix is a two-axis tensor, and this batch is
+            a three-axis tensor.
+          </p>
+          <p class="microcopy">
+            No new calculation is hiding here. These names only tell us how the numbers
+            are arranged. In this section we inspect one vector and its matrix; later,
+            the same number-arrangement language, and the code term <em>shape</em>, will
+            help us read the network's weight tables.
           </p>
         </div>
 
@@ -425,7 +545,7 @@
               <h3>Move two word vectors</h3>
               <span id="vectorSummary" class="pill">geometry</span>
             </div>
-            <p class="microcopy">Think of <strong>A</strong> as the vector for <code>cat</code> and <strong>B</strong> as the vector for <code>dog</code>. Type exact components and watch how similar their directions are.</p>
+            <p class="microcopy">Think of <strong>A</strong> as the vector for <code>cat</code> and <strong>B</strong> as the vector for <code>dog</code>. Type exact components and watch how similar their directions are. <code>cat=[0.70,-0.30]</code>, <code>dog=[0.60,-0.20]</code> - the same rows used in the forward-pass panel below.</p>
             <div class="vector-controls">
               <label class="number-row vector-number-row" for="vectorAx">
                 <span>A x</span>
@@ -433,7 +553,7 @@
               </label>
               <label class="number-row vector-number-row" for="vectorAy">
                 <span>A y</span>
-                <input id="vectorAy" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="0.30">
+                <input id="vectorAy" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="-0.30">
               </label>
               <label class="number-row vector-number-row" for="vectorBx">
                 <span>B x</span>
@@ -441,7 +561,7 @@
               </label>
               <label class="number-row vector-number-row" for="vectorBy">
                 <span>B y</span>
-                <input id="vectorBy" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="0.40">
+                <input id="vectorBy" class="control-input vector-number-input" type="number" min="-1" max="1" step="0.05" value="-0.20">
               </label>
             </div>
             <svg id="vectorSvg" class="vector-svg" viewBox="0 0 520 360" role="img" aria-label="Two vectors on a coordinate grid"></svg>
@@ -453,12 +573,7 @@
               <span id="dotProductLabel" class="pill">dot product</span>
             </div>
             <div id="vectorMetrics" class="metric-card-grid" aria-live="polite"></div>
-            <p class="insight-note">
-              When the model ranks the next word, it compares a context vector against
-              each candidate word vector with exactly this dot product. Bigger score,
-              higher rank. This is why I keep slowing down on the dot product: attention,
-              much later, runs the same comparison at a far larger scale.
-            </p>
+            <p class="insight-note">This panel compares two embedding rows. A high cosine means they point in nearly the same direction; it does not make a next-word prediction. We build that prediction in the next section.</p>
             <label class="select-row matrix-row" for="embeddingLookupSelect">
               <span>Inspect a row</span>
               <select id="embeddingLookupSelect" class="control-input">
@@ -475,12 +590,12 @@
         <div class="worked-example" aria-label="Dot product by hand">
           <h3>One dot product, by hand</h3>
           <p>
-            Say <code>cat = [0.7, 0.3]</code> and <code>dog = [0.6, 0.4]</code>. Their
+            Say <code>cat = [0.7, -0.3]</code> and <code>dog = [0.6, -0.2]</code>. Their
             similarity score is just multiply-and-add:
           </p>
           <div class="formula-stack">
-            <code>dot(cat, dog) = 0.7×0.6 + 0.3×0.4 = 0.42 + 0.12 = 0.54</code>
-            <code>cosine = dot ÷ (length cat × length dog) ≈ 0.54 ÷ (0.76 × 0.72) ≈ 0.98</code>
+            <code>dot(cat, dog) = 0.7×0.6 + (-0.3)×(-0.2) = 0.42 + 0.06 = 0.48</code>
+            <code>cosine = dot ÷ (length cat × length dog) ≈ 0.48 ÷ (0.762 × 0.632) ≈ 0.997</code>
           </div>
           <p class="microcopy">
             A cosine near 1 means <code>cat</code> and <code>dog</code> are pointing in
@@ -493,7 +608,7 @@
         <div class="math-formal" aria-label="Comparison in symbols">
           <h3>The same comparison, in symbols</h3>
           <p>
-            Why does multiplying and adding numbers measure meaning? Imagine each dimension in a word vector represents a hidden trait (like "furriness" or "royalty"). When you multiply matching components, you are checking for shared traits. If both <code>cat</code> and <code>dog</code> score high on "furry," multiplying those values produces a large number. Adding these up across all dimensions yields the <strong>dot product</strong>—a raw score of semantic overlap.
+            Why does multiplying and adding numbers measure meaning? Fort now, imagine a coordinate trying to measure a hidden trait such as "furriness" or "royalty." Chapter 2's important caveat still applies: real dimensions are not individually labelled features; the useful pattern is distributed across the whole vector. This is just for us to get an intuition. When you multiply matching components, you are checking for shared coordinates. If both <code>cat</code> and <code>dog</code> score high on "furry," multiplying those values produces a large number. Adding these up across all dimensions yields the <strong>dot product</strong>—a raw score of alignment in this intuition.
           </p>
           <p>
             This mathematical trick wasn't invented for language. In the 1880s, physicists like Josiah Willard Gibbs formulated vector algebra to calculate how much of one physical force aligns with another (like wind pushing against a sail). They proved that the dot product inherently captures the geometric <strong>angle</strong> (\(\theta\)) between two arrows.
@@ -503,16 +618,13 @@
           </p>
           $$a \cdot b = \sum_{i=1}^{n} a_i b_i \qquad \lVert a \rVert = \sqrt{a \cdot a} \qquad \cos\theta = \frac{a \cdot b}{\lVert a \rVert\,\lVert b \rVert}$$
           <ul class="symbol-glossary">
-            <li>\(a_i\): the \(i\)-th number inside vector \(a\) (e.g., its score for a specific trait).</li>
+            <li>\(a_i\): the \(i\)-th coordinate inside vector \(a\); one coordinate has no reliable human label on its own.</li>
             <li>\(n\): how many numbers each vector holds (just 2 in this demo, but thousands in an LLM).</li>
             <li>\(\lVert a \rVert\): the magnitude or overall length of the arrow \(a\).</li>
             <li>\(\theta\): the angle between the two arrows. If they point the exact same way (identical meaning), the angle is 0&deg;, and \(\cos(0) = 1\).</li>
           </ul>
           <p class="microcopy">
-            With \(\text{cat} = [0.7, 0.3]\) and \(\text{dog} = [0.6, 0.4]\):
-            \(a \cdot b = 0.54\), \(\lVert \text{cat} \rVert \approx 0.76\),
-            \(\lVert \text{dog} \rVert \approx 0.72\), so \(\cos\theta \approx 0.98\).
-            The model ranks every candidate next word with this one operation, finding the vector that points in the most similar direction.
+            With \(\text{cat} = [0.7, -0.3]\) and \(\text{dog} = [0.6, -0.2]\): \(a \cdot b = 0.48\), \(\lVert \text{cat} \rVert \approx 0.762\), \(\lVert \text{dog} \rVert \approx 0.632\), so \(\cos\theta \approx 0.997\). This cosine tells us that the two embedding rows point in nearly the same direction. That is all we are measuring here. In the next section, we will follow these rows through the network and see how they help it make a prediction.
           </p>
         </div>
         
@@ -535,8 +647,7 @@
           <h2 id="nn-title">Stack the pieces into a tiny network we can inspect.</h2>
           <p>
             We have three ingredients so far - probability, word vectors, and the dot
-            product. Time to assemble them into a machine that makes a guess - one that
-            ends in a <strong>softmax</strong> step we unpack in the next section. Think of a neural network as a pipeline. The input data (our context words) is the water flowing through the pipes, and the <strong>weights</strong> are the adjustable valves. The water always flows forward, but the valves decide how much pressure makes it to each possible next-word output.
+            product. In this section, we will assemble them into a neural network to predict the next word. We will produce a raw score for every possible next word. In the next section we will convert the scores into <strong>softmax</strong> by turning them into probabilities. Think of a neural network as a pipeline. The input data (our context words) is the water flowing through the pipes, and the <strong>weights</strong> are the adjustable valves. The water always flows forward, but the valves decide how much pressure makes it to each possible next-word output.
           </p>
           <p>
             The smallest valve intersection is a <strong>neuron</strong>: it
@@ -564,22 +675,32 @@
             or MLP.
           </p>
           <p>
-            Thus, the forward pass is the following: look up an <strong>embedding</strong> row for each context word,
-            join the rows, push them through a hidden layer with an activation, and
-            finish with softmax over the candidate words. Context words in, a next-word
-            distribution out. Try it out by changing the context or the activation below and watch the
-            prediction shift. These weights are fixed and illustrative for now; we will learn to adjust them later.
+            This is the part of the forward pass we will build in this section: look up an <strong>embedding</strong> row for each context (adjoining) word, join the rows, push them through a hidden layer with an activation, and produce one <strong>logit</strong>, or raw pre-probability score, for each candidate word. Use Back and Next below to inspect every multiply-and-add. Then change the context or activation and replay the same five steps. These weights are fixed and illustrative for now; we will learn to adjust them later.
           </p>
         </div>
 
-        <figure class="manim-clip">
-          <video controls muted playsinline preload="metadata" poster="assets/videos/chapter4-forward-pass-poster.jpg" aria-label="Short animation showing the forward pass through the tiny next-word network">
-            <source src="assets/videos/chapter4-forward-pass.mp4" type="video/mp4">
-          </video>
-          <figcaption>
-            <strong>Forward pass in motion.</strong> The same tiny network pushes one number left to right: input value, hidden activation, word scores, then softmax and loss.
-          </figcaption>
-        </figure>
+        <section id="forward-walkthrough" class="forward-walkthrough" aria-labelledby="forward-step-title">
+          <div class="forward-stepper-head">
+            <div>
+              <p class="eyebrow">Learner-controlled walkthrough</p>
+              <h3 id="forward-step-title">Look up and join the two embedding rows</h3>
+              <p id="forwardStepCopy">Start with the two context words. Each token ID selects one row from the embedding table; joining those rows gives the four-number input.</p>
+            </div>
+            <span id="forwardStepCount" class="pill">step 1 of 5</span>
+          </div>
+          <div class="forward-step-jumps" role="group" aria-label="Jump to a forward-pass step">
+            <button type="button" data-forward-step="0">1 <span>Lookup</span></button>
+            <button type="button" data-forward-step="1">2 <span>Dot product</span></button>
+            <button type="button" data-forward-step="2">3 <span>Activation</span></button>
+            <button type="button" data-forward-step="3">4 <span>Logits</span></button>
+            <button type="button" data-forward-step="4">5 <span>Handoff</span></button>
+          </div>
+          <div class="stepper-row forward-stepper-controls" aria-label="Forward-pass playback controls">
+            <button id="forwardBackButton" class="ghost-button" type="button">Back</button>
+            <button id="forwardPlayButton" class="ghost-button" type="button">Play</button>
+            <button id="forwardNextButton" class="primary-button" type="button">Next</button>
+            <button id="forwardReplayButton" class="ghost-button" type="button">Replay</button>
+          </div>
 
         <div class="network-grid">
           <div class="panel diagram-panel">
@@ -588,8 +709,11 @@
               <span id="forwardSummary" class="pill">MLP</span>
             </div>
             <div class="control-grid compact-controls">
-              <label class="select-row activation-row" for="forwardCtxA">
-                <span>Context 1</span>
+              <label class="select-row activation-row forward-control-card" for="forwardCtxA">
+                <span class="forward-control-copy">
+                  <strong>First context word</strong>
+                  <small id="forwardCtxAReadout">the &rarr; [0.20, 0.10]</small>
+                </span>
                 <select id="forwardCtxA" class="control-input">
                   <option value="the" selected>the</option>
                   <option value="cat">cat</option>
@@ -598,8 +722,11 @@
                   <option value="ran">ran</option>
                 </select>
               </label>
-              <label class="select-row activation-row" for="forwardCtxB">
-                <span>Context 2</span>
+              <label class="select-row activation-row forward-control-card" for="forwardCtxB">
+                <span class="forward-control-copy">
+                  <strong>Second context word</strong>
+                  <small id="forwardCtxBReadout">cat &rarr; [0.70, -0.30]</small>
+                </span>
                 <select id="forwardCtxB" class="control-input">
                   <option value="the">the</option>
                   <option value="cat" selected>cat</option>
@@ -608,8 +735,11 @@
                   <option value="ran">ran</option>
                 </select>
               </label>
-              <label class="select-row activation-row" for="activationSelect">
-                <span>Activation</span>
+              <label class="select-row activation-row forward-control-card" for="activationSelect">
+                <span class="forward-control-copy">
+                  <strong>Hidden activation</strong>
+                  <small id="forwardActivationReadout">ReLU &rarr; keep positive, clip negative</small>
+                </span>
                 <select id="activationSelect" class="control-input">
                   <option value="relu">ReLU</option>
                   <option value="tanh">tanh</option>
@@ -620,31 +750,27 @@
             <svg id="networkSvg" class="network-svg" viewBox="0 0 560 300" role="img" aria-label="Tiny next-word network forward pass"></svg>
             <p class="microcopy">
               Edge <strong>color</strong> shows the sign of that connection's push
-              (<span class="edge-key edge-key-pos">teal positive</span>,
-              <span class="edge-key edge-key-neg">coral negative</span>); edge
+              (<span class="edge-key edge-key-pos">green positive</span>,
+              <span class="edge-key edge-key-neg">red negative</span>); edge
               <strong>thickness</strong> shows how hard it pushes for this input. The ringed
-              hidden neuron is the one traced step by step on the right - <strong>click any
-              neuron</strong> to trace a different one.
+              hidden neuron is the one traced step by step on the right. Each visible
+              word-to-neuron line bundles two coordinate connections; in Step 2 its label
+              shows their two weights. <strong>Click any neuron</strong> to trace a different one.
+              In Step 4, click a candidate word to inspect its output weights and bias.
             </p>
           </div>
 
           <div class="panel breakdown-panel">
             <div class="section-title-row">
-              <h3>Inside the pass</h3>
-              <span class="pill">embeddings → softmax</span>
+              <h3>Inside this step</h3>
+              <span id="forwardDetailBadge" class="pill">embedding lookup</span>
             </div>
             <p class="microcopy">
-              Every number below is computed live from the two context words and the
-              activation you picked. Follow the five steps top to bottom and watch the
-              real multiply-and-add that turns two word vectors into a next-word guess.
+              Every number below is computed live from the context and activation you
+              picked. Only the selected step is shown, so you can inspect the arithmetic
+              before moving forward or backward.
             </p>
             <div id="forwardPanel" class="forward-panel" aria-live="polite"></div>
-            <p class="insight-note">
-              This is exactly the shape of the model you are about to train: context
-              words in, a next-word distribution out. The only thing missing is
-              learning, which is the four-beat loop of forward pass, loss, backward
-              pass, and update.
-            </p>
           </div>
 
           <div class="model-shape-bridge" aria-label="Bridge from toy network dimensions to Transformer model-card symbols">
@@ -694,6 +820,13 @@
           </p>
           </div>
         </div>
+        </section>
+
+        <div id="matrix-multiplication" class="math-formal review-block review-add" aria-labelledby="matrix-multiplication-title">
+          <p class="eyebrow">The same hidden-layer work, all at once</p>
+          <h3 id="matrix-multiplication-title">One matrix multiplication, by hand.</h3>
+          <div id="matrixMultiplyPanel" aria-live="polite"></div>
+        </div>
 
         <div class="math-formal" aria-label="Forward pass in symbols">
           <h3>The whole forward pass, in symbols</h3>
@@ -705,16 +838,16 @@
           <p>
             Stack those into the tiny next-word network. Look up an embedding row for
             each of the two context words and join them, pass through one hidden layer
-            with a \(\tanh\) activation, produce one raw score per vocabulary word, and
-            finish with softmax:
+            with a \(\tanh\) activation, and produce one raw score per vocabulary word.
+            The softmax conversion appears in the next section:
           </p>
           $$e = \big[\,E_{w_1}\,;\,E_{w_2}\,\big] \qquad h = \tanh(W_1 e + b_1)$$
-          $$z = W_2 h + b_2 \qquad q = \text{softmax}(z)$$
+          $$z = W_2 h + b_2$$
           <ul class="symbol-glossary">
             <li>\(E_{w}\): the embedding row looked up for word \(w\); \(e\): the two rows joined.</li>
             <li>\(W_1, b_1\): the hidden layer's weights and bias; \(\tanh\): its activation \(f\).</li>
             <li>\(W_2, b_2\): the output weights and bias that turn the hidden layer into logits \(z\).</li>
-            <li>\(q\): the next-word probability the model assigns to every word in the vocabulary (the model's prediction, written \(q\) as in the cross-entropy setup above).</li>
+            <li>\(z\): one raw logit per candidate word. The next section turns these logits into the model distribution \(q\).</li>
           </ul>
         </div>
       </div>
@@ -955,10 +1088,10 @@
             move the numbers? Let's start simple, we will shrink
             the model to the simplest thing that can possibly learn - a straight line
             with two knobs, a <code>slope</code> and an <code>intercept</code> - and
-            ask it to pass through a cloud of dots. The <strong>loss</strong> is just
+            ask it to pass through a cloud of dots. The <strong>mean squared error (MSE) loss</strong> is just
             the average squared gap between the line and the dots: one number that
             answers "how wrong are we right now?". (Our word model will later swap in
-            cross-entropy loss, but the nudging idea is exactly the same.)
+            cross-entropy loss, but the nudging idea is exactly the same.) MSE and cross-entropy are different objectives on different scales, so their raw loss numbers should not be compared with each other.
           </p>
           <p>
             Now the move that does all the work. Imagine you are standing blindfolded on the side of a hilly valley, trying to reach the absolute bottom (where your loss is zero). Because you can't see the whole landscape, you just feel the angle of the ground directly under your feet. The <strong>gradient</strong> is the math calculating that slope. It answers "if I jiggle this one knob, does the loss climb or fall, and how steeply?" By mathematical definition, a gradient always points toward the direction of steepest <em>increase</em>—straight uphill. So, to head downhill toward our goal, we take that exact measurement and deliberately step in the opposite direction.
@@ -2091,7 +2224,7 @@
           <div class="trainer-head">
             <div>
               <h3>Training controls</h3>
-              <p>Pick a time budget and train. The model keeps training until it converges or the budget runs out, showing live progress. Learning rate is fixed at 0.2 so the focus stays on watching it learn.</p>
+              <p>Pick a time budget and train. The model keeps training until it converges or the budget runs out, showing live progress. The learning rate is fixed at 0.02. Each pass through the corpus is measured; if later passes make the loss worse, the model finishes with the lowest-loss weights it found.</p>
             </div>
             <button id="nwResetButton" class="ghost-button" type="button">Reset model</button>
           </div>
@@ -2300,7 +2433,7 @@ return {
     </section>
   </main>
 
-  <script src="chapter4.js?v=20260728"></script>
+  <script src="chapter4.js?v=20260809k"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>

@@ -6,14 +6,31 @@
 
 We will complete this plan one checklist item at a time so every change remains easy to understand and review.
 
+### Review-markup lifecycle
+
+Each lesson change has two separate passes:
+
+1. **Proposal pass:** keep removed or replaced text visible with a strike-through and render proposed text in green. Use `<del class="review-remove">...</del>` and `<ins class="review-add">...</ins>` for inline copy. Use equivalent `.review-remove` and `.review-add` wrappers when a whole paragraph, figure, panel, or section is being replaced.
+2. **Approval pass:** after the author approves the proposal, permanently remove the struck-through version, unwrap the green version so it returns to normal lesson styling, rerun the focused checks, and mark the checklist item `[x]`.
+
+For interactive changes, never leave two working copies of controls with duplicate IDs or event listeners. The old version may remain only as an inert struck-through snapshot with IDs removed and controls disabled; the green version is the only live implementation. For a JavaScript algorithm change that cannot coexist safely, show its old observed result struck through and its proposed result in green in a temporary comparison near the affected output.
+
+Keep active proposals in a temporary review queue near the top of this long chapter. Sort the queue by the order in which the affected material appears in the lesson, name the affected section, and link to the live surface. Contextual redline may also remain beside the changed content, but the author must not have to scroll through the chapter to discover what changed.
+
+This does **not** authorize reordering Chapter 4. The lesson keeps its existing section order. We reorder only the implementation queue: after the already-active A1 review is resolved, choose remaining work by the first place it affects the chapter and proceed from the overview to the references. Priority labels describe impact; they do not determine review order.
+
+Do not combine the proposal and approval passes. Do not start another checklist item while the current item is `[~]` and awaiting review.
+
 For each item:
 
-1. Implement only that item and avoid unrelated cleanup.
-2. Preserve the author's words, phrases, examples, and voice unless the item explicitly identifies a correctness, clarity, duplication, or prerequisite problem.
-3. Run focused math, browser, interaction, and responsive checks for the affected slice.
-4. Summarize exactly what changed and what was preserved.
-5. Pause for review before starting the next item.
-6. Update this checklist immediately when an item is approved or when its scope changes.
+1. Select one checklist item and mark only that item `[~]`.
+2. Implement only that item in review-markup mode and avoid unrelated cleanup.
+3. Preserve the author's words, phrases, examples, and voice unless the item explicitly identifies a correctness, clarity, duplication, or prerequisite problem.
+4. Run focused math, browser, interaction, and responsive checks for the affected slice.
+5. Summarize exactly what changed, what remains visible for comparison, and what was preserved.
+6. Pause for author review before cleanup or before starting the next item.
+7. After approval, perform the cleanup pass, rerun focused validation, mark the item `[x]`, and then choose the next item.
+8. Update this checklist immediately when an item is approved, rejected, blocked, or changes scope.
 
 Status key:
 
@@ -21,6 +38,176 @@ Status key:
 - `[~]` In progress or awaiting review
 - `[x]` Approved and complete
 - `[!]` Blocked or needs a decision
+
+Items 2-4 below were implemented before this review-markup lifecycle was adopted and remain `[~]`. They must be reviewed one at a time. If the existing result is difficult to verify, reconstruct its before/after presentation in review mode before asking for approval.
+
+## Current Position
+
+- **Completed and approved:** A0 (reusable review-diff styling), A1 (stable next-word training with concrete completion feedback), A4 (Chapter 1 continuity and synchronized `p`/`q` example), A5 (refocused Words as vectors around the operation Chapter 4 needs), A6 (Chapter 3 tokenization-to-embedding bridge), Items 1 (copy and markup defects), 5 (loss names, units, and precision), 7 (scalar-vector-matrix-tensor bridge), and 13 (probability-section required path).
+- **Approved local slice:** A3's Build the forward pass revision is approved and cleaned up; later A3 slices remain deferred to Softmax and Backpropagation.
+- **Active and awaiting review:** Item 8, one matrix multiplication by hand.
+- **Next after Item 8 approval and cleanup:** Item 10, clarify input embeddings versus output scoring weights.
+- **Later enhancement:** evaluate a floating scratch calculator separately after the core walkthroughs are approved.
+- **Already implemented before this workflow, to review later in chapter order:** Items 2-4 when the queue reaches Softmax and Gradients.
+
+## Master Implementation Order: Top to Bottom
+
+A1 was completed as the one exception already underway when this ordering rule was adopted. Continue with this chapter-location queue rather than task-number order:
+
+1. **Overview and course continuity:** A6.
+2. **Surprise and the next word:** A4, 5, 13.
+3. **Words as vectors:** A5, 7, A7 where it first affects the vector panel.
+4. **Build the forward pass:** A3 where the responsibility split begins, then 8, 10, 11, 26 for the forward-pass clip.
+5. **Softmax and assigning blame:** 2, 3, 6, 14, then the softmax portion of A3 and A7.
+6. **Gradients and loss:** 4, 15, 23, A8.
+7. **Backpropagation:** 9, 16-22, A9, then the backpropagation clips from 26.
+8. **Act 1 - generalization and overfitting:** 24-25 where they affect this trainer, then 27.
+9. **Act 2 - train a next-word model:** A1 (complete), then A2, 24-25 where they affect this trainer, 28-31, A10, and 32.
+10. **References:** 33.
+11. **Whole-chapter verification and release:** 34-36.
+
+When a cross-cutting item touches several sections, stage and review its local effects as the queue reaches each section rather than forcing the author to jump backward and forward through the chapter.
+
+This is the controlling work order. The chapter itself is not reordered.
+
+## Audit Addendum: Newly Verified Tasks
+
+- [x] **A0. Add reusable review-diff styling** — approved and cleaned up
+
+  Add the temporary visual language required by this workflow before changing lesson content:
+  - `.review-remove` remains readable but visibly struck through;
+  - `.review-add` is clearly green and readable in light and responsive layouts;
+  - inline `<del>` and `<ins>` do not disturb paragraph flow;
+  - block wrappers preserve spacing and do not create nested-card layouts;
+  - inert old controls cannot receive focus or submit actions.
+
+  Keep this styling available through all Chapter 4 review cycles, but make it easy to remove after the chapter is approved. Remove A0's sample markup after its review; retain the reusable classes until the final chapter cleanup. If shared `styles.css` is used, bump its cache token on every lesson page as required by the deployment guide.
+
+  Completion checks:
+  - A tiny text and block example renders correctly at desktop and mobile widths.
+  - Strike-through and green additions remain distinguishable without relying on color alone.
+  - No duplicate IDs, focusable removed controls, console errors, or horizontal overflow are introduced.
+
+- [x] **A1. Stabilize the next-word trainer and convergence rule** — approved and cleaned up
+
+  Fix the root cause of the verified deterministic learning failure. With the current fixed rate of `0.2`, the model improves through roughly epoch 5 and then degrades: loss moved from `4.1135` initially to `1.4139` at epoch 5, but rose to `2.3445` by epoch 60. The current plateau rule also counts a worsening loss as progress toward "converged."
+
+  Evaluate the smallest honest remedy, such as a lower rate, a decaying rate, best-checkpoint restoration, and a convergence test that distinguishes improvement, plateau, and divergence. Keep the browser model simple enough to teach vanilla stochastic gradient descent.
+
+  Completion checks:
+  - The same seeded run improves reliably at the default code-cell length.
+  - The 15-, 30-, and 60-second paths never finish with a materially worse model than the best model reached during that run.
+  - The completion message states the starting loss, kept loss, best epoch, and number of later passes that did not beat it; unexplained terms such as "plateau" and "best checkpoint" stay out of the learner-facing status.
+  - Loss, perplexity, watched contexts, and generated samples agree with the restored/final weights.
+
+- [ ] **A2. Make the final code cell report an honest baseline and useful curve**
+
+  The current `startLoss` is captured after the first training epoch, which hides the true random-initialization baseline. Change the exercise so it records epoch 0 before training, exposes enough of the curve to show what happened, and does not promise monotonic improvement unless the implementation guarantees it.
+
+  Completion checks:
+  - `startLoss` and starting perplexity come from epoch 0.
+  - The returned result makes improvement or regression visible rather than reporting only two potentially misleading endpoints.
+  - Running the code cell still reveals and refreshes the nearby next-word panels.
+  - The quiz, comments, rendered output, and live trainer describe the same behavior.
+
+- [ ] **A3. Reorder the conceptual responsibilities of softmax, gradients, and backprop** — forward-pass slice approved and cleaned up; later Softmax/Backpropagation slices not started
+
+  Keep the broad chapter flow but stop deriving gradient rules before the learner knows what a gradient is. Use this responsibility split as the starting proposal:
+  - forward pass: carry the example through raw logits and preview that normalization comes next;
+  - softmax: turn logits into probabilities and calculate cross-entropy;
+  - gradients: explain derivative, gradient, chain rule, and gradient descent with the line-fitting lab;
+  - backprop: derive `q - y`, apply the temperature chain-rule factor, and send that error backward.
+
+  Completion checks:
+  - No displayed value, derivative, or quiz depends on gradient vocabulary before the gradient section motivates it.
+  - The softmax panel may preview later learning only in plain language, not with unexplained derivative notation.
+  - Cross-references still make the complete compute order clear.
+  - Existing correct temperature math is preserved when moved.
+
+- [x] **A4. Make Chapter 1 continuity explicit without re-teaching perplexity** — approved and cleaned up
+
+  Chapter 1 now teaches per-token surprise, logarithm bases, bits/nats, perplexity, held-out evaluation, and overfitting in depth. Refocus Chapter 4's opening probability section on what is new here: a true distribution `p`, a model distribution `q`, the entropy floor, cross-entropy as training loss, and the gap between unavoidable and avoidable surprise.
+
+  Completion checks:
+  - The section opens with a concise recall of Chapter 1 rather than presenting perplexity as new.
+  - The `the cat -> sat/ran/slept` counts and live sliders remain the running example.
+  - Every occurrence of the two distributions keeps the same word order and labels `p` as evidence and `q` as the model's current belief; the by-hand formula shows that `p` supplies frequency weights and `q` supplies surprise.
+  - The default `p`/`q` comparison, metrics, and narrative render on load; moving any count or guess slider continues to recompute them live.
+  - Each word keeps one consistent color across its evidence slider, model slider, and computed evidence bar, including when a context preset changes row order.
+  - New concepts receive full explanation; repeated Chapter 1 material is shortened or placed behind optional disclosure without deleting unique reasoning.
+
+- [x] **A5. Refocus the vector section around the network operation Chapter 4 actually needs** — approved and cleaned up
+
+  Chapter 2 already teaches vector direction, cosine similarity, embedding training, PCA, and the warning that individual dimensions are not human-labelled traits. Remove or correct Chapter 4's renewed "furriness/royalty" dimension story and its implication that this model ranks candidate words directly with the input embedding rows.
+
+  Rebuild the required path around:
+  - token ID selects an input embedding row;
+  - two rows are concatenated into the network input;
+  - neurons use dot products with learned weight rows;
+  - the hidden state is scored by `W2` plus bias to create logits;
+  - input/output weight tying is optional context, not the behavior of this toy.
+
+  Completion checks:
+  - The prose agrees with `z = W2 h + b2` and the live implementation.
+  - No single embedding dimension is presented as a literal interpretable trait.
+  - Chapter 2's useful vector intuition is recalled, not duplicated at full length.
+
+- [x] **A6. Add the Chapter 3 tokenization-to-embedding bridge near the opening** — approved and cleaned up
+
+  State early that the browser toy deliberately uses one whole word per token, while Chapter 3 showed that production tokenizers usually produce subword token IDs. Show the actual transition:
+
+  `text -> toy word tokens -> token IDs -> embedding rows -> network`
+
+  Completion checks:
+  - The opening no longer jumps directly from words to vectors as if tokenization did not exist.
+  - The simplification is explicit and does not imply that real LLM vocabularies contain only words.
+  - Later uses of "word," "token," "token ID," and "embedding row" remain consistent.
+
+- [ ] **A7. Apply learner-initiated reveal consistently** — vector-panel slice rejected; retain its populated cat/dog baseline because the starting comparison is useful evidence. Later slices not started.
+
+  Audit the vector, forward-pass, softmax, and logit-gradient outputs that currently render their answers on load while probability, line fitting, and trainers begin blank. Define a meaningful trigger for each output and retain live updates after the first interaction.
+
+  Completion checks:
+  - Every gated placeholder names the exact nearby control that reveals it.
+  - Readout labels that make controls feel responsive may remain live before reveal.
+  - Running a nearby code cell reveals the corresponding visual when applicable.
+  - Deliberate baseline exceptions are documented rather than accidental.
+
+- [ ] **A8. Replace uncontrolled looping motion with learner-controlled motion**
+
+  The gradient-descent GIF loops automatically, unlike the chapter's controlled MP4 clips and step buttons. Replace it with a paused poster plus controls, a manual stepper, or another static-first implementation that provides replay and reduced-motion behavior.
+
+  Completion checks:
+  - Nothing important autoplays or loops indefinitely.
+  - The first frame teaches something before interaction.
+  - Keyboard controls, caption/transcript, and reduced-motion behavior are available.
+
+- [ ] **A9. Repair the verified mobile backprop formula clipping**
+
+  At the narrow test viewport, three backprop `.formula-stack` blocks are wider than their containers while the page hides horizontal overflow. The affected examples include the two-class softmax calculation, the output-weight gradient, and the hidden-weight gradient.
+
+  Completion checks:
+  - Each affected formula wraps legibly or scrolls within its own clearly bounded container.
+  - The backprop section and document have no hidden/clipped content at mobile widths.
+  - KaTeX, code formulas, tables, SVG labels, and worksheet controls remain contained.
+
+- [ ] **A10. Correct stale finale copy and precision claims**
+
+  Update text that no longer matches the implementation, including the closing instruction to "push the epochs slider" and the reference to "twelve sentences." The current UI uses a time-budget selector and the live corpus contains 72 sentences. Also audit over-broad statements such as cross-entropy being "the difference" between distributions and `-log2(q)` being a literal integer bit count rather than an ideal information/code length.
+
+  Completion checks:
+  - Every named control exists with the exact displayed label.
+  - Corpus size, parameter count, context width, learning rate, and training behavior match the live implementation.
+  - Cross-entropy, entropy gap/KL interpretation, and ideal code-length wording are mathematically precise but remain approachable.
+
+- [ ] **A11. Evaluate an optional floating scratch calculator**
+
+  After the core worked examples and reversible steppers are approved, evaluate a small learner-controlled calculator for checking arithmetic without leaving the page. It must be optional, keyboard accessible, movable or collapsible without covering lesson content, and must not replace the lesson's own worked steps.
+
+  Completion checks:
+  - The calculator solves a demonstrated learner need rather than adding generic chrome.
+  - It never obscures controls, formulas, or diagrams at desktop or mobile widths.
+  - Learners can dismiss it and complete the chapter without it.
 
 ## Phase 1: Correctness and Clean Baseline
 
@@ -89,7 +276,7 @@ Status key:
   - One-point worked example is explicitly labeled as one point.
   - Live gradient numbers reproduce the formula.
 
-- [ ] **5. Standardize loss names and units**
+- [x] **5. Standardize loss names and units** — approved and cleaned up
 
   Label each displayed quantity precisely:
   - entropy or cross-entropy in bits;
@@ -121,7 +308,7 @@ Status key:
 
 ## Phase 2: Missing Mathematical Foundations
 
-- [ ] **7. Add a scalar-vector-matrix-tensor bridge**
+- [x] **7. Add a scalar-vector-matrix-tensor bridge** — approved and cleaned up
 
   Introduce these objects using the chapter's network rather than a detached glossary:
   - one loss value is a scalar;
@@ -136,7 +323,7 @@ Status key:
   - No broad tensor theory is added without immediate use.
   - The learner can identify the scalar, vectors, and matrices in the tiny network.
 
-- [ ] **8. Teach one matrix multiplication by hand**
+- [~] **8. Teach one matrix multiplication by hand** — awaiting author review
 
   Follow the attached PDF's useful ladder: check compatible shapes, select one row and one column, compute their dot product, place that value in one output cell, then repeat conceptually.
 
@@ -198,7 +385,7 @@ Status key:
   - No major page redesign is required.
   - The learner can state what has been built at the midpoint and what remains.
 
-- [ ] **13. Refine the probability section's required path**
+- [x] **13. Refine the probability section's required path** — approved and cleaned up
 
   Keep the running `the cat -> sat/ran/slept` example, live counts, entropy, cross-entropy, perplexity, and worked arithmetic as the required spine.
 
@@ -375,7 +562,7 @@ Status key:
   - Mouse, keyboard, touch, and automation paths work.
   - Running guards remain intact.
 
-- [ ] **26. Validate video and motion behavior**
+- [ ] **26. Validate video and motion behavior** — the forward-pass clip is being reconsidered under A3; validate only clips that remain after review
 
   Check all four MP4 files and posters:
   - forward pass;
@@ -556,4 +743,6 @@ Status key:
 
 ## Recommended Starting Point
 
-Begin with **Item 1: Repair obvious copy and markup defects**. It is a narrow, low-risk change that establishes a clean baseline. After implementation and focused validation, pause for review before starting Item 2.
+Current item: review **Item 8: Teach one matrix multiplication by hand**. After approval and cleanup, continue to **Item 10: Clarify input embeddings versus output scoring weights**. The vector panel remains a documented populated-baseline exception.
+
+Items 2-4 are older changes awaiting review. Review them separately when the top-to-bottom queue reaches their affected sections; do not bundle them into another item.
