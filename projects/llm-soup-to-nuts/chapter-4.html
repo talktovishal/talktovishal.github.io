@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260726">
-  <link rel="stylesheet" href="chapter4.css?v=20260809k">
+  <link rel="stylesheet" href="chapter4.css?v=20260811s">
   <link rel="stylesheet" href="review-diff.css?v=20260808b">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
@@ -35,12 +35,12 @@
       <a href="#math-toolkit"><span>01</span>Surprise and the next word</a>
       <a href="#vectors"><span>02</span>Words as vectors</a>
       <a href="#neural-networks"><span>03</span>Build the forward pass</a>
-      <a href="#softmax"><span>04</span>Softmax and blame</a>
-      <a href="#gradients"><span>05</span>Gradients and loss</a>
+      <a href="#softmax"><span>04</span>Softmax and cross-entropy</a>
+      <a href="#gradients"><span>05</span>Gradients, gradient descent, and loss</a>
       <a href="#backpropagation"><span>06</span>Backpropagation</a>
-      <a href="#warmup-lab"><span>07</span>Watch it learn &amp; overfit</a>
-      <a href="#train-lab"><span>08</span>Train a next-word model</a>
-      <a href="#references"><span>09</span>References</a>
+      <a href="#warmup-lab"><span>07</span>The final build, in two acts</a>
+      <a href="#train-lab"><span>08</span>The same loop on real words</a>
+      <a href="#references"><span>09</span>Going deeper</a>
     </nav>
   </aside>
 
@@ -51,27 +51,56 @@
     </div>
     <aside class="review-queue" aria-labelledby="review-queue-title">
       <div class="review-queue-inner">
-        <p class="eyebrow">Changes awaiting review</p>
-        <h2 id="review-queue-title">Chapter 4 review queue</h2>
-        <p class="review-queue-intro">Proposals are listed here in the order their affected material appears in the chapter. Each item links to its live location.</p>
-        <article id="item-8-review" class="review-comparison" aria-labelledby="item-8-review-title">
+        <p class="eyebrow">Final changes awaiting review</p>
+        <h2 id="review-queue-title">Sections 7–9 and whole-chapter checks</h2>
+        <p class="review-queue-intro">The conceptual core through Backpropagation is approved. These final cards cover the two-act build, trainer behavior, further reading, and release readiness.</p>
+        <article id="section-7-review" class="review-comparison" aria-labelledby="section-7-review-title">
           <div class="review-comparison-meta">
-            <strong>Affected area: 3. Build the forward pass</strong>
-            <a href="#matrix-multiplication">Jump to the proposed matrix walkthrough</a>
+            <strong>Affected area: 7. The final build, Act 1</strong>
+            <a href="#warmup-lab">Jump to Act 1</a>
           </div>
-          <p class="eyebrow">Item 8 proposal - matrix multiplication by hand</p>
-          <h4 id="item-8-review-title">Show that a matrix multiply repeats the dot product the learner already did</h4>
+          <p class="eyebrow">Act 1 batch - make generalization the new idea</p>
+          <h4 id="section-7-review-title">Keep the classifier because it makes overfitting visible</h4>
           <div class="review-diff-demo-grid">
-            <div class="review-block review-remove" inert>
-              <strong>Earlier behavior</strong>
-              <p>The walkthrough calculates one hidden neuron carefully, but the symbolic panel later jumps to <code>W1 × e</code> without showing how that operation computes all three neurons.</p>
-            </div>
-            <div class="review-block review-add">
-              <strong>Proposed behavior</strong>
-              <p>Use the current live context to check compatible shapes, multiply one weight row by the input column, place that dot product in one output cell, repeat for the other rows, then add the bias separately.</p>
-            </div>
+            <div class="review-block review-remove" inert><strong>Earlier emphasis</strong><p>The learner could read Act 1 as another generic “watch a network train” lab, and reset behavior was implicit.</p></div>
+            <div class="review-block review-add"><strong>Proposed emphasis</strong><p>Name generalization as the one new concept, connect a wiggly boundary to memorization, and state exactly what Reset network and New data split clear.</p></div>
           </div>
-          <p class="review-comparison-note">The panel updates when the context changes and uses the exact same <code>W1</code>, embedding rows, bias, and hidden raw values as the reversible walkthrough.</p>
+        </article>
+        <article id="section-8-review" class="review-comparison" aria-labelledby="section-8-review-title">
+          <div class="review-comparison-meta">
+            <strong>Affected area: 8. The same loop on real words</strong>
+            <a href="#train-lab">Jump to Act 2</a>
+          </div>
+          <p class="eyebrow">Act 2 batch - make every training number explain itself</p>
+          <h4 id="section-8-review-title">Expose the corpus, model, epoch, update rule, optimizer, and honest baseline</h4>
+          <div class="review-diff-demo-grid">
+            <div class="review-block review-remove" inert><strong>Earlier behavior</strong><p>The lab said “dozens,” “a few thousand,” and “each pass,” while the code cell called epoch 1 its starting loss and trainer buttons had duplicate pointer/click bindings.</p></div>
+            <div class="review-block review-add"><strong>Proposed behavior</strong><p>Show live counts, define epoch/SGD/mini-batch, explain the vanilla optimizer and alternatives, record epoch 0 in the code cell, render its loss curve, simplify training events, and make reset behavior explicit.</p></div>
+          </div>
+        </article>
+        <article id="section-9-review" class="review-comparison" aria-labelledby="section-9-review-title">
+          <div class="review-comparison-meta">
+            <strong>Affected area: 9. Going deeper</strong>
+            <a href="#references">Jump to references</a>
+          </div>
+          <p class="eyebrow">References batch - add the book that grounded the math audit</p>
+          <h4 id="section-9-review-title">Recommend Math for Deep Learning without reproducing it</h4>
+          <div class="review-diff-demo-grid">
+            <div class="review-block review-remove" inert><strong>Earlier list</strong><p>The references linked papers and tutorials but omitted Ronald T. Kneusel’s book.</p></div>
+            <div class="review-block review-add"><strong>Proposed list</strong><p>Add the publisher page and point readers to linear algebra, differential and matrix calculus, backpropagation, gradient descent, and optimizers.</p></div>
+          </div>
+        </article>
+        <article id="chapter-final-review" class="review-comparison" aria-labelledby="chapter-final-review-title">
+          <div class="review-comparison-meta">
+            <strong>Affected area: whole chapter</strong>
+            <a href="#overview">Jump to the beginning</a>
+          </div>
+          <p class="eyebrow">Release gate - verification now, publication after approval</p>
+          <h4 id="chapter-final-review-title">Formula, interaction, voice, reset, and responsive checks are staged together</h4>
+          <div class="review-diff-demo-grid">
+            <div class="review-block review-remove" inert><strong>Earlier state</strong><p>Several completed teaching changes remained unchecked in the work plan, and the final trainers had not received one consolidated reset/event/formula pass.</p></div>
+            <div class="review-block review-add"><strong>Proposed state</strong><p>Close verified checklist lag, decline the floating calculator as unnecessary chrome, and record the complete test matrix. Freezing, removing the In Progress banner, deleting the plan, committing, and publishing still wait for explicit approval.</p></div>
+          </div>
         </article>
       </div>
     </aside>
@@ -164,7 +193,7 @@
             </div>
             <div>
               <strong>Compare with vectors</strong>
-              <span>Give each word numbers, then score candidates with dot products and similarity.</span>
+              <span>Use embedding rows for the context words, compute a hidden summary, then score each candidate with separate output weights.</span>
             </div>
             <div>
               <strong>Nudge with gradients</strong>
@@ -257,6 +286,9 @@
             is the model's <em>actual</em> average surprise when it uses its own internal, imperfect probabilities to predict the real next words. If our model incorrectly thinks <code>slept</code> is the most likely next word, it will incur a massive "surprise penalty" every time <code>sat</code> repeatedly shows up in the training data. The closer the model's predictions match the true distribution, the lower the cross-entropy gets, eventually bottoming out exactly at the true Entropy floor. In machine learning, minimizing cross-entropy is the standard way we teach models to predict text.
           </p>
           <p>
+            This formula was not chosen only because the intuition sounds right. A useful information measure must assign zero surprise to certainty, assign more surprise to less likely events, and <em>add</em> the surprises of independent events even though their probabilities multiply. Under mild regularity assumptions, those requirements force a negative logarithm. Averaging that surprise over what reality actually produces gives \(-\sum p\log q\). The optional deep dive below derives this carefully and shows why coding theory, honest probability forecasts, and maximum-likelihood training all arrive at the same expression.
+          </p>
+          <p>
             As you saw in Chapter 1, <a href="https://en.wikipedia.org/wiki/Perplexity" target="_blank" rel="noreferrer">perplexity</a>
             rewrites this cross-entropy metric on a much friendlier, intuitive scale. While "bits of surprise" can feel abstract, perplexity translates those bits back into an effective vocabulary size. Mathematically, it is simply the exponentiation of cross-entropy (e.g., 2<sup>cross-entropy</sup>). If a model has a perplexity of 4 on a given text, it means that, on average, the model felt as confused as if it were choosing blindly between 4 equally likely words. A perfect model that knows exactly what comes next has a perplexity of 1. In this chapter, it stays beside cross-entropy as a readable translation of the same surprise, not as a separate training objective.
           </p>
@@ -331,7 +363,7 @@
           </div>
         </div>
 
-        <div class="worked-example" aria-label="Cross-entropy by hand">
+        <div id="cross-entropy-by-hand" class="worked-example" aria-label="Cross-entropy by hand">
           <h3>Cross-entropy by hand</h3>
           <p>
             Now use those same two distributions together. Evidence <code>p</code> says how often each word actually happened: <code>sat 8/12</code>, <code>ran 3/12</code>, <code>slept 1/12</code>. Model <code>q</code> says what the model currently believes: <code>sat 0.55</code>, <code>ran 0.30</code>, <code>slept 0.15</code>. Cross-entropy goes row by row: <code>p</code> supplies how heavily that row counts, while <code>-log2(q)</code> supplies how surprised the model is on that row.
@@ -352,7 +384,7 @@
         <div class="math-formal" aria-label="Surprise in symbols">
           <h3>The same idea, in symbols</h3>
           <p>
-            Everything we just discussed has a compact mathematical form. The core building block is the <em>surprise</em> of a single word. If our model assigns a probability \(q\) to a specific word, the surprise of seeing that word is measured as \(-\log_2(q)\) bits. Notice how this aligns with our intuition: if the model is highly confident (\(q\) is close to 1), the surprise drops to nearly zero. But if the model thinks a word is almost impossible (\(q\) is close to 0), the resulting surprise penalty is massive.
+            Everything we just discussed has a compact mathematical form. The core building block is the <em>surprise</em> of a single word. <del class="review-remove">If our model assigns a probability \(q\) to a specific word, the surprise of seeing that word is measured as \(-\log_2(q)\) bits.</del> <ins class="review-add">If our model assigns probability \(q\) to a word, its surprise is \(-\log_2(q)\) bits of <em>ideal information</em>. That value can be fractional; it is not claiming that one real codeword or one game of 20 Questions literally uses a fractional question.</ins> Notice how this aligns with our intuition: if the model is highly confident (\(q\) is close to 1), the surprise drops to nearly zero. But if the model thinks a word is almost impossible (\(q\) is close to 0), the resulting surprise penalty is massive.
           </p>
           <p>
             To evaluate the model's overall performance, we don't just look at one word; we calculate the <em>expected</em> (or average) surprise. We take the surprise of every possible next word and weight it by how often that word <strong>truly</strong> appears in the evidence (\(p\)). Adding all these weighted surprises together gives us the Entropy (if using the true probabilities \(p\) for the surprise) or Cross-Entropy (if using the model's imperfect guesses \(q\) for the surprise):
@@ -392,56 +424,102 @@
 
 
         <details class="math-depth-disclosure">
-          <summary>Go deeper: why logarithms? The compression view</summary>
-          <div class="math-depth-body" aria-label="Intuition and Reasoning">
-          <h3>Why \(-\log_2(q)\)? The Four Rules of Surprise</h3>
-          <p>
-            The formula \(-\log_2(q)\) wasn't chosen randomly. Claude Shannon formulated it in 1948 because it is the <em>only</em> mathematical function that perfectly matches how our common-sense concept of "surprise" works:
-          </p>
-          <ul>
-            <li>
-              <strong>Certainty means zero surprise:</strong> If a model is 100% certain (probability \(q = 1.0\)), it shouldn't be surprised when it's right. Mathematically, \(-\log_2(1) = 0\) bits.
-            </li>
-            <li>
-              <strong>Surprises must add up:</strong> If you flip a coin (50% chance) and draw a specific suit from a deck of cards (25% chance), the probability of <em>both</em> happening is found by multiplying (\(0.5 \times 0.25 = 0.125\)). But surprise shouldn't multiply; it should <em>add</em>. Logarithms are the exact mathematical tool that turns multiplication into addition.
-            </li>
-            <li>
-              <strong>We want positive numbers:</strong> Probabilities are always fractions, and logarithms of fractions are negative (e.g., \(\log_2(0.5) = -1\)). Shannon simply added a negative sign to the front of the equation to flip the result back to a positive number, giving us \(1\) bit of surprise.
-            </li>
-            <li>
-              <strong>We want to measure in "Choices":</strong> Using base-2 (\(\log_2\)) ties the math directly to binary choices, or bits. A 1-in-2 chance (\(q = 0.5\)) yields \(1\) bit. A 1-in-4 chance yields \(2\) bits. As the probability approaches zero, the surprise shoots toward infinity.
-            </li>
-          </ul>
+          <summary>Go deeper: why cross-entropy has this exact form</summary>
+          <div class="math-depth-body" aria-label="Why cross-entropy has this mathematical form">
+            <p>
+              The intuition is useful, but the formula was not an inspired guess. Several different lines of reasoning constrain us toward the same expression. We will start with the requirements for one event's surprise, then average that surprise over reality, and finally check the result against coding theory and model training.
+            </p>
 
-          <h3>The Deeper Truth: Optimal Data Compression</h3>
-          <p>
-            To get to the next level of depth, we have to look past the metaphor of "surprise." Shannon was originally trying to figure out the fundamental physical limits of data compression. The reason \(-\log_2(q)\) is the "right" formula is because it calculates the absolute minimum number of <strong>1s and 0s (bits)</strong> required to encode a piece of information.
-          </p>
-          <p>
-            Imagine playing a game of 20 Questions to guess the next word, where every yes/no question costs exactly 1 bit. To be efficient, you assign your shortest paths (fewest questions) to the most common words:
-          </p>
-          <ul>
-            <li>If a word happens <strong>50%</strong> of the time (1-in-2), it takes exactly <strong>1 question</strong> to identify (\(-\log_2(0.5) = 1\) bit).</li>
-            <li>If a word happens <strong>25%</strong> of the time (1-in-4), it takes <strong>2 questions</strong> (\(-\log_2(0.25) = 2\) bits).</li>
-            <li>If a word happens <strong>12.5%</strong> of the time (1-in-8), it takes <strong>3 questions</strong> (\(-\log_2(0.125) = 3\) bits).</li>
-          </ul>
-          <p>
-            The formula isn't an arbitrary penalty; it is the <em>literal number of bits you must spend to encode that word</em> in a perfectly optimized system.
-          </p>
+            <h3>1. The requirements force a logarithm</h3>
+            <p>
+              Call the surprise of an event with probability \(q\) by the name \(I(q)\). A sensible information measure should obey a few rules:
+            </p>
+            <ul>
+              <li><strong>Certainty means zero surprise:</strong> \(I(1)=0\).</li>
+              <li><strong>Rarer events are more surprising:</strong> as \(q\) gets smaller, \(I(q)\) gets larger.</li>
+              <li><strong>Small probability changes cause small surprise changes:</strong> \(I(q)\) should be continuous rather than jumping unpredictably.</li>
+              <li><strong>Independent surprises add:</strong> if independent events have probabilities \(q_1\) and \(q_2\), their joint probability is \(q_1q_2\), while their information should add.</li>
+            </ul>
+            $$I(q_1q_2)=I(q_1)+I(q_2)$$
+            <p>
+              Continuous logarithms are exactly the functions that turn multiplication into addition. Those requirements therefore give
+              \(I(q)=-K\log q\), where \(K>0\) chooses the unit. The minus sign makes the surprise non-negative because the logarithm of a probability below 1 is negative.
+            </p>
+            <ul>
+              <li>Choose base 2 and \(K=1\): surprise is measured in <strong>bits</strong>.</li>
+              <li>Choose the natural log and \(K=1\): surprise is measured in <strong>nats</strong>.</li>
+            </ul>
+            <p>
+              That is why each halving of probability adds one bit: \(-\log_2(1/2)=1\), \(-\log_2(1/4)=2\), and \(-\log_2(1/8)=3\).
+            </p>
 
-          <h3>Why Cross-Entropy is the Perfect Loss Function</h3>
-          <p>
-            When we evaluate a Large Language Model, we are judging the "rulebook" it uses to compress and predict language.
-          </p>
-          <p>
-            <strong>Entropy (\(H\))</strong> is the unbreakable law of physics for compression. If we know the <em>exact</em> true probabilities of every word, Entropy tells us the minimum average number of bits per word needed to encode the text.
-          </p>
-          <p>
-            <strong>Cross-Entropy</strong> measures what happens when we compress the true text using our model's <em>flawed</em> rulebook. If our model incorrectly predicts that a common word like <code>sat</code> is incredibly rare (say, \(q = 0.01\)), it will assign a long, 6.6-bit code to it (\(-\log_2(0.01) \approx 6.6\)). Because <code>sat</code> actually shows up all the time, we are forced to constantly use this massive 6.6-bit code, wasting a huge amount of data.
-          </p>
-          <p>
-            When we train an LLM to "minimize cross-entropy loss," we are literally forcing it to rearrange its internal probabilities so its coding rulebook wastes as few bits as possible compared to the true distribution of the text.
-          </p>
+            <h3>2. Reality supplies the weights; the model supplies the surprise</h3>
+            <p>
+              Now suppose reality produces outcome \(i\) with probability \(p_i\), while the model assigns that outcome probability \(q_i\). Whenever outcome \(i\) occurs, the model pays \(-\log q_i\) surprise. Reality makes some outcomes occur more often than others, so the average surprise is the expectation under \(p\):
+            </p>
+            $$H(p,q)=\mathbb{E}_{i\sim p}[-\log q_i]= -\sum_i p_i\log q_i$$
+            <ul>
+              <li><strong>\(p_i\)</strong> says how often reality makes us pay for row \(i\).</li>
+              <li><strong>\(q_i\)</strong> determines how expensive or surprising that row is when it occurs.</li>
+            </ul>
+            <p>
+              This is the same division of labor in the worked example above: evidence \(p\) supplies the frequency weights, and model belief \(q\) supplies each word's surprise. That expected surprise is cross-entropy.
+            </p>
+
+            <h3>3. The same formula is expected coding cost</h3>
+            <p>
+              Now look past the metaphor of surprise. In an ideal code based on model probability \(q_i\), outcome \(i\) has information length \(-\log_2 q_i\) bits. Frequent model outcomes get short descriptions; outcomes the model considers rare get long descriptions.
+            </p>
+            <p>
+              Imagine playing 20 Questions to identify the next word, where every yes/no question costs one bit. Probabilities that are exact powers of two make the relationship especially visible:
+            </p>
+            <ul>
+              <li>A 50% event needs \(-\log_2(0.5)=1\) bit.</li>
+              <li>A 25% event needs \(-\log_2(0.25)=2\) bits.</li>
+              <li>A 12.5% event needs \(-\log_2(0.125)=3\) bits.</li>
+            </ul>
+            <p>
+              Real prefix codes use whole-bit codewords, so an individual codeword is not always exactly \(-\log_2 q_i\) bits. The <a href="https://en.wikipedia.org/wiki/Shannon%27s_source_coding_theorem" target="_blank" rel="noreferrer">source coding theorem</a> says that, over long sequences, good codes can approach this ideal average. If the data really follows \(p\) but the code was designed from \(q\), its expected ideal length is
+              \(-\sum_i p_i\log_2q_i\): cross-entropy in bits.
+            </p>
+            <p>
+              So a bad model wastes bits. If <code>sat</code> occurs often under \(p\) but the model gives it \(q=0.01\), we repeatedly pay about \(6.64\) bits for a common event.
+            </p>
+
+            <h3>4. Why reporting the true probabilities wins</h3>
+            <p>
+              Cross-entropy separates into the unavoidable uncertainty in reality and an extra penalty for using the wrong model:
+            </p>
+            $$H(p,q)=H(p)+D_{\mathrm{KL}}(p\|q)$$
+            $$D_{\mathrm{KL}}(p\|q)=\sum_i p_i\log\frac{p_i}{q_i}\ge 0$$
+            <p>
+              The <a href="https://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence" target="_blank" rel="noreferrer">KL divergence</a> cannot be negative, and it is zero when \(q=p\) (apart from zero-probability edge cases). Therefore
+              \(H(p,q)\ge H(p)\): the model cannot beat reality's own entropy floor, and cross-entropy reaches that floor when its probabilities match reality.
+            </p>
+            <p>
+              In forecasting language, negative log probability is a <strong>strictly proper scoring rule</strong>: in expectation, the best strategy is to report your real probabilities rather than pretending to be more or less confident. That makes cross-entropy useful for learning honest probability distributions, not merely choosing the winning class.
+            </p>
+
+            <h3>5. Maximum likelihood arrives at the same objective</h3>
+            <p>
+              Suppose the training data contains observed outcomes \(x_1,\ldots,x_N\), and a model with parameters \(\theta\) assigns each one probability \(q_\theta(x_n)\). Maximum likelihood asks for parameters that make the entire observed dataset as probable as possible:
+            </p>
+            $$\max_\theta\prod_{n=1}^{N}q_\theta(x_n)$$
+            <p>
+              Logs turn the product into a sum. Negating and dividing by \(N\) turns maximization into minimization:
+            </p>
+            $$\min_\theta -\frac{1}{N}\sum_{n=1}^{N}\ln q_\theta(x_n)$$
+            <p>
+              That is empirical cross-entropy: the average negative log probability assigned to the outcomes that actually occurred. With one-hot targets, each example contributes only \(-\ln q_{\text{true}}\), exactly the loss used later in the Softmax section.
+            </p>
+
+            <h3>6. The historical thread</h3>
+            <p>
+              <a href="https://en.wikipedia.org/wiki/Ralph_Hartley" target="_blank" rel="noreferrer">Ralph Hartley</a> used logarithms in 1928 to measure information through the number of possible messages. In 1948, <a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf" target="_blank" rel="noreferrer">Claude Shannon</a> gave the modern communication-theory treatment: he formalized entropy's defining properties and connected it to the limits of coding. Cross-entropy is the natural next case: reality follows \(p\), but our code or model uses \(q\).
+            </p>
+            <p>
+              These viewpoints meet at one formula for a reason. The logarithm satisfies the information rules; the expectation under \(p\) measures real average cost; KL divergence guarantees truth is optimal; and maximum likelihood turns observed data into the same training loss.
+            </p>
           </div>
         </details>
 
@@ -455,7 +533,7 @@
           <p class="eyebrow">2. Words as vectors</p>
           <h2 id="vectors-title">Representing words as vectors - a list of numbers.</h2>
           <p>
-            Entrophy tells us <em>how wrong</em> our guess was. But before the model can
+            <del class="review-remove">Entrophy</del><ins class="review-add">Entropy</ins> tells us <em>how wrong</em> our guess was. But before the model can
             guess at all, it needs a way to tell words apart - and, more usefully, to
             notice when two words are <em>alike</em>. You already do this without
             thinking: <code>cat</code> and <code>dog</code> feel like cousins, while
@@ -608,7 +686,7 @@
         <div class="math-formal" aria-label="Comparison in symbols">
           <h3>The same comparison, in symbols</h3>
           <p>
-            Why does multiplying and adding numbers measure meaning? Fort now, imagine a coordinate trying to measure a hidden trait such as "furriness" or "royalty." Chapter 2's important caveat still applies: real dimensions are not individually labelled features; the useful pattern is distributed across the whole vector. This is just for us to get an intuition. When you multiply matching components, you are checking for shared coordinates. If both <code>cat</code> and <code>dog</code> score high on "furry," multiplying those values produces a large number. Adding these up across all dimensions yields the <strong>dot product</strong>—a raw score of alignment in this intuition.
+            Why does multiplying and adding numbers measure meaning? <del class="review-remove">Fort now</del><ins class="review-add">For now</ins>, imagine a coordinate trying to measure a hidden trait such as "furriness" or "royalty." Chapter 2's important caveat still applies: real dimensions are not individually labelled features; the useful pattern is distributed across the whole vector. This is just for us to get an intuition. When you multiply matching components, you are checking for shared coordinates. If both <code>cat</code> and <code>dog</code> score high on "furry," multiplying those values produces a large number. Adding these up across all dimensions yields the <strong>dot product</strong>—a raw score of alignment in this intuition.
           </p>
           <p>
             This mathematical trick wasn't invented for language. In the 1880s, physicists like Josiah Willard Gibbs formulated vector algebra to calculate how much of one physical force aligns with another (like wind pushing against a sail). They proved that the dot product inherently captures the geometric <strong>angle</strong> (\(\theta\)) between two arrows.
@@ -822,10 +900,20 @@
         </div>
         </section>
 
-        <div id="matrix-multiplication" class="math-formal review-block review-add" aria-labelledby="matrix-multiplication-title">
+        <div id="matrix-multiplication" class="math-formal" aria-labelledby="matrix-multiplication-title">
           <p class="eyebrow">The same hidden-layer work, all at once</p>
           <h3 id="matrix-multiplication-title">One matrix multiplication, by hand.</h3>
           <div id="matrixMultiplyPanel" aria-live="polite"></div>
+        </div>
+
+        <div id="scoring-roles" class="scoring-roles-bridge" aria-labelledby="scoring-roles-title">
+          <p class="eyebrow">Three jobs that are easy to mix up</p>
+          <h3 id="scoring-roles-title">Input rows go in; a hidden state is computed; output weights score candidates.</h3>
+          <div id="scoringRolesPanel" aria-live="polite"></div>
+          <details class="scoring-roles-note">
+            <summary>Production note: some models tie the input and output weights</summary>
+            <p>Some production language models reuse one learned matrix for both input lookup and output scoring. This is called <strong>weight tying</strong>. It is an optional architectural choice, not the rule that makes embeddings work. This browser model keeps the two parameter sets separate so you can inspect each job directly.</p>
+          </details>
         </div>
 
         <div class="math-formal" aria-label="Forward pass in symbols">
@@ -858,14 +946,23 @@
     <section id="softmax" class="band band-muted" aria-labelledby="softmax-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">4. Softmax and assigning blame</p>
-          <h2 id="softmax-title">Turn raw word scores into next-word probabilities.</h2>
+          <p class="eyebrow">4. Softmax and cross-entropy</p>
+          <h2 id="softmax-title">Turn raw scores into probabilities, then calculate cross-entropy loss.</h2>
           <p>
             Once we run the network to get its output, it will not naturally
             hand us neat percentages for the list of possible words. It will hand us a raw score for every word it
             could predict - a number called a
-            <strong>logit</strong>. A logit can be 4.2 or -1.1 or anything at all, and that is perfectly legal. The problem is not the minus sign; logits are raw relative scores, not probabilities. They do not have to be positive or add up to 1. We promised the model would output <em>probabilities</em>: positive numbers between 0 and 1 that add up to 1.
+            <strong>logit</strong>. A logit can be 4.2 or -1.1 or anything at all, and that is perfectly legal. The problem is not the minus sign; logits are raw relative scores, not probabilities. They do not have to be positive or add up to 1.
+            If all we wanted was the single winning word, the logits would be enough: choose the largest one. But a raw logit such as <code>4.2</code> does not mean 42% confident, so logits do not tell us what share of the model's belief belongs to each candidate. Probabilities make every word share one fixed budget of 1, or 100%. If <code>sat</code> receives <code>0.68</code>, exactly <code>0.32</code> remains for all the other words. That shared scale lets us sample plausible alternatives and gives cross-entropy the probability assigned to the word that actually occurred.
           </p>
+          <div class="softmax-section-contract">
+            <p class="eyebrow">What this section finishes</p>
+            <h3>Two jobs: create a probability distribution, then calculate cross-entropy loss.</h3>
+            <div class="softmax-goal-grid">
+              <article><span>1</span><strong>Softmax creates probabilities</strong><p>It turns the three logits into probabilities \(q\) that are positive and add to 1.</p></article>
+              <article><span>2</span><strong>Cross-entropy calculates loss</strong><p>It uses the probability assigned to the word that actually came next to calculate one loss \(L\).</p></article>
+            </div>
+          </div>
           <p>
             <a href="https://en.wikipedia.org/wiki/Softmax_function" target="_blank" rel="noreferrer">Softmax</a>
             is the elegant bridge that gets us from any-old-numbers to a clean distribution. It relies on a two-step trick: first, it <em>exponentiates</em> every score. This instantly turns every number (even negative ones) positive, and it stretches the gaps between close numbers so a clear winner emerges. Second, it divides each by the running total so the whole set perfectly sums to 1. <strong>Temperature</strong> is the dial
@@ -882,41 +979,36 @@
             exactly Chapter 1's top-pick, now recovered as one end of a continuous dial.
           </p>
           <p>
-            Now the satisfying part: assigning blame, aka error calculation. Remember cross-entropy? It's the measure of the difference between the model's predicted probabilities and the actual outcomes. With probabilities in hand,
-            cross-entropy builds on that to measure how much confidence the model put on the word that actually
-            came next - little there means a lot of surprise, a high loss. To fix it, the model must hand each word its share of the blame. And here is the small miracle that makes the whole machine practical: for softmax paired with cross-entropy, the blame on each <em>temperature-scaled score</em> collapses to one of the simplest expressions in all of deep learning - <code>probability &minus; target</code>. Predicted minus wanted. At temperature 1, the scaled score and original logit are identical, so this is also the gradient on the logit: if the model predicts <code>0.99</code> for the true word (target <code>1.0</code>), the gradient is <code>-0.01</code>, just a tiny nudge. But if it predicts <code>0.01</code>, the gradient is <code>-0.99</code>, a massive correction. At any other temperature, one final chain-rule step divides that logit gradient by <code>T</code>.
+              Once Softmax gives us probabilities, we calculate the <strong>cross-entropy loss</strong>. It asks one focused question: how much probability did the model give the word that actually came next? High probability for the true word means low surprise and low loss; tiny probability means high surprise and high loss.
           </p>
           <p>
-            Why does it land on something so clean? Because the two halves are built from
-            opposite operations that undo each other. Softmax turns a raw score into a
-            probability with an exponential (<code>e</code> to the score), and cross-entropy
-            measures the loss with that exponential's exact mirror image, the natural log
-            (<code>ln</code>). When we ask calculus how the loss shifts as one score moves, the
-            <code>e</code> and the <code>ln</code> cancel and the messy middle terms fall away,
-            leaving nothing but the gap between what the model gave and what we wanted on the scaled score. There
-            is also a tidy intuition for the leftover: the loss only ever wants the true word's
-            probability to climb toward 1 and every other word's to sink toward 0, so the
-            steepest fix is simply <em>how far each probability still sits from its goal</em> -
-            which is exactly <code>probability &minus; target</code>. To carry that blame back
-            through the temperature step and reach the original logit, we divide by <code>T</code>.
-            (The full line-by-line cancellation is worked out in the symbols panel below.) Move
-            the raw scores and temperature below and watch the exact logit gradient change.
+              Earlier, in <a href="#cross-entropy-by-hand">Cross-entropy by hand</a>, we averaged surprise over the evidence distribution \(p\): words that occurred more often received more weight. Training presents the same idea one observed example at a time. In this example, exactly one word actually came next: <code>sat</code>. We record that fact with the target vector \(y=[1,0,0]\), in the same <code>sat, ran, slept</code> order as the probabilities \(q\).
+          </p>
+          <p>
+              The earlier worked example used \(\log_2\), so its surprise was measured in bits. Training code conventionally uses the natural log \(\ln\), so this loss is measured in nats. The reasoning is identical; only the unit changes. Start from the full one-example cross-entropy sum, then substitute that target vector:
+          </p>
+          <div class="formula-stack" aria-label="One-hot cross-entropy simplification">
+            <span>\(L=-\sum_i y_i\ln q_i\)</span>
+            <span>\(L=-\big(1\ln q_{\text{sat}}+0\ln q_{\text{ran}}+0\ln q_{\text{slept}}\big)\)</span>
+            <span>\(L=-\ln q_{\text{sat}}=-\ln q_{\text{true}}\)</span>
+          </div>
+          <p>
+              The two zero-weighted terms disappear, leaving only the surprise of the word that actually occurred. Averaging this one-example loss across the training data recovers the distribution-level cross-entropy from the earlier worked example: frequent outcomes contribute the same term more often.
+          </p>
+          <p>
+              With the default probabilities below, the true word <code>sat</code> receives \(q_{\text{sat}}\approx0.681\). The live calculation keeps the unrounded probability \(0.681487\), so its loss is \(-\ln(0.681487)\approx0.383\) nats. If the model gave the true word only \(0.10\), the loss would jump to \(-\ln(0.10)\approx2.303\) nats. Cross-entropy therefore gives the model one scalar score that clearly distinguishes a confident correct guess from a poor one.
+          </p>
+          <p>
+              This section completes both the probability distribution \(q\) and the loss \(L\). The next section introduces gradients. Backpropagation later differentiates this loss with respect to each logit and carries those derivatives backward; it does not introduce or finish cross-entropy itself.
           </p>
         </div>
 
-        <figure class="manim-clip">
-          <video controls muted playsinline preload="metadata" poster="assets/videos/chapter4-softmax-loss-poster.jpg" aria-label="Short animation showing how softmax turns raw scores into probabilities and blame">
-            <source src="assets/videos/chapter4-softmax-loss.mp4" type="video/mp4">
-          </video>
-          <figcaption>
-            <strong>Softmax to blame.</strong> Raw scores become positive numbers, then probabilities; cross-entropy gives <code>probability &minus; target</code> on the scaled score, and dividing by <code>T</code> carries the gradient back to the original logit.
-          </figcaption>
-        </figure>
+        <p class="microcopy"><strong>Choose the example, then walk through it.</strong> The default logits, probabilities, and loss are populated because they are the evidence this exercise starts from. Change any score, temperature, or true word below; the bars and every walkthrough step update together.</p>
 
         <div class="softmax-grid">
           <div class="panel">
             <div class="section-title-row">
-              <h3>Raw word scores</h3>
+              <h3>1. Set the raw word scores</h3>
               <span id="softmaxTempLabel" class="pill">temperature</span>
             </div>
             <p class="microcopy">Context: <code>the cat</code> ___. These are the model's raw scores for three candidate next words.</p>
@@ -954,36 +1046,57 @@
 
           <div class="panel">
             <div class="section-title-row">
-              <h3>Probabilities and logit gradients</h3>
+              <h3>2. Read the probabilities and calculate cross-entropy loss</h3>
               <span id="softmaxLossLabel" class="pill">cross-entropy</span>
             </div>
             <div id="softmaxPanel" class="probability-panel" aria-live="polite"></div>
-            <p class="microcopy">The rows below show the gradient on each original score slider: \(\partial L/\partial z_i = (q_i-y_i)/T\). At temperature 1, this is the familiar \(q_i-y_i\).</p>
-            <div id="backpropPanel" class="backprop-panel" aria-live="polite"></div>
+            <p id="softmaxNarrative" class="microcopy"></p>
           </div>
         </div>
 
+        <section id="softmax-walkthrough" class="softmax-walkthrough" aria-labelledby="softmax-step-title">
+          <div class="forward-stepper-head">
+            <div>
+              <p class="eyebrow">Learner-controlled walkthrough</p>
+              <h3 id="softmax-step-title">Scale the logits with temperature</h3>
+              <p id="softmaxStepCopy">Temperature changes how far apart the raw scores feel before Softmax converts them.</p>
+            </div>
+            <span id="softmaxStepCount" class="pill">step 1 of 4</span>
+          </div>
+          <div class="softmax-step-jumps" role="group" aria-label="Jump to a Softmax step">
+            <button type="button" data-softmax-step="0">1 <span>Temperature</span></button>
+            <button type="button" data-softmax-step="1">2 <span>Stabilize</span></button>
+            <button type="button" data-softmax-step="2">3 <span>Exponentiate</span></button>
+            <button type="button" data-softmax-step="3">4 <span>Normalize + loss</span></button>
+          </div>
+          <div class="stepper-row softmax-stepper-controls" aria-label="Softmax playback controls">
+            <button id="softmaxBackButton" class="ghost-button" type="button">Back</button>
+            <button id="softmaxPlayButton" class="ghost-button" type="button">Play</button>
+            <button id="softmaxNextButton" class="primary-button" type="button">Next</button>
+            <button id="softmaxReplayButton" class="ghost-button" type="button">Replay</button>
+          </div>
+          <div id="softmaxStepPanel" class="softmax-step-panel" aria-live="polite"></div>
+        </section>
+
         <div class="worked-example" aria-label="Softmax by hand">
-          <h3>Softmax, then logit gradients, by hand</h3>
+          <h3>Stable Softmax and cross-entropy, by hand</h3>
           <p>
             Take the three raw scores above - <code>sat 1.70, ran 0.80, slept -1.10</code>
-            at temperature 1. Exponentiate each, then divide by the total so the
-            results sum to 1:
+            at temperature 1. Subtract the largest score, exponentiate, then divide by the total so the
+            results sum to 1. The subtraction keeps the exponentials numerically safe:
           </p>
           <div class="formula-stack">
-            <span>\(e^{1.70} \approx 5.47,\ e^{0.80} \approx 2.23,\ e^{-1.10} \approx 0.33 \quad (\text{total: } 8.03)\)</span>
-            <span>\(\text{softmax: sat} = \tfrac{5.47}{8.03} \approx 0.681,\ \text{ran} = \tfrac{2.23}{8.03} \approx 0.277,\ \text{slept} = \tfrac{0.33}{8.03} \approx 0.041\)</span>
-            <span>\(\text{if \textbf{sat} is true: loss} = -\ln(0.681) \approx 0.38 \text{ nats}\)</span>
-            <span>\(\text{at } T=1,\ \dfrac{\partial L}{\partial z_i}=\dfrac{q_i-y_i}{1}\text{: sat } -0.319,\ \text{ran } +0.277,\ \text{slept } +0.041\)</span>
+            <span>\(\max(z)=1.70 \Rightarrow z-\max(z)=[0,-0.90,-2.80]\)</span>
+            <span>\(e^0=1.000,\ e^{-0.90}\approx0.407,\ e^{-2.80}\approx0.061 \quad (\text{total: }1.468)\)</span>
+            <span>\(\text{softmax: sat}=\tfrac{1.000}{1.468}\approx0.681,\ \text{ran}=\tfrac{0.407}{1.468}\approx0.277,\ \text{slept}=\tfrac{0.061}{1.468}\approx0.041\)</span>
+            <span>\(\text{if \textbf{sat} is true: loss} = -\ln(0.681487) \approx 0.383 \text{ nats}\)</span>
           </div>
           <p class="microcopy">
-            The live panel recomputes these as you drag the scores or temperature. Because
-            this worked example uses \(T=1\), dividing by temperature changes nothing. At
-            any other temperature, the panel includes that final \(1/T\) chain-rule factor.
-            The gradient on the
-            true word is negative (its score gets pushed up) while the others are
-            positive (pushed down): this logit-gradient vector is the exact starting error
-            signal for the entire network.
+            This fixed by-hand calculation uses \(T=1\). The live panel and walkthrough above
+            recompute the scaled scores, stable exponentials, probabilities, and cross-entropy
+            loss at every temperature. At Step 4, cross-entropy always reads the probability of
+            whichever word you selected as true. The only calculation left for Backpropagation
+            is the derivative of this completed loss, not the loss itself.
           </p>
           <p class="microcopy">
             <em>Units note:</em> a <em>nat</em> is just a unit of surprise - the very same
@@ -995,62 +1108,62 @@
           </p>
         </div>
 
-        <div class="math-formal" aria-label="Softmax and temperature-aware gradients in symbols">
-          <h3>Softmax, loss, and gradients, in symbols</h3>
+        <div class="math-formal" aria-label="Stable Softmax and cross-entropy in symbols">
+          <h3>Stable Softmax and cross-entropy, in symbols</h3>
           <p>
-            Temperature first turns each original logit \(z_i\) into a scaled score
-            \(s_i=z_i/T\). Softmax exponentiates those scaled scores and divides by the
-            total, so the outputs are positive and sum to 1. Cross-entropy then reads off
-            the negative log probability of the true word. The gradient on \(s_i\)
-            collapses to one clean difference; carrying it back to \(z_i\) contributes
-            the extra \(1/T\) from the chain rule:
+            These equations are just the four walkthrough steps above written as shorthand;
+            nothing new is being introduced. Start with original logit \(z_i\) for candidate
+            \(i\). Temperature turns it into scaled score \(s_i=z_i/T\): a lower \(T\)
+            spreads the scores apart, a higher \(T\) pulls them together, and their ranking
+            stays unchanged because every logit is divided by the same positive number.
           </p>
-          $$s_i = \frac{z_i}{T} \qquad q_i = \frac{e^{s_i}}{\sum_{j} e^{s_j}}$$
-          $$L = -\sum_i y_i \ln q_i = -\ln q_{\text{true}}$$
-          $$\frac{\partial L}{\partial s_i} = q_i-y_i \qquad \frac{\partial L}{\partial z_i} = \frac{q_i-y_i}{T}$$
+          $$s_i=\frac{z_i}{T} \qquad m=\max_j s_j$$
+          <p>
+            Next choose \(m\), the largest scaled score, and subtract it from every score.
+            The largest shifted score becomes 0 and all the others become non-positive, so
+            no exponential can grow beyond \(e^0=1\). This is the numerically stable form
+            software uses.
+          </p>
+          $$q_i=\frac{e^{s_i-m}}{\sum_j e^{s_j-m}}$$
+          <p>
+            Why is that subtraction allowed? It multiplies every exponential by the same
+            factor \(e^{-m}\). The factor appears in both numerator and denominator and
+            cancels, so the probabilities are exactly the same as ordinary Softmax:
+          </p>
+          $$\frac{e^{s_i-m}}{\sum_j e^{s_j-m}}
+          =\frac{e^{-m}e^{s_i}}{e^{-m}\sum_j e^{s_j}}
+          =\frac{e^{s_i}}{\sum_j e^{s_j}}$$
+          <p>
+            Exponentiation makes every amount positive. Dividing by their shared total gives
+            probabilities \(q_i\) that sum to 1 while preserving the score ranking. Softmax
+            has now completed its job: the raw scores have become one model distribution
+            \(q\).
+          </p>
+          <p>
+            Cross-entropy now calculates the loss from that distribution. The target vector
+            \(y\) has a 1 at the word that actually came next and 0 everywhere else, so only
+            the true word's term survives. This is the one-example version of the
+            distribution-level cross-entropy from the opening section:
+          </p>
+          $$L=-\sum_i y_i\ln q_i=-\ln q_{\text{true}}$$
           <ul class="symbol-glossary">
-            <li>\(z_i\): the original raw score (logit) for word \(i\); \(s_i=z_i/T\): the score after temperature scales it.</li>
-            <li>\(q_i\): the softmax probability computed from the scaled scores.</li>
-            <li>\(y_i\): the target, 1 for the true next word and 0 for every other word.</li>
-            <li>\(T\): temperature; \(T{=}1\) leaves the scores unchanged.</li>
-            <li>\(\frac{\partial L}{\partial s_i}=q_i-y_i\): the blame on the scaled score.</li>
-            <li>\(\frac{\partial L}{\partial z_i}=(q_i-y_i)/T\): the gradient on the original logit shown by the live panel.</li>
-          </ul>
-
-          <h3>Why does the blame collapse to that?</h3>
-          <p>
-            It looks too clean to be an accident, and it is not one: the \(\ln\) in
-            cross-entropy and the \(e\) in softmax are near-inverses, so they cancel each
-            other's mess. Work first with the scaled score \(s_i=z_i/T\). Start from the
-            loss for the true word \(c\), substitute the softmax definition, and split the
-            fraction with \(\ln\tfrac{a}{b} = \ln a - \ln b\):
-          </p>
-          $$L = -\ln q_c = -\ln \frac{e^{s_c}}{\sum_j e^{s_j}} = -s_c + \ln\sum_j e^{s_j}$$
-          <p>
-            Now take the derivative with respect to any single scaled score \(s_i\). Each
-            of the two pieces has a tidy, intuitive job:
-          </p>
-          <ul class="symbol-glossary">
-            <li>\(\dfrac{\partial}{\partial s_i}\big(-s_c\big) = -y_i\): the \(-s_c\) term touches only the <em>true</em> word, pushing its score up. It contributes \(-1\) for the true word and \(0\) for every other.</li>
-            <li>\(\dfrac{\partial}{\partial s_i}\ln\sum_j e^{s_j} = \dfrac{e^{s_i}}{\sum_j e^{s_j}} = q_i\): the derivative of that running total is <em>the softmax all over again</em>, which pushes every word's score down in proportion to the probability it currently holds.</li>
+            <li>\(i\): the candidate we are currently talking about; \(j\): the index used to scan all candidates in a maximum or sum.</li>
+            <li>\(z_i\): the original raw logit for candidate \(i\); it can be any real number.</li>
+            <li>\(T\): temperature; \(T=1\) leaves logits unchanged, lower sharpens, and higher flattens.</li>
+            <li>\(s_i=z_i/T\): candidate \(i\)'s temperature-scaled score.</li>
+            <li>\(m\): the largest scaled score, subtracted from every score only for numerical safety.</li>
+            <li>\(q_i\): the resulting probability for candidate \(i\); every \(q_i\) is positive and \(\sum_i q_i=1\).</li>
+            <li>\(y_i\): the target for candidate \(i\), 1 for the word that actually came next and 0 for every other word.</li>
+            <li>\(L\): the completed cross-entropy loss in nats, the negative natural log of the true word's probability.</li>
           </ul>
           <p>
-            Add the two together and the scaled-score gradient is \(q_i-y_i\). One short
-            chain-rule step carries it back through \(s_i=z_i/T\) to the original logit:
+            Read the final line in plain words: look up how much probability the model gave
+            the true word, take its negative natural log, and call that one scalar \(L\).
+            High true-word probability gives low loss; low true-word probability gives high
+            loss. No trainable parameter changes during these equations. This is still the
+            forward calculation.
           </p>
-          $$\frac{\partial L}{\partial z_i} = \frac{\partial L}{\partial s_i}\frac{\partial s_i}{\partial z_i} = (q_i-y_i)\frac{1}{T}$$
-          <p>
-            In plain
-            words: <strong>lift the true word's score, and shave a little off every word
-            in proportion to how much probability it is currently hogging.</strong> The
-            scaled-score blame is self-correcting, too: on the true word it is \(q_c-1\), a
-            feather-light nudge when the model is already confident (\(q_c \approx 1\)) but
-            full \(-1\) shove when it is badly wrong (\(q_c \approx 0\)); temperature then
-            scales the gradient that reaches the original logit by \(1/T\). The rest of
-            this chapter's training examples use \(T=1\), so there \(s_i=z_i\) and the
-            familiar \(q_i-y_i\) rule applies directly. Once the model is perfect, every
-            \(q_i-y_i=0\) and both gradients vanish, which is exactly when learning should stop.
-          </p>
+          <p class="microcopy"><strong>Complete here:</strong> logits became probabilities \(q\), and \(q\) became cross-entropy loss \(L\). <strong>Next question:</strong> after gradients are introduced, Backpropagation asks how moving each logit would change this already-known loss.</p>
         </div>
 
         <div class="code-quiz" data-quiz-type="predict" data-explain="Softmax exponentiates then divides by the total, so every output lands between 0 and 1 and the whole set sums to exactly 1 - a proper probability distribution. It does not make them equal; a bigger logit still earns a bigger probability.">
@@ -1063,17 +1176,29 @@
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
 
-        <div class="code-quiz" data-quiz-type="predict" data-explain="Softmax paired with cross-entropy gives q_i minus y_i on the scaled score z_i/T. The chain rule then contributes 1/T, so the gradient on the original logit is (q_i minus y_i)/T. At T=1, the two are identical.">
-          <p class="quiz-prompt">Quick check: temperature first turns a logit into <code>z_i / T</code>. What gradient flows all the way back to the original logit <code>z_i</code>?</p>
-          <div class="quiz-options" role="group" aria-label="The softmax cross-entropy gradient">
-            <button class="quiz-option" type="button" data-correct="true">The probability-target gap divided by temperature, <code>(q_i &minus; y_i) / T</code></button>
-            <button class="quiz-option" type="button" data-feedback="That is the gradient on the scaled score z_i/T, and it equals the original-logit gradient only when T is 1. The chain rule contributes one more factor of 1/T.">Just <code>q_i &minus; y_i</code> at every temperature</button>
-            <button class="quiz-option" type="button" data-feedback="It is non-zero for the true word too: q_true minus 1, which still pushes its score up.">Always zero for the correct word</button>
+        <div class="code-quiz" data-quiz-type="predict" data-explain="For one observed next word, cross-entropy is -ln(q_true). Giving the true word more probability makes -ln(q_true) smaller, so q_sat = 0.80 has lower loss than q_sat = 0.20.">
+          <p class="quiz-prompt">Quick check: <code>sat</code> really came next. Which model guess has the lower cross-entropy loss?</p>
+          <div class="quiz-options" role="group" aria-label="Which probability gives lower cross-entropy">
+            <button class="quiz-option" type="button" data-correct="true"><code>q(sat) = 0.80</code></button>
+            <button class="quiz-option" type="button" data-feedback="That gives the true word little probability, so -ln(0.20) is a larger surprise penalty."><code>q(sat) = 0.20</code></button>
+            <button class="quiz-option" type="button" data-feedback="Cross-entropy reads the true word's probability, so changing it changes the loss.">They have the same loss</button>
           </div>
           <p class="quiz-feedback" aria-live="polite" hidden></p>
         </div>
+
+        <div class="softmax-handoff">
+          <p class="eyebrow">What leaves this section</p>
+          <h3>A probability distribution \(q\) and one cross-entropy loss \(L\).</h3>
+          <p>For the default example, \(q\approx[0.681,0.277,0.041]\), <code>sat</code> is true, and the live unrounded calculation gives \(L\approx0.383\) nats. That is a complete forward calculation. The next section teaches how a gradient describes the direction of change; Backpropagation later uses that idea to calculate how every parameter affected this same \(L\).</p>
+        </div>
       </div>
     </section>
+
+    <div class="chapter-midpoint review-block review-add" aria-label="Chapter midpoint">
+      <p class="eyebrow">Midpoint: the guess is complete</p>
+      <h2>Part A made a guess. Part B will make it learn.</h2>
+      <p>We now have the full forward story: token IDs selected embedding rows, the network produced logits, Softmax made probabilities, and cross-entropy calculated one loss. Nothing has learned yet. The next two sections calculate which way every trainable number should move, then apply those moves.</p>
+    </div>
 
     <section id="gradients" class="band" aria-labelledby="gradients-title">
       <div class="section-shell">
@@ -1093,19 +1218,119 @@
             answers "how wrong are we right now?". (Our word model will later swap in
             cross-entropy loss, but the nudging idea is exactly the same.) MSE and cross-entropy are different objectives on different scales, so their raw loss numbers should not be compared with each other.
           </p>
-          <p>
-            Now the move that does all the work. Imagine you are standing blindfolded on the side of a hilly valley, trying to reach the absolute bottom (where your loss is zero). Because you can't see the whole landscape, you just feel the angle of the ground directly under your feet. The <strong>gradient</strong> is the math calculating that slope. It answers "if I jiggle this one knob, does the loss climb or fall, and how steeply?" By mathematical definition, a gradient always points toward the direction of steepest <em>increase</em>—straight uphill. So, to head downhill toward our goal, we take that exact measurement and deliberately step in the opposite direction.
-          </p>
-          <p>
-            <a href="https://en.wikipedia.org/wiki/Gradient_descent" target="_blank" rel="noreferrer">Gradient descent</a>
-            is nothing grander than repeating that one blindfolded move: measure the slope, take a downhill step, repeat, until the line settles perfectly into the dots. This is where the <code>step size</code> (often called the <em>learning rate</em>) becomes incredibly delicate. If your step size is too tiny, you merely crawl, taking an eternity to reach the bottom. But if your step size is too massive, you leap clean over the bottom of the valley, landing even higher up on the opposite wall and making your mistake <em>worse</em>. Press <em>Step descent</em> below and watch the line walk toward the dots, one calculated nudge at a time.
-          </p>
+          <figure class="gradient-motion-figure" aria-labelledby="gradient-motion-title">
+            <div class="gradient-motion-intro">
+              <p class="eyebrow">See the two knobs before we calculate them</p>
+              <h3 id="gradient-motion-title">Fitting the line means rotating it and lifting or lowering it until the gaps shrink.</h3>
+              <p>The six dots below are the same six points used by the live lab. The coral line starts at the lab's default <code>slope = -0.40</code> and <code>intercept = 0.20</code>.</p>
+            </div>
+            <div class="gradient-motion-grid">
+              <article>
+                <svg class="gradient-motion-svg" viewBox="0 0 280 180" role="img" aria-labelledby="gradient-gap-title gradient-gap-desc">
+                  <title id="gradient-gap-title">The current line and its six prediction errors</title>
+                  <desc id="gradient-gap-desc">Six data points rise from left to right while the current model line falls. Vertical gold segments show the gap between each point and the line's prediction.</desc>
+                  <line class="svg-axis" x1="30" y1="90" x2="250" y2="90"></line>
+                  <line class="svg-axis" x1="140" y1="20" x2="140" y2="155"></line>
+                  <line class="gradient-motion-line is-current" x1="32" y1="53" x2="248" y2="104"></line>
+                  <g class="gradient-motion-errors">
+                    <line x1="48" y1="122" x2="48" y2="57"></line>
+                    <line x1="82" y1="101" x2="82" y2="65"></line>
+                    <line x1="122" y1="86" x2="122" y2="75"></line>
+                    <line x1="166" y1="72" x2="166" y2="84"></line>
+                    <line x1="202" y1="50" x2="202" y2="93"></line>
+                    <line x1="234" y1="38" x2="234" y2="100"></line>
+                  </g>
+                  <g class="gradient-motion-points">
+                    <circle cx="48" cy="122" r="6"></circle>
+                    <circle cx="82" cy="101" r="6"></circle>
+                    <circle cx="122" cy="86" r="6"></circle>
+                    <circle cx="166" cy="72" r="6"></circle>
+                    <circle cx="202" cy="50" r="6"></circle>
+                    <circle cx="234" cy="38" r="6"></circle>
+                  </g>
+                  <text class="gradient-motion-label" x="154" y="120">current guess</text>
+                  <text class="gradient-motion-error-label" x="39" y="143">prediction gaps</text>
+                </svg>
+                <h4>1. Loss measures the gaps</h4>
+                <p>At each dot, the model predicts the height of the line. MSE squares the six vertical gaps and averages them. Big gaps mean big loss.</p>
+              </article>
+              <article>
+                <svg class="gradient-motion-svg" viewBox="0 0 280 180" role="img" aria-labelledby="gradient-slope-title gradient-slope-desc">
+                  <title id="gradient-slope-title">Changing slope rotates the line</title>
+                  <desc id="gradient-slope-desc">A coral line slopes downward and a green line slopes upward. They meet at the same intercept, showing that changing slope rotates the line around its centre crossing.</desc>
+                  <defs>
+                    <marker id="gradient-rotate-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                      <path d="M0,0 L6,3 L0,6 Z"></path>
+                    </marker>
+                  </defs>
+                  <line class="svg-axis" x1="30" y1="90" x2="250" y2="90"></line>
+                  <line class="svg-axis" x1="140" y1="20" x2="140" y2="155"></line>
+                  <line class="gradient-motion-line is-current" x1="32" y1="53" x2="248" y2="104"></line>
+                  <line class="gradient-motion-line is-target" x1="32" y1="126" x2="248" y2="43"></line>
+                  <circle class="gradient-pivot" cx="140" cy="79" r="5"></circle>
+                  <path class="gradient-rotate-arrow" d="M100 54 Q140 28 181 55" marker-end="url(#gradient-rotate-arrow)"></path>
+                  <text class="gradient-motion-label" x="31" y="45">before</text>
+                  <text class="gradient-motion-target-label" x="205" y="34">after tilt</text>
+                  <text class="gradient-motion-small-label" x="151" y="122">same intercept</text>
+                </svg>
+                <h4>2. Slope rotates the line</h4>
+                <p>Turn the <code>slope</code> knob and the line changes tilt. Points on opposite sides of the centre move in opposite vertical directions.</p>
+              </article>
+              <article>
+                <svg class="gradient-motion-svg" viewBox="0 0 280 180" role="img" aria-labelledby="gradient-intercept-title gradient-intercept-desc">
+                  <title id="gradient-intercept-title">Changing intercept shifts the line vertically</title>
+                  <desc id="gradient-intercept-desc">Two parallel green lines are connected by vertical arrows, showing that changing the intercept moves the whole line up or down without changing its angle.</desc>
+                  <defs>
+                    <marker id="gradient-shift-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                      <path d="M0,0 L6,3 L0,6 Z"></path>
+                    </marker>
+                  </defs>
+                  <line class="svg-axis" x1="30" y1="90" x2="250" y2="90"></line>
+                  <line class="svg-axis" x1="140" y1="20" x2="140" y2="155"></line>
+                  <line class="gradient-motion-line is-shifted" x1="32" y1="120" x2="248" y2="62"></line>
+                  <line class="gradient-motion-line is-target" x1="32" y1="94" x2="248" y2="36"></line>
+                  <line class="gradient-shift-arrow" x1="74" y1="108" x2="74" y2="82" marker-end="url(#gradient-shift-arrow)"></line>
+                  <line class="gradient-shift-arrow" x1="205" y1="73" x2="205" y2="47" marker-end="url(#gradient-shift-arrow)"></line>
+                  <text class="gradient-motion-small-label" x="34" y="137">same tilt</text>
+                  <text class="gradient-motion-target-label" x="151" y="28">lift the whole line</text>
+                </svg>
+                <h4>3. Intercept shifts the line</h4>
+                <p>Turn the <code>intercept</code> knob and every prediction moves by the same amount. The line rises or falls without rotating.</p>
+              </article>
+            </div>
+            <figcaption><strong>Gradient descent does not move the line directly.</strong> It measures which way each knob should move to shrink those gaps, then updates the slope and intercept a little at a time.</figcaption>
+          </figure>
+          <div class="gradient-role-bridge" aria-label="Loss, gradient, and gradient descent have three different jobs">
+            <article><span>1</span><h3>Loss measures the mistake</h3><p>MSE compresses every gap between the line and the dots into one number: how wrong are we right now?</p></article>
+            <article><span>2</span><h3>The gradient calculates direction</h3><p>Imagine standing blindfolded on a hilly valley. For each knob, the gradient asks: if I jiggle this knob, does loss climb or fall, and how steeply? It points uphill, toward steepest increase.</p></article>
+            <article><span>3</span><h3>Gradient descent applies the update</h3><p>To go downhill, subtract the gradient. Repeat the measurement and step, using the learning rate to control whether you crawl steadily or leap past the bottom.</p></article>
+          </div>
         </div>
 
-        <figure class="intuition-figure">
-          <img src="assets/figures/chapter4-gradient-descent.gif" width="720" height="360" alt="Animated point moving downhill on a loss curve, with one arrow showing the local gradient and another arrow showing the update step." decoding="async">
-          <figcaption>The gradient tells you the local uphill direction. Gradient descent subtracts it, so the parameters take a small downhill step.</figcaption>
-        </figure>
+        <section id="gradient-walkthrough" class="gradient-walkthrough" aria-labelledby="gradient-step-title">
+          <div class="forward-stepper-head">
+            <div>
+              <p class="eyebrow">One gradient step, under your control</p>
+              <h3 id="gradient-step-title">Measure the current mistake</h3>
+              <p id="gradientStepCopy">Start from the line's current slope and intercept, then compress all six point errors into one MSE loss.</p>
+            </div>
+            <span id="gradientStepCount" class="pill">step 1 of 4</span>
+          </div>
+          <div class="softmax-step-jumps gradient-step-jumps" role="group" aria-label="Jump to a gradient-descent step">
+            <button type="button" data-gradient-step="0">1 <span>Measure loss</span></button>
+            <button type="button" data-gradient-step="1">2 <span>Find gradients</span></button>
+            <button type="button" data-gradient-step="2">3 <span>Plan update</span></button>
+            <button type="button" data-gradient-step="3">4 <span>Check result</span></button>
+          </div>
+          <div class="softmax-stepper-controls gradient-walkthrough-controls" aria-label="Gradient walkthrough controls">
+            <button id="gradientBackButton" class="ghost-button" type="button">Back</button>
+            <button id="gradientPlayButton" class="ghost-button" type="button">Play</button>
+            <button id="gradientNextButton" class="primary-button" type="button">Next</button>
+            <button id="gradientReplayButton" class="ghost-button" type="button">Replay</button>
+          </div>
+          <div id="gradientStepPanel" class="softmax-step-panel gradient-step-panel" aria-live="polite"></div>
+          <p class="microcopy"><strong>Inspect first, apply second.</strong> This walkthrough previews the update using the current sliders without changing them. Press <em>Step descent</em> in the lab below when you want to apply that exact move.</p>
+        </section>
 
         <div class="math-formal" aria-label="Learning in symbols">
           <h3>Loss, gradient, and the update rule, in symbols</h3>
@@ -1135,6 +1360,13 @@
             <li>\(\eta\) (eta): the <strong>learning rate</strong> or step size (the same slider used in the lab).</li>
             <li>\(\leftarrow\): "becomes" (we replace the old weight with its newly nudged value).</li>
           </ul>
+          <div class="gradient-vector-bridge">
+            <h4>Two derivatives here become millions of derivatives later</h4>
+            <p>This line has two trainable knobs, so its gradient is the two-number vector below. A neural network follows the identical rule; its gradient vector simply has one entry for every embedding value, weight, and bias.</p>
+            <code>&nabla;L<sub>line</sub> = [&part;L/&part;slope, &part;L/&part;intercept]</code>
+            <code>&nabla;L<sub>network</sub> = [&part;L/&part;E<sub>1,1</sub>, &hellip;, &part;L/&part;W<sub>2,1,1</sub>, &hellip;, &part;L/&part;b<sub>2,V</sub>]</code>
+            <p>Backpropagation's job is to calculate that longer vector efficiently. Gradient descent's job stays separate: it subtracts the completed vector from the parameters.</p>
+          </div>
           <p class="microcopy">
             <strong>Walking through one step for the slope:</strong> This is the \(N=1\) special case, so the average contains one term and \(1/N=1\). For a single data point \((x{=}1,\ y{=}1)\) and a starting \(\text{slope}{=}0\), our prediction is \(\hat{y}=0\). The error is \(\hat{y}-y = -1\).
             <br><br>
@@ -1183,6 +1415,7 @@
               <button id="gradientAutoButton" class="ghost-button" type="button">Auto train</button>
               <button id="gradientResetButton" class="ghost-button" type="button">Reset</button>
             </div>
+            <p id="gradientRunNote" class="microcopy" aria-live="polite">Auto train stops when the fit settles, diverges, reaches 80 steps, or runs for 10 seconds. Press Stop at any time.</p>
             <svg id="lineFitSvg" class="line-fit-svg" viewBox="0 0 560 360" role="img" aria-label="Line fit and training points"></svg>
             <p class="microcopy">
               The sloped line is the model's current guess: its <strong>tilt</strong> is the
@@ -1231,30 +1464,111 @@
           <p class="eyebrow">6. Backpropagation</p>
           <h2 id="backprop-title">Flow the blame backward to fix the weights.</h2>
           <p>
-            We know our final error - that "probability minus target" small miracle we found in the softmax section. But that only tells us how wrong the final scores are. How do we fix the weights buried deep in the <strong>hidden layers</strong>? Imagine a factory assembly line: the boss at the end yells, "This car is ruined!" The final assembler says, "Don't just blame me, the chassis arrived crooked from the previous station!" To fix the factory, the blame must be passed backward down the line, proportioned by who caused the most error.
+              We know the loss, and the preceding gradients section showed what a gradient means. But our tiny network has many knobs buried across two layers. Imagine a factory assembly line: the boss at the end yells, "This car is ruined!" The final assembler replies, "The chassis arrived crooked from the previous station." To fix the factory, we pass responsibility backward through every station in proportion to how strongly that station affected the result.
           </p>
           <p>
-            This backward flow of blame is <a href="https://en.wikipedia.org/wiki/Backpropagation" target="_blank" rel="noreferrer">Backpropagation</a>. Instead of guessing how to tweak each hidden weight, we use the <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a> from calculus to multiply the sensitivities backward. The error at the output tells the hidden layer how it should have behaved, and the hidden layer tells its weights how they need to adjust. This mathematical chain reaction allows the network to efficiently calculate the perfect downhill gradient for <em>every single weight</em> in one graceful sweep.
+              That backward accounting is <a href="https://en.wikipedia.org/wiki/Backpropagation" target="_blank" rel="noreferrer">backpropagation</a>. It uses the chain rule to <strong>calculate one gradient for every trainable parameter</strong>. It does not update a single parameter. Only after backprop has finished does <strong>gradient descent apply those gradients</strong> with \(\theta \leftarrow \theta-\eta\nabla\theta\).
           </p>
         </div>
 
-        <div class="manim-clip-grid two-up" aria-label="Backpropagation animation clips">
-          <figure class="manim-clip">
-            <video controls muted playsinline preload="metadata" poster="assets/videos/chapter4-backprop-blame-poster.jpg" aria-label="Short animation showing output blame flowing backward through the tiny network">
-              <source src="assets/videos/chapter4-backprop-blame.mp4" type="video/mp4">
-            </video>
-            <figcaption>
-              <strong>Backprop blame flow.</strong> The error starts at the loss, splits across the output scores, then gathers at the hidden neuron through the chain rule.
-            </figcaption>
-          </figure>
-          <figure class="manim-clip">
-            <video controls muted playsinline preload="metadata" poster="assets/videos/chapter4-gradient-update-poster.jpg" aria-label="Short animation showing gradient descent updating the tiny network weights">
-              <source src="assets/videos/chapter4-gradient-update.mp4" type="video/mp4">
-            </video>
-            <figcaption>
-              <strong>Gradient update.</strong> Once backprop has the gradients, gradient descent subtracts them so the important weights move in the direction that lowers loss.
-            </figcaption>
-          </figure>
+        <div class="computational-graph" aria-labelledby="computational-graph-title">
+          <div class="section-title-row">
+            <div><p class="eyebrow">One graph, two directions</p><h3 id="computational-graph-title">Each box remembers one local slope.</h3></div>
+            <span class="pill">automatic differentiation</span>
+          </div>
+          <div class="computational-graph-flow" aria-label="Values flow forward and local derivatives flow backward">
+            <div><strong>\(x\)</strong><span>joined input</span></div><b>&rarr;</b>
+            <div><strong>\(r=W_1x+b_1\)</strong><span>affine operation</span></div><b>&rarr;</b>
+            <div><strong>\(h=f(r)\)</strong><span>activation</span></div><b>&rarr;</b>
+            <div><strong>\(z=W_2h+b_2\)</strong><span>logits</span></div><b>&rarr;</b>
+            <div><strong>\(q=\operatorname{softmax}(z/T)\)</strong><span>probabilities</span></div><b>&rarr;</b>
+            <div><strong>\(L=-\ln q_{true}\)</strong><span>loss</span></div>
+          </div>
+          <div class="computational-graph-backward">
+            <strong>Backward:</strong> start with how \(L\) changes, multiply by each box's local slope, and add contributions when paths meet. Libraries such as PyTorch and TensorFlow record this graph during the forward pass, then compose those local rules in reverse. That is <em>automatic differentiation</em>; the later parameter update is gradient descent.
+          </div>
+        </div>
+
+        <div class="backprop-shape-primer" aria-labelledby="backprop-shape-title">
+          <p class="eyebrow">The exact worksheet network</p>
+          <h3 id="backprop-shape-title">Keep one small shape map beside the arithmetic.</h3>
+          <p>The worksheet below is our canonical by-hand network: input width \(D=2\), hidden width \(H=2\), vocabulary size \(V=5\), ReLU activation, true word <strong>sat</strong>, and temperature \(T=1\).</p>
+          <div class="backprop-shape-grid">
+            <article><code>x: D&times;1 = 2&times;1</code><span>two input numbers</span></article>
+            <article><code>W<sub>1</sub>: H&times;D = 2&times;2</code><span>input-to-hidden weights</span></article>
+            <article><code>h: H&times;1 = 2&times;1</code><span>two hidden signals</span></article>
+            <article><code>W<sub>2</sub>: V&times;H = 5&times;2</code><span>hidden-to-word weights</span></article>
+            <article><code>z,q,&delta;: V&times;1 = 5&times;1</code><span>one value per candidate word</span></article>
+          </div>
+          <div class="backprop-operation-grid">
+            <article><strong>Transpose \((\top)\)</strong><p>Flip rows into columns. \(W_2^\top\) is \(2\times5\), so \(W_2^\top\delta\) gathers five word blames into two hidden blames.</p></article>
+            <article><strong>Element-wise multiply \((\odot)\)</strong><p>Pair matching positions. Hidden blame \((2\times1)\) pairs with two ReLU slopes \((2\times1)\), one gate per hidden neuron.</p></article>
+            <article><strong>Outer product</strong><p>Multiply every blame by every incoming signal. \(\delta h^\top\) is \((5\times1)(1\times2)=5\times2\), exactly the shape of \(W_2\).</p></article>
+          </div>
+          <div class="temperature-gradient-bridge">
+            <h4>The output error that starts the backward pass</h4>
+            <p>The Softmax section scaled each logit with \(s_i=z_i/T\). Softmax plus cross-entropy gives \(\partial L/\partial s_i=q_i-y_i\). The chain rule through \(s_i=z_i/T\) adds \(1/T\):</p>
+            $$\delta_i=\frac{\partial L}{\partial z_i}=\frac{q_i-y_i}{T}$$
+            <p>The worksheet uses \(T=1\), so its output blame is the familiar \(\delta=q-y\). Nothing has been dropped; the temperature factor simply equals 1 here.</p>
+            <details class="backprop-output-proof">
+              <summary>Why does Softmax plus cross-entropy simplify to \(q-y\)?</summary>
+              <div class="backprop-output-proof-body">
+                <p>
+                  This is the detailed cancellation that used to appear in the Softmax
+                  section. It belongs here because it calculates a derivative. Work first
+                  with the temperature-scaled score \(s_i=z_i/T\). The stable maximum
+                  subtraction from the forward pass does not change \(q\), so we can write
+                  ordinary Softmax compactly as
+                  \(q_i=e^{s_i}/\sum_j e^{s_j}\).
+                </p>
+                <p>
+                  Let \(c\) be the index of the true word. Cross-entropy for this one
+                  example is \(L=-\ln q_c\). Substitute the Softmax definition, then use
+                  \(\ln(a/b)=\ln a-\ln b\):
+                </p>
+                $$L=-\ln\frac{e^{s_c}}{\sum_j e^{s_j}}
+                =-s_c+\ln\sum_j e^{s_j}$$
+                <p>
+                  Now ask how \(L\) changes when one scaled score \(s_i\) moves. The two
+                  terms make different contributions:
+                </p>
+                <ul class="symbol-glossary">
+                  <li>
+                    \(\dfrac{\partial}{\partial s_i}(-s_c)=-y_i\): this term touches
+                    only the true word. It contributes \(-1\) when \(i=c\) and 0 for
+                    every other candidate.
+                  </li>
+                  <li>
+                    \(\dfrac{\partial}{\partial s_i}\ln\sum_j e^{s_j}
+                    =\dfrac{e^{s_i}}{\sum_j e^{s_j}}=q_i\): the derivative of the
+                    shared log-sum is the Softmax probability itself.
+                  </li>
+                </ul>
+                <p>Add those two contributions:</p>
+                $$\frac{\partial L}{\partial s_i}=q_i-y_i$$
+                <p>
+                  Finally carry that derivative through the temperature operation
+                  \(s_i=z_i/T\). Its local derivative is \(1/T\):
+                </p>
+                $$\frac{\partial L}{\partial z_i}
+                =\frac{\partial L}{\partial s_i}\frac{\partial s_i}{\partial z_i}
+                =(q_i-y_i)\frac{1}{T}$$
+                <p>
+                  In plain words: raise the true word's logit and lower every other logit
+                  in proportion to the probability it currently holds. The correction is
+                  self-scaling. For the true word it is \(q_c-1\): small when the model is
+                  already confident, and close to \(-1\) when it gave the truth almost no
+                  probability. For other words it is \(q_i\), so an incorrect word that is
+                  hogging probability receives the largest downward correction.
+                </p>
+                <p>
+                  As \(q\) approaches the one-hot target \(y\), every \(q_i-y_i\)
+                  approaches 0 and the output gradient vanishes. The worksheet's backward
+                  half begins by calculating exactly this \(T=1\) error vector.
+                </p>
+              </div>
+            </details>
+          </div>
         </div>
 
         <div class="by-hand-lab" id="byHandLab" aria-labelledby="by-hand-title">
@@ -1266,7 +1580,7 @@
             <span id="byHandProgress" class="pill">step 1 of 13</span>
           </div>
           <p class="microcopy">
-            This is the same story as the videos, but now you hold the pencil. A two-number input flows into a hidden layer, then five possible next words. Type each number, check it, ask for hints when you need them, and reveal the solution only when you are ready.
+            This worksheet is the main story, and now you hold the pencil. Follow the canonical \(D=2, H=2, V=5\) network above from two input numbers to five possible next words, then carry the loss backward. Type each number, check it, ask for progressive hints, and reveal a solution only when you are ready.
           </p>
           <aside class="by-hand-math-refresher" aria-labelledby="by-hand-math-title">
             <div>
@@ -1478,7 +1792,15 @@
           </div>
         </div>
 
-        <div class="math-formal" aria-label="Backpropagation in symbols">
+        <div class="backprop-worksheet-handoff">
+          <p class="eyebrow">From one worked path to every weight</p>
+          <h3>You have already stepped through the mechanism.</h3>
+          <p>The worksheet's Previous and Next controls let you revisit every forward value, output blame, hidden-path sum, gradient, and update. The optional proof below scales those same moves into matrix notation; the live panel then applies them to every weight and shows whether loss actually falls.</p>
+        </div>
+
+        <details class="backprop-deep-dive">
+          <summary>Optional deep dive: repeat one cropped path, then prove the matrix rules</summary>
+        <div class="math-formal" aria-label="Optional backpropagation derivation in symbols">
           <h3>A Step-by-Step Backpropagation Walkthrough</h3>
           <p>
             To truly demystify backpropagation, we are going to start by ditching the abstract algebra and crunching real numbers step-by-step (an approach heavily inspired by <a href="https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/" target="_blank" rel="noreferrer">Matt Mazur's classic backpropagation tutorial</a>, but adapted for our language model). Once we prove the math works for a single weight, we will scale it up using matrices—revealing why operations like "transpose" are the secret weapons that make modern AI possible.
@@ -1574,8 +1896,8 @@
             <li>\(z, q\): the output logits and softmax probabilities; \(y\): the one-hot target (\(1\) at the true word \(c\)); \(L = -\ln q_c\): the final loss.</li>
           </ul>
 
-          <h3>Part 1: The Micro View (Step-by-Step)</h3>
-          <p>Let's isolate a tiny slice of our network. We have 1 input value, 1 hidden neuron, and 2 output words to choose from. We'll set the learning rate \(\eta\) to \(0.1\), assume biases are \(0\), and use a simple ReLU activation:</p>
+          <h3>Part 1: Replay one cropped path</h3>
+          <p>This is not a new network. It crops the worksheet's \(D=2, H=2, V=5\) graph down to one visible input, one hidden neuron, and two output words so we can repeat one chain-rule path without carrying every number. We'll set the learning rate \(\eta\) to \(0.1\), assume biases are \(0\), and use the same ReLU activation:</p>
           <ul class="symbol-glossary">
             <li><strong>Input Data:</strong> \(x_1 = 0.5\)</li>
             <li><strong>Hidden layer weight (W1):</strong> \(w_1 = 0.4\) (connects input \(x_1\) to hidden neuron \(h_1\)).</li>
@@ -1788,7 +2110,7 @@
             <div style="margin-top: 1rem; cursor: text;">
               <p>The appearance of the transpose (\(\top\)) isn't an arbitrary matrix trick—it is the mathematically unavoidable result of applying the multivariable chain rule to every number in the grid simultaneously.</p>
               
-              <p>Let's look at our simple linear layer: \(z = Wx\).<br>
+              <p>Let's look at our simple linear layer: \(z = Wx\). In this chapter's output layer, the generic \(M\) below is vocabulary size \(V\), and \(N\) is hidden width \(H\).<br>
               Let \(W\) be a matrix of size \(M \times N\).<br>
               Let \(x\) be a column vector of size \(N \times 1\).<br>
               Let \(z\) be a column vector of size \(M \times 1\).<br>
@@ -1835,10 +2157,15 @@
           <p>
             This algorithm—<a href="https://en.wikipedia.org/wiki/Automatic_differentiation" target="_blank" rel="noreferrer">reverse-mode automatic differentiation</a>—is incredibly efficient. However, look closely at Rule 3. Every time we step backward through a layer, we multiply by an activation slope (\(f'\)). If your network is very deep, you are multiplying fraction after fraction. The blame signal gets smaller and smaller until it entirely vanishes before reaching the first layers. This is the infamous <a href="https://en.wikipedia.org/wiki/Vanishing_gradient_problem" target="_blank" rel="noreferrer">vanishing gradient problem</a>, and it is exactly why the modern architectures we cover in Chapter 5 rely heavily on skip connections and normalization to keep the blame flowing clearly.
           </p>
-        </div>        
+        </div>
+        </details>
 
-        
-        
+        <div class="backprop-live-bridge">
+          <p class="eyebrow">Now widen the same computation</p>
+          <h3>The live panel uses more numbers, not a different algorithm.</h3>
+          <p>The worksheet used \(D=2, H=2, V=5\) for hand arithmetic. This panel returns to the chapter's two 2D embedding rows joined into \(D=4\), with \(H=3\) hidden neurons and three visible candidate words. The graph, transpose, element-wise gate, outer products, and \(T=1\) output blame are the same.</p>
+          <p><strong>Deliberate before-state:</strong> the untrained gradients are populated on load because they are the evidence you compare against after pressing <em>Take a gradient step</em>.</p>
+        </div>
 
         <div class="network-grid backprop-grid">
           <div class="panel backprop-visual-panel">
@@ -1888,7 +2215,7 @@
             <p class="microcopy">
               The orange dashes flow <strong>right to left</strong> - that is the error
               travelling backward. Each output word shows its <strong>blame</strong>
-              (<code>probability &minus; target</code>); each hidden neuron shows the
+              (<code>probability &minus; target</code> because this panel uses <code>T = 1</code>); each hidden neuron shows the
               gradient that will nudge its weights. <strong>Click a hidden neuron</strong>
               to trace its chain rule on the right.
             </p>
@@ -1949,6 +2276,9 @@
             read at a glance - a boundary between two colours of dots - so you can literally see
             learning happen and meet the one genuinely new idea: <strong>generalization</strong>.
             Then, in Act 2 just below, on the real next-word task that is the whole point of the chapter.
+          </p>
+          <p class="example-note final-build-purpose review-block review-add">
+            <em>What is genuinely new in Act 1?</em> Not forward pass, loss, backprop, or the update - you have already done each one. The new idea is <strong>generalization</strong>: whether a model learned a pattern that works on examples it never trained on. The shaded map lets you see the difference between learning the ring and merely tracing the training dots.
           </p>
           <p>
             This is a real two-layer network with random starting weights, and each epoch runs the
@@ -2035,6 +2365,7 @@
             </div>
             <button id="resetNetworkButton" class="ghost-button" type="button">Reset network</button>
           </div>
+          <p class="microcopy trainer-reset-contract review-add"><strong>Reset contract:</strong> <em>Reset network</em> clears learned weights, metrics, history, and the decision map while preserving your selected data, hidden width, learning rate, and epoch count. <em>New data split</em> also replaces the dots.</p>
 
           <div class="control-grid nn-controls">
             <label class="select-row" for="datasetSelect">
@@ -2114,12 +2445,15 @@
 
         </section>
 
-        <p class="insight-note build-bridge">
+        <p class="insight-note build-bridge review-remove" inert>
           That was the entire loop running to completion, and <strong>generalization</strong> - the gap
           between fitting and truly learning - is the one new idea that earned Act 1 its place. The dots
           were easy to picture; now we run the exact same four beats on the real task of the chapter,
           where the input is words and the output is a probability over the whole vocabulary. Watch for
           the same overfitting: on a corpus this small, the model will happily <em>memorise</em> it.
+        </p>
+        <p class="insight-note build-bridge review-add">
+          That was the whole loop running to completion, and <strong>generalization</strong> - the gap between fitting and truly learning - is the one new idea that earned Act 1 its place. On the noisy ring, overfitting means bending the boundary around individual training dots instead of learning the ring. In Act 2, the picture disappears but the failure is the same: a model can memorize individual context-to-next-word examples instead of learning a pattern that would travel to new text. Same loop, same pressure, different data.
         </p>
 
         <div class="section-heading" id="train-lab">
@@ -2130,6 +2464,9 @@
             only now the dots are words. Not a fake diagram, not a pretend model: everything above
             becomes one small network that predicts the next word, trained right here on a tiny corpus.
             When you click "Train", every example runs the full pipeline in <em>compute order</em>: <strong>Embeddings \(\rightarrow\) Forward Pass \(\rightarrow\) Softmax \(\rightarrow\) Cross-Entropy Loss \(\rightarrow\) Backprop \(\rightarrow\) Gradient Descent</strong>. Backprop lands <em>before</em> gradient descent here for a concrete reason: a step has to compute the gradients (backprop) before it can take the downhill move (gradient descent). That is the reverse of the order we taught them in, on purpose - the downhill step is the simpler idea, and backprop exists only to feed it.
+          </p>
+          <p class="review-add">
+            One <strong>epoch</strong> is one pass through every context-to-next-word example. At the start of each epoch, this browser shuffles those examples, then updates the weights after <em>one example at a time</em>: that is <strong>stochastic gradient descent</strong>, or SGD. Production training usually groups many examples into a <strong>mini-batch</strong> so GPUs can process them in parallel. We stay with one-at-a-time updates because every move remains easier to inspect.
           </p>
           <p>
             It is a miniature of the
@@ -2162,12 +2499,15 @@
               <a href="#softmax">Softmax</a> makes those scores a probability distribution:
               "given these two words, here is how likely each possible next word is."
             </p>
-            <p>
+            <p class="review-remove" inert>
               Training nudges every number along that path - the embeddings, both weight
               layers, and the biases - using the exact backprop you just traced. With a
               vocabulary of <code>V</code> words, a <code>12</code>-dimensional embedding, and
               <code>24</code> hidden units, that is a few thousand weights; the live
               <strong>parameters</strong> readout below counts them exactly.
+            </p>
+            <p class="review-add">
+              Training nudges every number along that path - the embeddings, both weight layers, and the biases - using the exact backprop you just traced. This browser model uses <code>53</code> vocabulary entries, <code>12</code> numbers per embedding, a two-word context, and <code>24</code> hidden units. Together those tables and biases contain exactly <code>2,561</code> trainable parameters, the same total shown by the live readout below.
             </p>
           </div>
           <figure class="build-network-figure">
@@ -2210,21 +2550,40 @@
             <h3>The training corpus</h3>
             <span id="nwCorpusCount" class="pill">sentences</span>
           </div>
-          <p class="microcopy">
+          <p class="microcopy review-remove" inert>
             A bigger, more varied corpus this time - dozens of short sentences about animals
             and people in a little nature world, with a deliberately controlled vocabulary so
             a two-word context is still genuinely predictive. Every sentence gets a hidden
             <code>start</code> marker so the first word has a context too. Here is a sample:
           </p>
+          <p class="microcopy review-add">
+            The complete corpus contains <strong>72 short sentences</strong> about animals and people in a little nature world. A deliberately controlled vocabulary keeps a two-word context genuinely predictive. Each sentence receives two hidden <code>start</code> markers and one end target, producing one training example for every word and ending. Here is a sample:
+          </p>
           <div id="nwCorpusPreview" class="corpus-lines" aria-live="polite"></div>
           <p class="microcopy">...and more, in the same style. The whole list trains within the budget you pick below.</p>
+        </div>
+
+        <div class="training-transparency review-block review-add" aria-labelledby="training-transparency-title">
+          <p class="eyebrow">The browser-scale contract</p>
+          <h3 id="training-transparency-title">Every training number, before you press Train.</h3>
+          <div class="training-transparency-grid">
+            <article><strong id="nwTrainingSentenceCount">72</strong><span>sentences</span><em>the full tiny corpus</em></article>
+            <article><strong id="nwTrainingExampleCount">484</strong><span>examples per epoch</span><em>one context → target pair each</em></article>
+            <article><strong id="nwTrainingVocabCount">53</strong><span>vocabulary entries</span><em>including start and end</em></article>
+            <article><strong>12</strong><span>embedding width</span><em>numbers per vocabulary row</em></article>
+            <article><strong>24</strong><span>hidden units</span><em>the context summary</em></article>
+            <article><strong id="nwTrainingParamCount">2,561</strong><span>parameters</span><em>every learned number</em></article>
+            <article><strong>0.02</strong><span>learning rate</span><em>fixed for this teaching run</em></article>
+          </div>
+          <p class="microcopy">These are deliberate browser-speed choices, not production recommendations. Larger language models use far wider vectors, many layers, vastly more data, and mini-batches spread across accelerators.</p>
         </div>
 
         <section class="trainer nn-trainer" aria-label="Next-word model training controls">
           <div class="trainer-head">
             <div>
               <h3>Training controls</h3>
-              <p>Pick a time budget and train. The model keeps training until it converges or the budget runs out, showing live progress. The learning rate is fixed at 0.02. Each pass through the corpus is measured; if later passes make the loss worse, the model finishes with the lowest-loss weights it found.</p>
+              <p class="review-remove" inert>Pick a time budget and train. The model keeps training until it converges or the budget runs out, showing live progress. The learning rate is fixed at 0.02. Each pass through the corpus is measured; if later passes make the loss worse, the model finishes with the lowest-loss weights it found.</p>
+              <p class="review-add">Pick a time budget and train. Each epoch shuffles and visits all <span id="nwTrainingExampleCountInline">484</span> examples using one-at-a-time SGD updates at a fixed learning rate of <code>0.02</code>. The run stops when improvement settles or time runs out, and it keeps the lowest-cross-entropy weights it found.</p>
             </div>
             <button id="nwResetButton" class="ghost-button" type="button">Reset model</button>
           </div>
@@ -2250,6 +2609,21 @@
             <button id="nwTrainStepButton" class="ghost-button" type="button">Train 8 more seconds</button>
             <button id="nwGenerateButton" class="ghost-button" type="button">Generate a sentence</button>
           </div>
+          <p class="microcopy trainer-reset-contract review-add"><strong>Reset contract:</strong> <em>Reset model</em> restores the original random weights and clears epochs, metrics, loss history, predictions, watched contexts, and generated text. It preserves your time budget, generation temperature, and selected prediction context.</p>
+
+          <details class="optimizer-bridge review-add">
+            <summary>Production note: why larger models use optimizers such as AdamW</summary>
+            <div>
+              <p>This lab uses the simplest optimizer: subtract the current gradient times one fixed learning rate.</p>
+              <ul>
+                <li><strong>Momentum</strong> keeps a running direction so noisy updates do not zigzag as much.</li>
+                <li><strong>RMSprop</strong> scales each parameter using its recent squared gradients, giving different knobs different effective step sizes.</li>
+                <li><strong>Adam</strong> combines momentum-like direction with adaptive scaling.</li>
+                <li><strong>AdamW</strong> keeps Adam's adaptive update but separates weight decay, making regularization easier to control.</li>
+              </ul>
+              <p>Those methods change how gradients become steps. They do not replace the forward pass, loss, or backpropagation that calculates the gradients.</p>
+            </div>
+          </details>
 
           <div id="nwProgress" class="training-progress" aria-live="polite">
             <div class="training-progress-copy">
@@ -2307,7 +2681,11 @@
             <div id="nwGeneratePanel" class="generate-panel" aria-live="polite"></div>
           </div>
 
-          <article class="code-cell chapter4-code-cell">
+          <div class="review-block review-remove" inert>
+            <strong>Earlier code-cell baseline</strong>
+            <p><code>startLoss</code> was recorded only after the first epoch, so the random model's true epoch-0 loss was missing and the returned object did not show the curve between its endpoints.</p>
+          </div>
+          <article class="code-cell chapter4-code-cell review-block review-add">
             <div class="cell-head">
               <h3>Train and sample from code</h3>
               <button class="run-button" type="button">Run</button>
@@ -2328,18 +2706,24 @@
 // loss, a backward pass, then update every weight (embeddings too).
 const epochs = 60;
 
-const lossPerEpoch = [];
+const startLoss = nextWordLoss();
+const startPerplexity = nextWordPerplexity();
+const lossPerEpoch = [startLoss];
 for (let epoch = 1; epoch <= epochs; epoch++) {
   nwTrainOneEpoch();
   lossPerEpoch.push(nextWordLoss());
 }
 
 // Lower loss means lower perplexity (less surprise). Then sample text.
+const endLoss = lossPerEpoch[lossPerEpoch.length - 1];
 return {
   epochs: epochs,
-  startLoss: lossPerEpoch[0],
-  endLoss: lossPerEpoch[epochs - 1],
+  startLoss: startLoss,
+  endLoss: endLoss,
+  improvement: startLoss - endLoss,
+  startPerplexity: startPerplexity,
   perplexity: nextWordPerplexity(),
+  lossCurve: lossPerEpoch,
   sample: generateSentence(0.8)
 };</textarea>
             <div class="code-output is-empty" aria-live="polite">
@@ -2351,7 +2735,7 @@ return {
           </article>
         </section>
 
-        <p class="insight-note chapter-bridge-note">
+        <p class="insight-note chapter-bridge-note review-remove" inert>
           Take a moment to appreciate what just happened. With nothing but
           probability, vectors, a dot product, softmax, and a gradient nudge, a pile
           of numbers taught itself to finish sentences. (Push the epochs slider high and
@@ -2363,6 +2747,9 @@ return {
           back in Chapter 1. We already pinned down the raw text-to-token step in
           Chapter 3. Next we meet the Transformer, the architecture that finally lets a
           model look across a whole sentence at once.
+        </p>
+        <p class="insight-note chapter-bridge-note review-add">
+          Take a moment to appreciate what just happened. With probability, vectors, dot products, Softmax, cross-entropy, backpropagation, and SGD, a pile of numbers taught itself to finish sentences. Give the tiny model a longer <strong>time budget</strong> and its training perplexity can slide toward 1 as it memorizes the <strong>72-sentence corpus</strong> - the same overfitting pressure you made visible on the noisy ring. Its real ceiling is the fixed two-word window: every prediction must squeeze the past into exactly two neighboring words. Chapter 5 introduces <strong>attention</strong>, which gathers useful context dynamically from farther back while keeping the machinery you built here: embeddings, logits, Softmax, cross-entropy, backpropagation, and optimization. The training loop stays; the way context enters the guess changes.
         </p>
       </div>
     </section>
@@ -2383,6 +2770,10 @@ return {
         </div>
 
         <ol class="reference-list">
+          <li class="review-add">
+            <a href="https://nostarch.com/math-deep-learning" target="_blank" rel="noreferrer">Ronald T. Kneusel, Math for Deep Learning</a>
+            <span>A practical foundation for this chapter: Chapters 5–6 cover linear algebra and matrix operations, Chapters 7–8 cover differential and matrix calculus, Chapter 10 develops backpropagation, and Chapter 11 covers gradient descent and adaptive optimizers.</span>
+          </li>
           <li>
             <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">Bengio et al., A Neural Probabilistic Language Model</a>
             <span>The fixed-window neural language model your next-word lab is a miniature of.</span>
@@ -2433,7 +2824,7 @@ return {
     </section>
   </main>
 
-  <script src="chapter4.js?v=20260809k"></script>
+  <script src="chapter4.js?v=20260811r"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>

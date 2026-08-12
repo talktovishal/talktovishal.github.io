@@ -21,6 +21,8 @@ This does **not** authorize reordering Chapter 4. The lesson keeps its existing 
 
 Do not combine the proposal and approval passes. Do not start another checklist item while the current item is `[~]` and awaiting review.
 
+Explicit author exception for this pass: Sections 4, 5, and 6 were requested together. Each remains an independent review batch with its own queue card, local red/green evidence, and focused validation.
+
 For each item:
 
 1. Select one checklist item and mark only that item `[~]`.
@@ -39,16 +41,20 @@ Status key:
 - `[x]` Approved and complete
 - `[!]` Blocked or needs a decision
 
-Items 2-4 below were implemented before this review-markup lifecycle was adopted and remain `[~]`. They must be reviewed one at a time. If the existing result is difficult to verify, reconstruct its before/after presentation in review mode before asking for approval.
+Items 2-4 below were implemented before this review-markup lifecycle was adopted and have now been reviewed and approved.
 
 ## Current Position
 
 - **Completed and approved:** A0 (reusable review-diff styling), A1 (stable next-word training with concrete completion feedback), A4 (Chapter 1 continuity and synchronized `p`/`q` example), A5 (refocused Words as vectors around the operation Chapter 4 needs), A6 (Chapter 3 tokenization-to-embedding bridge), Items 1 (copy and markup defects), 5 (loss names, units, and precision), 7 (scalar-vector-matrix-tensor bridge), and 13 (probability-section required path).
-- **Approved local slice:** A3's Build the forward pass revision is approved and cleaned up; later A3 slices remain deferred to Softmax and Backpropagation.
-- **Active and awaiting review:** Item 8, one matrix multiplication by hand.
-- **Next after Item 8 approval and cleanup:** Item 10, clarify input embeddings versus output scoring weights.
-- **Later enhancement:** evaluate a floating scratch calculator separately after the core walkthroughs are approved.
-- **Already implemented before this workflow, to review later in chapter order:** Items 2-4 when the queue reaches Softmax and Gradients.
+- **Approved through Section 6:** all staged changes from the overview through Backpropagation are approved and cleaned up. The temporary review queue is removed and Chapter 4 has no active review markup.
+- **Completed and approved:** Item 8, one matrix multiplication by hand.
+- **Completed and approved:** Item 10, clarify input embeddings versus output scoring weights.
+- **Completed and approved:** Section 5's MSE geometry scaffold, reversible arithmetic stepper, averaged gradients, gradient-vector bridge, and bounded line trainer.
+- **Completed and approved:** Section 6's relocated `q-y` derivation, temperature chain rule, canonical worksheet path, computational graph, shape primer, optional proof, live backprop panel, and mobile containment.
+- **Older changes:** Items 2-4 are approved and cleaned up.
+- **Awaiting final review:** Sections 7–9 now expose generalization, trainer mechanics and exact scale, an epoch-0 code-cell curve, optimizer context, the corrected Chapter 5 bridge, and the requested book reference.
+- **Awaiting final review:** reset/focus and single-start event behavior, formula/repeated-number audit, complete interaction matrix, responsive containment, and final voice/flow findings.
+- **Proposed decision:** do not add a floating scratch calculator. The by-hand worksheet, live-number steppers, and editable code cell already provide local arithmetic support; another floating control would cover lesson content without adding a distinct learning job.
 
 ## Master Implementation Order: Top to Bottom
 
@@ -58,7 +64,7 @@ A1 was completed as the one exception already underway when this ordering rule w
 2. **Surprise and the next word:** A4, 5, 13.
 3. **Words as vectors:** A5, 7, A7 where it first affects the vector panel.
 4. **Build the forward pass:** A3 where the responsibility split begins, then 8, 10, 11, 26 for the forward-pass clip.
-5. **Softmax and assigning blame:** 2, 3, 6, 14, then the softmax portion of A3 and A7.
+5. **Softmax and cross-entropy:** 2, 3, 6, 14, then the softmax portion of A3 and A7.
 6. **Gradients and loss:** 4, 15, 23, A8.
 7. **Backpropagation:** 9, 16-22, A9, then the backpropagation clips from 26.
 8. **Act 1 - generalization and overfitting:** 24-25 where they affect this trainer, then 27.
@@ -100,7 +106,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - The completion message states the starting loss, kept loss, best epoch, and number of later passes that did not beat it; unexplained terms such as "plateau" and "best checkpoint" stay out of the learner-facing status.
   - Loss, perplexity, watched contexts, and generated samples agree with the restored/final weights.
 
-- [ ] **A2. Make the final code cell report an honest baseline and useful curve**
+- [~] **A2. Make the final code cell report an honest baseline and useful curve** — implemented and awaiting review
 
   The current `startLoss` is captured after the first training epoch, which hides the true random-initialization baseline. Change the exercise so it records epoch 0 before training, exposes enough of the curve to show what happened, and does not promise monotonic improvement unless the implementation guarantees it.
 
@@ -110,7 +116,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Running the code cell still reveals and refreshes the nearby next-word panels.
   - The quiz, comments, rendered output, and live trainer describe the same behavior.
 
-- [ ] **A3. Reorder the conceptual responsibilities of softmax, gradients, and backprop** — forward-pass slice approved and cleaned up; later Softmax/Backpropagation slices not started
+- [x] **A3. Reorder the conceptual responsibilities of softmax, gradients, and backprop** — approved and cleaned up
 
   Keep the broad chapter flow but stop deriving gradient rules before the learner knows what a gradient is. Use this responsibility split as the starting proposal:
   - forward pass: carry the example through raw logits and preview that normalization comes next;
@@ -163,7 +169,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - The simplification is explicit and does not imply that real LLM vocabularies contain only words.
   - Later uses of "word," "token," "token ID," and "embedding row" remain consistent.
 
-- [ ] **A7. Apply learner-initiated reveal consistently** — vector-panel slice rejected; retain its populated cat/dog baseline because the starting comparison is useful evidence. Later slices not started.
+- [x] **A7. Apply learner-initiated reveal consistently** — approved and cleaned up
 
   Audit the vector, forward-pass, softmax, and logit-gradient outputs that currently render their answers on load while probability, line fitting, and trainers begin blank. Define a meaningful trigger for each output and retain live updates after the first interaction.
 
@@ -173,16 +179,16 @@ This is the controlling work order. The chapter itself is not reordered.
   - Running a nearby code cell reveals the corresponding visual when applicable.
   - Deliberate baseline exceptions are documented rather than accidental.
 
-- [ ] **A8. Replace uncontrolled looping motion with learner-controlled motion**
+- [x] **A8. Replace uncontrolled looping motion with learner-controlled motion** — approved and cleaned up
 
-  The gradient-descent GIF loops automatically, unlike the chapter's controlled MP4 clips and step buttons. Replace it with a paused poster plus controls, a manual stepper, or another static-first implementation that provides replay and reduced-motion behavior.
+  The gradient-descent GIF loop and its controlled-video replacement were both less useful than the chapter's reversible mechanism walkthroughs. Replace them with a live-number stepper that exposes one complete MSE update in four causal beats.
 
   Completion checks:
   - Nothing important autoplays or loops indefinitely.
   - The first frame teaches something before interaction.
-  - Keyboard controls, caption/transcript, and reduced-motion behavior are available.
+  - Back, Next, Play, Replay, direct-step controls, and reduced-motion behavior are available.
 
-- [ ] **A9. Repair the verified mobile backprop formula clipping**
+- [x] **A9. Repair the verified mobile backprop formula clipping** — approved and cleaned up
 
   At the narrow test viewport, three backprop `.formula-stack` blocks are wider than their containers while the page hides horizontal overflow. The affected examples include the two-class softmax calculation, the output-weight gradient, and the hidden-weight gradient.
 
@@ -191,7 +197,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - The backprop section and document have no hidden/clipped content at mobile widths.
   - KaTeX, code formulas, tables, SVG labels, and worksheet controls remain contained.
 
-- [ ] **A10. Correct stale finale copy and precision claims**
+- [~] **A10. Correct stale finale copy and precision claims** — implemented and awaiting review
 
   Update text that no longer matches the implementation, including the closing instruction to "push the epochs slider" and the reference to "twelve sentences." The current UI uses a time-budget selector and the live corpus contains 72 sentences. Also audit over-broad statements such as cross-entropy being "the difference" between distributions and `-log2(q)` being a literal integer bit count rather than an ideal information/code length.
 
@@ -200,7 +206,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Corpus size, parameter count, context width, learning rate, and training behavior match the live implementation.
   - Cross-entropy, entropy gap/KL interpretation, and ideal code-length wording are mathematically precise but remain approachable.
 
-- [ ] **A11. Evaluate an optional floating scratch calculator**
+- [~] **A11. Evaluate an optional floating scratch calculator** — evaluated; proposed decision is not to add it
 
   After the core worked examples and reversible steppers are approved, evaluate a small learner-controlled calculator for checking arithmetic without leaving the page. It must be optional, keyboard accessible, movable or collapsible without covering lesson content, and must not replace the lesson's own worked steps.
 
@@ -223,7 +229,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - No teaching content is reordered or removed.
   - A focused browser read confirms the corrected paragraphs render normally.
 
-- [~] **2. Correct the logits explanation**
+- [x] **2. Correct the logits explanation** — approved and cleaned up
 
   Replace the statement that negative logits break the math. Logits may be any real number, including negative numbers. Softmax is needed because logits are raw relative scores, not positive normalized probabilities.
 
@@ -234,7 +240,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - The worked negative-logit example remains intact.
   - The live softmax panel still matches the prose.
 
-- [~] **3. Correct temperature-dependent gradients**
+- [x] **3. Correct temperature-dependent gradients** — approved and cleaned up
 
   Distinguish between the gradient with respect to the scaled score and the gradient with respect to the original logit. If softmax uses `z/T`, then:
 
@@ -255,7 +261,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Values correctly scale at low and high temperatures.
   - Formula, panel labels, quiz feedback, and JavaScript use the same convention.
 
-- [~] **4. Correct averaged MSE gradients**
+- [x] **4. Correct averaged MSE gradients** — approved and cleaned up
 
   Make the formulas match the displayed mean squared error:
 
@@ -291,7 +297,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Bits/nats/perplexity conversions remain consistent.
   - No learner-facing panel presents incomparable losses as if they shared a scale.
 
-- [ ] **6. Explain numerically stable softmax**
+- [x] **6. Explain numerically stable softmax** — approved and cleaned up
 
   Add the implementation form already used in `chapter4.js`:
 
@@ -323,7 +329,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - No broad tensor theory is added without immediate use.
   - The learner can identify the scalar, vectors, and matrices in the tiny network.
 
-- [~] **8. Teach one matrix multiplication by hand** — awaiting author review
+- [x] **8. Teach one matrix multiplication by hand** — approved and cleaned up
 
   Follow the attached PDF's useful ladder: check compatible shapes, select one row and one column, compute their dot product, place that value in one output cell, then repeat conceptually.
 
@@ -334,7 +340,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Compute at least one output entry fully.
   - Connect the operation to hidden activations or output logits.
 
-- [ ] **9. Introduce transpose, element-wise multiplication, and outer products before backprop needs them**
+- [~] **9. Introduce transpose, element-wise multiplication, and outer products before backprop needs them** — verified in the approved shape primer; awaiting final bookkeeping review
 
   Explain:
   - transpose swaps rows and columns;
@@ -348,7 +354,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Shape compatibility is visible.
   - No determinant, inverse, eigenvalue, or unrelated linear-algebra material is added.
 
-- [ ] **10. Clarify input embeddings versus output scoring weights**
+- [x] **10. Clarify input embeddings versus output scoring weights** — approved and cleaned up
 
   Explain that:
   - input embedding rows represent context tokens;
@@ -362,7 +368,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Vector section and forward-pass section use compatible terminology.
   - The live network's actual `W2` scoring path is represented honestly.
 
-- [ ] **11. Motivate bias, activation, and logit before relying on the names**
+- [~] **11. Motivate bias, activation, and logit before relying on the names** — verified in the approved forward path; awaiting final bookkeeping review
 
   Preserve the existing valve and opinion-maker analogies. Ensure each term first solves a visible problem:
   - bias is a learned constant that shifts when a neuron activates;
@@ -375,7 +381,7 @@ This is the controlling work order. The chapter itself is not reordered.
 
 ## Phase 3: Strengthen the Main Narrative
 
-- [ ] **12. Make the chapter midpoint explicit: Make a guess -> Make it learn**
+- [~] **12. Make the chapter midpoint explicit: Make a guess -> Make it learn** — midpoint staged and awaiting review
 
   Keep the current section order, but add a visible narrative transition:
   - Part A builds the forward guess: probability, vectors, network, softmax, loss.
@@ -396,7 +402,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Optional depth preserves the author's voice and full reasoning.
   - The required path reaches the live cause/effect panel without excessive delay.
 
-- [ ] **14. Consolidate softmax repetition**
+- [x] **14. Consolidate softmax repetition** — approved and cleaned up
 
   Preserve:
   - motivation for logits;
@@ -412,7 +418,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Every retained surface adds a distinct layer.
   - `q-y` is derived once and referenced later rather than re-taught cold.
 
-- [ ] **15. Strengthen the gradient transition**
+- [x] **15. Strengthen the gradient transition** — approved and cleaned up
 
   Explicitly distinguish:
   1. loss measures the mistake;
@@ -421,13 +427,15 @@ This is the controlling work order. The chapter itself is not reordered.
 
   Connect the two-number line gradient to the later gradient vector containing every neural-network parameter derivative.
 
+  Before naming the gradient, show the same six-point line example visually: MSE is the six vertical prediction gaps squared and averaged, slope rotates the line, and intercept shifts it vertically. Reuse the live lab's default values so the static orientation and interactive panel tell one story.
+
   Completion checks:
   - Gradient and gradient descent are not used interchangeably.
   - The line-fitting lab visibly prepares the learner for backpropagation.
 
 ## Phase 4: Consolidate Backpropagation
 
-- [ ] **16. Choose one canonical network and notation**
+- [x] **16. Choose one canonical network and notation** — approved and cleaned up
 
   Audit the networks currently used by:
   - forward-pass panel;
@@ -443,7 +451,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Inputs, hidden units, outputs, activations, target word, and symbols remain consistent across surfaces.
   - Any deliberate simplification is stated before it appears.
 
-- [ ] **17. Make the 13-step worksheet the backprop section's spine**
+- [x] **17. Make the 13-step worksheet the backprop section's spine** — approved and cleaned up
 
   Preserve the worksheet, immediate correctness feedback, progressive hints, solution reveal, network diagram, and local calculus refresher.
 
@@ -454,7 +462,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - The worksheet's numbers match every nearby explanation.
   - No worksheet functionality is lost.
 
-- [ ] **18. Consolidate repeated backprop explanations without deleting depth**
+- [x] **18. Consolidate repeated backprop explanations without deleting depth** — approved and cleaned up
 
   Preserve:
   - factory analogy;
@@ -474,7 +482,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Optional rigor remains complete.
   - Every retained block has a unique teaching job.
 
-- [ ] **19. Add a computational-graph explanation**
+- [x] **19. Add a computational-graph explanation** — approved and cleaned up
 
   Use a tiny expression such as `y = f(Wx + b)` to show:
   - primitive operations as nodes;
@@ -488,7 +496,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Automatic differentiation is distinguished from gradient descent.
   - No framework-specific implementation tutorial is required.
 
-- [ ] **20. Re-anchor matrix shapes during backpropagation**
+- [x] **20. Re-anchor matrix shapes during backpropagation** — approved and cleaned up
 
   Replace abstract `M` and `N` where possible with chapter quantities:
   - output vocabulary size `V`;
@@ -502,7 +510,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Every matrix formula has input and output shapes.
   - Shapes match the earlier matrix bridge.
 
-- [ ] **21. Clarify backpropagation versus gradient descent**
+- [x] **21. Clarify backpropagation versus gradient descent** — approved and cleaned up
 
   State plainly and repeatedly enough to prevent confusion:
   - backpropagation calculates all gradients;
@@ -514,7 +522,7 @@ This is the controlling work order. The chapter itself is not reordered.
 
 ## Phase 5: Interaction Hardening
 
-- [ ] **22. Give blocked worksheet navigation visible feedback**
+- [x] **22. Give blocked worksheet navigation visible feedback** — approved and cleaned up
 
   When the learner presses Next before checking or revealing the current step, display a clear message explaining what is needed. Keep Enter-to-check behavior and consider Arrow Left/Right only if it does not conflict with text input.
 
@@ -523,7 +531,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Keyboard and mouse flows both work.
   - Feedback remains accessible through `aria-live`.
 
-- [ ] **23. Bound gradient auto-training**
+- [x] **23. Bound gradient auto-training** — approved and cleaned up
 
   Stop auto-training when any of these occurs:
   - loss converges;
@@ -538,7 +546,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - High learning rates cannot run indefinitely.
   - Start/Stop/Reset states remain predictable.
 
-- [ ] **24. Audit reset and focus behavior**
+- [~] **24. Audit reset and focus behavior** — audited, documented, and awaiting review
 
   Test and define intentional reset behavior for:
   - probability panel;
@@ -553,7 +561,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - No stale values survive a reset unexpectedly.
   - Empty-state versus baseline-state behavior is intentional and documented.
 
-- [ ] **25. Simplify training event handling**
+- [~] **25. Simplify training event handling** — duplicate pointer bindings removed; awaiting review
 
   Review dual `pointerdown` and `click` bindings on classifier and next-word training buttons. Keep one reliable cross-input path or explicitly suppress duplicate pointer-generated clicks.
 
@@ -562,24 +570,23 @@ This is the controlling work order. The chapter itself is not reordered.
   - Mouse, keyboard, touch, and automation paths work.
   - Running guards remain intact.
 
-- [ ] **26. Validate video and motion behavior** — the forward-pass clip is being reconsidered under A3; validate only clips that remain after review
+- [x] **26. Validate video and motion behavior** — approved and cleaned up
 
-  Check all four MP4 files and posters:
-  - forward pass;
-  - softmax/loss;
-  - backprop blame;
-  - gradient update.
+  Audit the four legacy clips by the unique teaching work they perform:
+  - forward pass and softmax/loss use reversible arithmetic steppers;
+  - gradient descent uses a reversible walkthrough tied to the line lab's current values;
+  - backpropagation uses the 13-step worksheet and live full-network panel.
 
-  Verify controls, keyboard access, poster frames, MIME types, captions, reduced-motion expectations, and readable fallback text when media cannot load.
+  Keep static posters only as temporary inert red review evidence. Remove obsolete MP4/GIF binaries and verify the stronger interactive surfaces instead.
 
   Completion checks:
-  - Every video loads locally.
-  - No autoplay is introduced.
-  - Each clip has a unique teaching purpose.
+  - No active `<video>` element or video asset request remains.
+  - Every temporal mechanism has reversible learner controls or a by-hand worksheet.
+  - Reduced-motion behavior, arithmetic agreement, and responsive containment pass.
 
 ## Phase 6: Strengthen the Final Build
 
-- [ ] **27. Make generalization and overfitting the explicit purpose of Act 1**
+- [~] **27. Make generalization and overfitting the explicit purpose of Act 1** — implemented and awaiting review
 
   Preserve the classifier, noisy-ring experiment, parameter readout, decision map, train/test split, and existing prose.
 
@@ -589,7 +596,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - The recommended overfitting experiment is prominent.
   - The train-test gap is visually and verbally unmistakable.
 
-- [ ] **28. Strengthen the Act 1 -> Act 2 bridge**
+- [~] **28. Strengthen the Act 1 -> Act 2 bridge** — implemented and awaiting review
 
   Explain directly:
   - classifier overfitting means chasing noisy training dots;
@@ -599,7 +606,7 @@ This is the controlling work order. The chapter itself is not reordered.
   Completion checks:
   - Act 2 feels like the payoff of Act 1, not a second unrelated trainer.
 
-- [ ] **29. Add corpus and training transparency**
+- [~] **29. Add corpus and training transparency** — implemented with live counts; awaiting review
 
   Surface or explain:
   - sentence count;
@@ -615,7 +622,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Every readout maps to a concept already introduced.
   - No unexplained magic number remains.
 
-- [ ] **30. Explain epochs, stochastic updates, and mini-batches**
+- [~] **30. Explain epochs, stochastic updates, and mini-batches** — implemented and awaiting review
 
   Connect prose to the actual browser implementation:
   - examples are shuffled each epoch;
@@ -627,7 +634,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - The explanation matches `nwTrainEpochs()` and the classifier trainer.
   - Batch terminology is not introduced without shapes or examples.
 
-- [ ] **31. Add a short optimizer bridge**
+- [~] **31. Add a short optimizer bridge** — implemented as optional depth; awaiting review
 
   Keep vanilla gradient descent as the required mechanism. Add concise optional context:
   - momentum smooths and accumulates direction;
@@ -640,7 +647,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - Explain the problem each optimizer addresses.
   - Do not imply the browser model uses Adam when it does not.
 
-- [ ] **32. Strengthen the Chapter 5 transition**
+- [~] **32. Strengthen the Chapter 5 transition** — implemented and awaiting review
 
   End with the fixed two-word context as the exact limitation. Explain that attention changes how context is gathered while retaining the same embeddings, logits, softmax, cross-entropy, backpropagation, and optimization loop.
 
@@ -649,7 +656,7 @@ This is the controlling work order. The chapter itself is not reordered.
 
 ## Phase 7: References, Verification, and Completion
 
-- [ ] **33. Add the attached PDF as a recommended reference**
+- [~] **33. Add the attached PDF as a recommended reference** — publisher reference staged and awaiting review
 
   Add *Math for Deep Learning* by Ronald T. Kneusel to further reading. Describe the most relevant chapters:
   - linear algebra and matrix multiplication;
@@ -659,7 +666,7 @@ This is the controlling work order. The chapter itself is not reordered.
 
   Do not reproduce copyrighted figures or extended text.
 
-- [ ] **34. Review all formulas and repeated numbers**
+- [~] **34. Review all formulas and repeated numbers** — audit completed; awaiting review
 
   Verify every formula, worked value, label, quiz explanation, worksheet answer, video caption, and live output against `chapter4.js`.
 
@@ -675,7 +682,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - trainer parameter counts;
   - final-model perplexity.
 
-- [ ] **35. Run the complete interaction test matrix**
+- [~] **35. Run the complete interaction test matrix** — matrix completed; awaiting review
 
   Test:
   - every slider and select;
@@ -690,7 +697,7 @@ This is the controlling work order. The chapter itself is not reordered.
   - desktop and mobile overflow;
   - local links and console errors.
 
-- [ ] **36. Final voice, flow, and release review**
+- [~] **36. Final voice, flow, and release review** — review changes staged; release actions wait for approval
 
   Read the chapter linearly as a curious high-school learner.
 
@@ -743,6 +750,6 @@ This is the controlling work order. The chapter itself is not reordered.
 
 ## Recommended Starting Point
 
-Current item: review **Item 8: Teach one matrix multiplication by hand**. After approval and cleanup, continue to **Item 10: Clarify input embeddings versus output scoring weights**. The vector panel remains a documented populated-baseline exception.
+Current item: author review of the final Chapter 4 batch covering Sections 7–9 and whole-chapter readiness. Use the four queue cards at the top of the page to review Act 1, Act 2, references, and release checks.
 
-Items 2-4 are older changes awaiting review. Review them separately when the top-to-bottom queue reaches their affected sections; do not bundle them into another item.
+After approval: clean the remaining red/green markup, rerun focused checks, then separately ask before freezing sections, removing the In Progress treatment, deleting this plan, committing, pushing, or publishing.

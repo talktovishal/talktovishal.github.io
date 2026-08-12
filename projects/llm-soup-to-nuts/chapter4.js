@@ -58,6 +58,16 @@ const dom = {
   gradientStatus: document.getElementById("gradientStatus"),
   gradientMetrics: document.getElementById("gradientMetrics"),
   gradientExplanation: document.getElementById("gradientExplanation"),
+  gradientRunNote: document.getElementById("gradientRunNote"),
+  gradientStepTitle: document.getElementById("gradient-step-title"),
+  gradientStepCopy: document.getElementById("gradientStepCopy"),
+  gradientStepCount: document.getElementById("gradientStepCount"),
+  gradientStepPanel: document.getElementById("gradientStepPanel"),
+  gradientBackButton: document.getElementById("gradientBackButton"),
+  gradientPlayButton: document.getElementById("gradientPlayButton"),
+  gradientNextButton: document.getElementById("gradientNextButton"),
+  gradientReplayButton: document.getElementById("gradientReplayButton"),
+  gradientStepButtons: Array.from(document.querySelectorAll("[data-gradient-step]")),
   logitA: document.getElementById("logitA"),
   logitB: document.getElementById("logitB"),
   logitC: document.getElementById("logitC"),
@@ -70,7 +80,16 @@ const dom = {
   softmaxLossLabel: document.getElementById("softmaxLossLabel"),
   correctClassSelect: document.getElementById("correctClassSelect"),
   softmaxPanel: document.getElementById("softmaxPanel"),
-  backpropPanel: document.getElementById("backpropPanel"),
+  softmaxNarrative: document.getElementById("softmaxNarrative"),
+  softmaxStepTitle: document.getElementById("softmax-step-title"),
+  softmaxStepCopy: document.getElementById("softmaxStepCopy"),
+  softmaxStepCount: document.getElementById("softmaxStepCount"),
+  softmaxStepPanel: document.getElementById("softmaxStepPanel"),
+  softmaxBackButton: document.getElementById("softmaxBackButton"),
+  softmaxPlayButton: document.getElementById("softmaxPlayButton"),
+  softmaxNextButton: document.getElementById("softmaxNextButton"),
+  softmaxReplayButton: document.getElementById("softmaxReplayButton"),
+  softmaxStepButtons: Array.from(document.querySelectorAll("[data-softmax-step]")),
   forwardCtxA: document.getElementById("forwardCtxA"),
   forwardCtxB: document.getElementById("forwardCtxB"),
   activationSelect: document.getElementById("activationSelect"),
@@ -81,6 +100,7 @@ const dom = {
   forwardSummary: document.getElementById("forwardSummary"),
   forwardPanel: document.getElementById("forwardPanel"),
   matrixMultiplyPanel: document.getElementById("matrixMultiplyPanel"),
+  scoringRolesPanel: document.getElementById("scoringRolesPanel"),
   forwardStepTitle: document.getElementById("forward-step-title"),
   forwardStepCopy: document.getElementById("forwardStepCopy"),
   forwardStepCount: document.getElementById("forwardStepCount"),
@@ -160,7 +180,12 @@ const dom = {
   nwProgressBar: document.getElementById("nwProgressBar"),
   nwWatchPanel: document.getElementById("nwWatchPanel"),
   nwCorpusPreview: document.getElementById("nwCorpusPreview"),
-  nwCorpusCount: document.getElementById("nwCorpusCount")
+  nwCorpusCount: document.getElementById("nwCorpusCount"),
+  nwTrainingSentenceCount: document.getElementById("nwTrainingSentenceCount"),
+  nwTrainingExampleCount: document.getElementById("nwTrainingExampleCount"),
+  nwTrainingExampleCountInline: document.getElementById("nwTrainingExampleCountInline"),
+  nwTrainingVocabCount: document.getElementById("nwTrainingVocabCount"),
+  nwTrainingParamCount: document.getElementById("nwTrainingParamCount")
 };
 
 const probabilityPresets = {
@@ -212,6 +237,7 @@ const softmaxNames = ["sat", "ran", "slept"];
 const state = {
   probabilityPreset: "cat",
   autoLineTimer: null,
+  autoLineRun: null,
   network: null,
   data: null,
   dataSeed: 41,
@@ -222,6 +248,10 @@ const state = {
   hasExploredProbability: true,
   hasExploredGradient: false,
   hasTrainedNetwork: false,
+  gradientWalkthroughStep: 0,
+  gradientWalkthroughTimer: null,
+  softmaxStep: 0,
+  softmaxPlayTimer: null,
   forwardFocus: null,
   forwardCandidateFocus: null,
   forwardStep: 0,
@@ -577,8 +607,132 @@ function lineLossAndGradients(w, b) {
   return { loss: loss / n, dw: dw / n, db: db / n };
 }
 
+const gradientWalkthroughMeta = [
+  { title: "Measure the current mistake", copy: "Start from the line's current slope and intercept, then compress all six point errors into one MSE loss." },
+  { title: "Calculate one gradient per knob", copy: "Average the six point contributions to learn which uphill direction belongs to the slope and which belongs to the intercept." },
+  { title: "Plan the opposite, downhill move", copy: "Multiply each gradient by the learning rate and subtract it from the matching knob. This previews the update without applying it." },
+  { title: "Check the predicted result", copy: "Recompute MSE with the planned slider values. A useful step lowers loss; an oversized step can raise it." }
+];
+
+function stopGradientWalkthroughPlayback() {
+  if (state.gradientWalkthroughTimer) {
+    window.clearInterval(state.gradientWalkthroughTimer);
+    state.gradientWalkthroughTimer = null;
+  }
+  if (dom.gradientPlayButton) dom.gradientPlayButton.textContent = "Play";
+}
+
+function setGradientWalkthroughStep(nextStep, { keepPlaying = false } = {}) {
+  state.gradientWalkthroughStep = clamp(nextStep, 0, gradientWalkthroughMeta.length - 1);
+  if (!keepPlaying) stopGradientWalkthroughPlayback();
+  renderGradient();
+}
+
+function toggleGradientWalkthroughPlayback() {
+  if (state.gradientWalkthroughTimer) {
+    stopGradientWalkthroughPlayback();
+    return;
+  }
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setGradientWalkthroughStep(gradientWalkthroughMeta.length - 1);
+    return;
+  }
+  if (state.gradientWalkthroughStep >= gradientWalkthroughMeta.length - 1) state.gradientWalkthroughStep = 0;
+  dom.gradientPlayButton.textContent = "Pause";
+  renderGradient();
+  state.gradientWalkthroughTimer = window.setInterval(() => {
+    if (state.gradientWalkthroughStep >= gradientWalkthroughMeta.length - 1) {
+      stopGradientWalkthroughPlayback();
+      return;
+    }
+    state.gradientWalkthroughStep += 1;
+    renderGradient();
+  }, 1600);
+}
+
+function resetGradientWalkthrough() {
+  stopGradientWalkthroughPlayback();
+  state.gradientWalkthroughStep = 0;
+  renderGradient();
+}
+
+function gradientComparisonCard(label, w, b, loss, note, className = "") {
+  const card = createElement("article", `gradient-comparison-card ${className}`.trim());
+  card.append(
+    createElement("span", "gradient-comparison-label", label),
+    createElement("code", "", `ŷ = ${formatNumber(w, 2)}x + ${formatNumber(b, 2)}`),
+    createElement("strong", "", `MSE ${formatNumber(loss, 4)}`),
+    createElement("p", "", note)
+  );
+  return card;
+}
+
+function renderGradientWalkthrough({ w, b, lr, info }) {
+  if (!dom.gradientStepPanel) return;
+  const step = clamp(state.gradientWalkthroughStep, 0, gradientWalkthroughMeta.length - 1);
+  const meta = gradientWalkthroughMeta[step];
+  const n = lineData.length;
+  const rows = lineData.map((point) => {
+    const prediction = w * point.x + b;
+    const error = prediction - point.y;
+    return { ...point, prediction, error };
+  });
+  const sumSquaredError = rows.reduce((sum, row) => sum + row.error ** 2, 0);
+  const sumErrorTimesX = rows.reduce((sum, row) => sum + row.error * row.x, 0);
+  const sumError = rows.reduce((sum, row) => sum + row.error, 0);
+  const plannedW = clamp(w - lr * info.dw, -2, 2);
+  const plannedB = clamp(b - lr * info.db, -1, 1);
+  const appliedW = Math.round(plannedW * 100) / 100;
+  const appliedB = Math.round(plannedB * 100) / 100;
+  const nextLoss = lineLossAndGradients(appliedW, appliedB).loss;
+
+  dom.gradientStepTitle.textContent = meta.title;
+  dom.gradientStepCopy.textContent = meta.copy;
+  dom.gradientStepCount.textContent = `step ${step + 1} of ${gradientWalkthroughMeta.length}`;
+  dom.gradientBackButton.disabled = step === 0;
+  dom.gradientNextButton.disabled = step === gradientWalkthroughMeta.length - 1;
+  dom.gradientStepButtons.forEach((button, index) => {
+    const active = index === step;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+
+  const nodes = [];
+  if (step === 0) {
+    nodes.push(forwardExplanation("What is being measured?", `The current line is ŷ = ${formatNumber(w, 2)}x + ${formatNumber(b, 2)}. For each of the ${n} dots, subtract the true y from the line's prediction, square that error, then average.`));
+    nodes.push(forwardResultRow("Add squared errors", rows.map((row) => formatNumber(row.error ** 2, 3)).join(" + "), sumSquaredError, "Every gap contributes positively after squaring."));
+    nodes.push(forwardResultRow("Average the total", `${formatNumber(sumSquaredError, 4)} ÷ ${n}`, info.loss, "This scalar MSE is the mistake we want to lower."));
+    nodes.push(createElement("p", "forward-takeaway", `What we learned: the current slope and intercept produce MSE ${formatNumber(info.loss, 4)}. Loss measures the mistake; it does not yet say how either knob should move.`));
+  } else if (step === 1) {
+    nodes.push(forwardExplanation("Give each knob its own slope", "The slope gradient weights each error by x because changing slope affects distant x-values more. The intercept gradient uses each error directly because changing intercept lifts or lowers the whole line equally."));
+    nodes.push(forwardResultRow("Slope gradient", `(2 ÷ ${n}) × ${formatNumber(sumErrorTimesX, 4)}`, info.dw, "∂L/∂slope: the uphill direction for the line's tilt."));
+    nodes.push(forwardResultRow("Intercept gradient", `(2 ÷ ${n}) × ${formatNumber(sumError, 4)}`, info.db, "∂L/∂intercept: the uphill direction for the line's height."));
+    nodes.push(createElement("p", "forward-takeaway", `What we learned: the gradient vector is [${formatNumber(info.dw, 3)}, ${formatNumber(info.db, 3)}]. Each entry belongs to one trainable knob.`));
+  } else if (step === 2) {
+    nodes.push(forwardExplanation("Subtract, because the gradient points uphill", `The learning rate η = ${formatNumber(lr, 2)} scales both moves. A negative gradient makes subtraction increase that knob; a positive gradient makes subtraction decrease it.`));
+    nodes.push(forwardResultRow("Plan new slope", `${formatNumber(w, 2)} − ${formatNumber(lr, 2)} × ${signedFactor(info.dw, 3)}`, plannedW, `The slider stores two decimals, so applying the step uses ${formatNumber(appliedW, 2)}.`));
+    nodes.push(forwardResultRow("Plan new intercept", `${formatNumber(b, 2)} − ${formatNumber(lr, 2)} × ${signedFactor(info.db, 3)}`, plannedB, `The slider stores two decimals, so applying the step uses ${formatNumber(appliedB, 2)}.`));
+    nodes.push(createElement("p", "forward-takeaway", "What we learned: gradient descent applies the gradients; backpropagation or calculus must calculate them first."));
+  } else {
+    nodes.push(forwardExplanation("Did the planned move help?", "Use the exact two-decimal values that the sliders will store, draw the planned line, and recompute the same MSE measurement."));
+    const comparison = createElement("div", "gradient-comparison-grid");
+    const improved = nextLoss < info.loss;
+    comparison.append(
+      gradientComparisonCard("before", w, b, info.loss, "Current slider values."),
+      gradientComparisonCard("after one step", appliedW, appliedB, nextLoss, improved ? "Lower loss: this step heads downhill." : "Higher loss: this step overshoots.", improved ? "is-improved" : "is-worse")
+    );
+    nodes.push(comparison);
+    const change = nextLoss - info.loss;
+    nodes.push(forwardResultRow("Recompute MSE", `${formatNumber(info.loss, 4)} → ${formatNumber(nextLoss, 4)}`, nextLoss, `The change is ${change < 0 ? "a decrease" : "an increase"} of ${formatNumber(Math.abs(change), 4)}.`));
+    nodes.push(createElement("p", "forward-takeaway", improved ? "What we learned: this learning rate produces a useful downhill move. Press Step descent below to apply it." : "What we learned: this learning rate is too aggressive for this position. Lower it before applying the step."));
+  }
+  dom.gradientStepPanel.replaceChildren(...nodes);
+}
+
 function renderGradient() {
   const { w, b, lr } = readLineParams();
+  const info = lineLossAndGradients(w, b);
+  renderGradientWalkthrough({ w, b, lr, info });
   if (!state.hasExploredGradient) {
     dom.gradientStatus.textContent = "press Step";
     renderLineFitPlaceholder();
@@ -586,7 +740,6 @@ function renderGradient() {
     dom.gradientExplanation.replaceChildren();
     return;
   }
-  const info = lineLossAndGradients(w, b);
   dom.gradientStatus.textContent = `MSE ${formatNumber(info.loss, 3)}`;
   renderLineFitSvg(w, b);
   renderMetricCards(dom.gradientMetrics, [
@@ -748,36 +901,195 @@ function stepGradientDescent() {
   dom.slopeSlider.value = Math.round(nextW * 100);
   dom.interceptSlider.value = Math.round(nextB * 100);
   renderGradient();
+  return lineLossAndGradients(Number(dom.slopeSlider.value) / 100, Number(dom.interceptSlider.value) / 100);
 }
 
 function resetGradient() {
   stopAutoGradient();
+  stopGradientWalkthroughPlayback();
+  state.gradientWalkthroughStep = 0;
   dom.slopeSlider.value = -40;
   dom.interceptSlider.value = 20;
   dom.lineRateSlider.value = 8;
   renderGradient();
+  dom.gradientRunNote.textContent = "Reset to the starting line. Auto train remains bounded to 80 steps or 10 seconds.";
 }
 
-function stopAutoGradient() {
+function stopAutoGradient(label = "", message = "") {
   if (state.autoLineTimer) {
     window.clearInterval(state.autoLineTimer);
     state.autoLineTimer = null;
   }
+  state.autoLineRun = null;
   dom.gradientAutoButton.textContent = "Auto train";
+  if (label) dom.gradientStatus.textContent = label;
+  if (message) dom.gradientRunNote.textContent = message;
+}
+
+function runAutoGradientTick() {
+  const run = state.autoLineRun;
+  if (!run) return;
+  const info = stepGradientDescent();
+  run.steps += 1;
+  const elapsed = performance.now() - run.startedAt;
+  const change = Math.abs(run.previousLoss - info.loss);
+  run.stalledSteps = change < 0.000001 ? run.stalledSteps + 1 : 0;
+  run.previousLoss = info.loss;
+
+  if (!Number.isFinite(info.loss) || !Number.isFinite(info.dw) || !Number.isFinite(info.db)) {
+    stopAutoGradient("diverged", `Stopped after ${run.steps} steps because the loss or gradient became non-finite. Reset or lower the step size before trying again.`);
+  } else if (info.loss > Math.max(run.startingLoss * 4, run.startingLoss + 1)) {
+    stopAutoGradient("diverged", `Stopped after ${run.steps} steps because MSE rose from ${formatNumber(run.startingLoss, 4)} to ${formatNumber(info.loss, 4)}. Lower the step size before trying again.`);
+  } else if (info.loss < 0.005 || Math.max(Math.abs(info.dw), Math.abs(info.db)) < 0.005 || run.stalledSteps >= 8) {
+    stopAutoGradient("settled", `Stopped after ${run.steps} steps because the fit settled at MSE ${formatNumber(info.loss, 4)}.`);
+  } else if (run.steps >= 80 || elapsed >= 10000) {
+    stopAutoGradient("limit reached", `Stopped at the safety limit after ${run.steps} steps and MSE ${formatNumber(info.loss, 4)}. You can adjust the step size and start a fresh run.`);
+  } else {
+    dom.gradientStatus.textContent = `auto ${run.steps}/80`;
+    dom.gradientRunNote.textContent = `Running: step ${run.steps} of at most 80, MSE ${formatNumber(info.loss, 4)}. Press Stop at any time.`;
+  }
 }
 
 function toggleAutoGradient() {
   if (state.autoLineTimer) {
-    stopAutoGradient();
+    const steps = state.autoLineRun?.steps || 0;
+    stopAutoGradient("stopped", `Stopped by you after ${steps} automatic step${steps === 1 ? "" : "s"}. Press Auto train to start a fresh bounded run.`);
     return;
   }
+  const { w, b } = readLineParams();
+  const starting = lineLossAndGradients(w, b);
+  state.autoLineRun = {
+    steps: 0,
+    startedAt: performance.now(),
+    startingLoss: starting.loss,
+    previousLoss: starting.loss,
+    stalledSteps: 0
+  };
   dom.gradientAutoButton.textContent = "Stop";
-  state.autoLineTimer = window.setInterval(() => {
-    stepGradientDescent();
-    const { w, b } = readLineParams();
-    const { loss } = lineLossAndGradients(w, b);
-    if (loss < 0.005) stopAutoGradient();
-  }, 180);
+  dom.gradientStatus.textContent = "auto 0/80";
+  dom.gradientRunNote.textContent = `Auto train started at MSE ${formatNumber(starting.loss, 4)}. It will stop when the fit settles, diverges, reaches 80 steps, or reaches 10 seconds.`;
+  state.autoLineTimer = window.setInterval(runAutoGradientTick, 180);
+}
+
+const softmaxStepMeta = [
+  { title: "Scale the logits with temperature", copy: "Divide every raw logit by the same temperature. This changes how far apart the scores feel without changing their order." },
+  { title: "Subtract the largest scaled score", copy: "Shift every scaled score by the same amount. Their differences stay identical, but the largest shifted score becomes 0." },
+  { title: "Exponentiate the shifted scores", copy: "Exponentials turn every shifted score into a positive amount. Larger shifted scores receive larger amounts." },
+  { title: "Normalize, then measure the true word", copy: "Divide each positive amount by their total to get probabilities, then read the true word's negative log probability as cross-entropy loss." }
+];
+
+function stopSoftmaxPlayback() {
+  if (state.softmaxPlayTimer) {
+    clearInterval(state.softmaxPlayTimer);
+    state.softmaxPlayTimer = null;
+  }
+  if (dom.softmaxPlayButton) dom.softmaxPlayButton.textContent = "Play";
+}
+
+function setSoftmaxStep(nextStep, { keepPlaying = false } = {}) {
+  state.softmaxStep = clamp(nextStep, 0, softmaxStepMeta.length - 1);
+  if (!keepPlaying) stopSoftmaxPlayback();
+  renderSoftmax();
+}
+
+function toggleSoftmaxPlayback() {
+  if (state.softmaxPlayTimer) {
+    stopSoftmaxPlayback();
+    return;
+  }
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setSoftmaxStep(softmaxStepMeta.length - 1);
+    return;
+  }
+  if (state.softmaxStep >= softmaxStepMeta.length - 1) state.softmaxStep = 0;
+  dom.softmaxPlayButton.textContent = "Pause";
+  renderSoftmax();
+  state.softmaxPlayTimer = setInterval(() => {
+    if (state.softmaxStep >= softmaxStepMeta.length - 1) {
+      stopSoftmaxPlayback();
+      return;
+    }
+    state.softmaxStep += 1;
+    renderSoftmax();
+  }, 1600);
+}
+
+function resetSoftmaxWalkthrough() {
+  stopSoftmaxPlayback();
+  state.softmaxStep = 0;
+  renderSoftmax();
+}
+
+function softmaxNumberRows(labels, columns) {
+  const table = createElement("div", "softmax-number-table");
+  const header = createElement("div", "softmax-number-row softmax-number-head");
+  header.append(createElement("strong", "", "candidate"));
+  columns.forEach((column) => header.append(createElement("span", "", column.label)));
+  table.append(header);
+  labels.forEach((label, index) => {
+    const row = createElement("div", "softmax-number-row");
+    row.append(createElement("strong", "", label));
+    columns.forEach((column) => row.append(createElement("code", column.className || "", column.values[index])));
+    table.append(row);
+  });
+  return table;
+}
+
+function renderSoftmaxStep({ logits, temperature, scaled, maxScaled, shifted, exponentials, exponentialTotal, probabilities, correctName, correctIndex, loss }) {
+  const step = clamp(state.softmaxStep, 0, softmaxStepMeta.length - 1);
+  const meta = softmaxStepMeta[step];
+  dom.softmaxStepTitle.textContent = meta.title;
+  dom.softmaxStepCopy.textContent = meta.copy;
+  dom.softmaxStepCount.textContent = `step ${step + 1} of ${softmaxStepMeta.length}`;
+  dom.softmaxBackButton.disabled = step === 0;
+  dom.softmaxNextButton.disabled = step === softmaxStepMeta.length - 1;
+  dom.softmaxStepButtons.forEach((button, index) => {
+    const active = index === step;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+
+  const nodes = [];
+  if (step === 0) {
+    nodes.push(forwardExplanation("What temperature does", `For each candidate, compute scaled score s = z ÷ T. Here T = ${formatNumber(temperature, 2)}. The same divisor applies to every logit, so their ranking is unchanged.`));
+    nodes.push(softmaxNumberRows(softmaxNames, [
+      { label: "raw logit z", values: logits.map((value) => formatNumber(value, 3)) },
+      { label: `z ÷ ${formatNumber(temperature, 2)}`, values: scaled.map((value) => formatNumber(value, 3)) }
+    ]));
+    nodes.push(createElement("p", "forward-takeaway", temperature < 1 ? "Lower temperature spreads the scaled scores farther apart, preparing a sharper distribution." : temperature > 1 ? "Higher temperature pulls the scaled scores closer together, preparing a flatter distribution." : "At T = 1, the scaled scores equal the original logits."));
+  } else if (step === 1) {
+    nodes.push(forwardExplanation("Why subtract the maximum", `The largest scaled score is m = ${formatNumber(maxScaled, 3)}. Subtract m from every scaled score. The winner becomes 0 and every other value becomes non-positive, which keeps exponentials in a safe numeric range.`));
+    nodes.push(softmaxNumberRows(softmaxNames, [
+      { label: "scaled score s", values: scaled.map((value) => formatNumber(value, 3)) },
+      { label: "s - m", values: shifted.map((value) => formatNumber(value, 3)) }
+    ]));
+    const beforeGap = scaled[0] - scaled[1];
+    const afterGap = shifted[0] - shifted[1];
+    nodes.push(forwardResultRow("Gap check", `${formatNumber(scaled[0], 3)} - ${formatNumber(scaled[1], 3)} = ${formatNumber(beforeGap, 3)}; after shifting: ${formatNumber(shifted[0], 3)} - ${formatNumber(shifted[1], 3)}`, afterGap, "The gap is unchanged, so Softmax probabilities will be unchanged."));
+  } else if (step === 2) {
+    nodes.push(forwardExplanation("Turn scores into positive amounts", "Apply the exponential to each shifted score. Every amount is now positive, and the largest shifted score 0 becomes exactly e⁰ = 1."));
+    nodes.push(softmaxNumberRows(softmaxNames, [
+      { label: "shifted score", values: shifted.map((value) => formatNumber(value, 3)) },
+      { label: "exp(shifted)", values: exponentials.map((value) => formatNumber(value, 3)), className: "is-positive" }
+    ]));
+    nodes.push(forwardResultRow("Add the positive amounts", exponentials.map((value) => formatNumber(value, 3)).join(" + "), exponentialTotal, "This total becomes the denominator for every probability."));
+  } else {
+    nodes.push(forwardExplanation("Make a probability distribution", "Divide every positive amount by their shared total. The results are positive, preserve the logit ranking, and add to 1."));
+    nodes.push(softmaxNumberRows(softmaxNames, [
+      { label: "positive amount", values: exponentials.map((value) => formatNumber(value, 3)) },
+      { label: "probability q", values: probabilities.map((value) => formatNumber(value, 3)), className: "is-positive" }
+    ]));
+    const probabilityTotal = probabilities.reduce((sum, value) => sum + value, 0);
+    nodes.push(forwardResultRow("Probability check", probabilities.map((value) => formatNumber(value, 3)).join(" + "), probabilityTotal, "The probabilities add to 1 (up to displayed rounding)."));
+    const lossBlock = createElement("section", "softmax-loss-worked");
+    lossBlock.append(
+      createElement("h4", "", `Cross-entropy reads the true word: “${correctName}”`),
+      createElement("p", "", `Softmax gives “${correctName}” probability ${formatNumber(probabilities[correctIndex], 3)}. Loss asks how surprising that true outcome was.`),
+      createElement("code", "", `L = -ln(q_true) = -ln(${formatNumber(probabilities[correctIndex], 6)}) = ${formatNumber(loss, 3)} nats`)
+    );
+    nodes.push(lossBlock, createElement("p", "forward-takeaway", "What we learned: logits are now a probability distribution, and the true word's probability has become one complete cross-entropy loss number. Backpropagation later calculates the derivative of this loss; it does not replace or finish the loss calculation."));
+  }
+  dom.softmaxStepPanel.replaceChildren(...nodes);
 }
 
 function renderSoftmax() {
@@ -788,7 +1100,11 @@ function renderSoftmax() {
   ];
   const temperature = Number(dom.temperatureSlider.value) / 100;
   const scaled = logits.map((value) => value / temperature);
-  const probabilities = softmax(scaled);
+  const maxScaled = Math.max(...scaled);
+  const shifted = scaled.map((value) => value - maxScaled);
+  const exponentials = shifted.map((value) => Math.exp(value));
+  const exponentialTotal = exponentials.reduce((sum, value) => sum + value, 0);
+  const probabilities = exponentials.map((value) => value / exponentialTotal);
   const correctName = dom.correctClassSelect.value;
   const correctIndex = softmaxNames.indexOf(correctName);
   const loss = -Math.log(Math.max(probabilities[correctIndex], 1e-9));
@@ -814,26 +1130,8 @@ function renderSoftmax() {
     );
     dom.softmaxPanel.append(row);
   });
-
-  dom.backpropPanel.replaceChildren();
-  probabilities.forEach((probability, index) => {
-    const target = index === correctIndex ? 1 : 0;
-    const scaledGradient = probability - target;
-    const logitGradient = scaledGradient / temperature;
-    const className = index === correctIndex ? "is-answer" : logitGradient > 0.2 ? "is-too-high" : "";
-    const row = createElement("div", `blame-row ${className}`.trim());
-    const track = createElement("div", "softmax-track");
-    const fill = createElement("span");
-    fill.style.width = `${Math.min(Math.abs(logitGradient) * 100, 100)}%`;
-    track.append(fill);
-    const direction = logitGradient < 0 ? "raise score" : logitGradient > 0 ? "lower score" : "leave alone";
-    row.append(
-      createElement("strong", "", softmaxNames[index]),
-      track,
-      createElement("em", "", `${formatNumber(logitGradient, 3)}: ${direction}`)
-    );
-    dom.backpropPanel.append(row);
-  });
+  dom.softmaxNarrative.textContent = `The true word is “${correctName}”. Softmax assigns it ${formatPercent(probabilities[correctIndex])}, so cross-entropy loss is ${formatNumber(loss, 3)} nats. Drag a score or temperature and replay the four steps to see where that number came from.`;
+  renderSoftmaxStep({ logits, temperature, scaled, maxScaled, shifted, exponentials, exponentialTotal, probabilities, correctName, correctIndex, loss });
 }
 
 function activation(name, value) {
@@ -996,6 +1294,7 @@ function renderForwardPass() {
     step, wordA, wordB, embA, embB, input, inputLabels, activationName, z1, hidden, logits, bestIndex, focus, candidateFocus
   }));
   renderMatrixMultiplyPanel({ wordA, wordB, input, inputLabels, z1 });
+  renderScoringRolesPanel({ wordA, wordB, embA, embB, hidden, logits, candidateFocus });
 }
 
 function activationEffectTag(name, z) {
@@ -1491,6 +1790,71 @@ function renderMatrixMultiplyPanel({ wordA, wordB, input, inputLabels, z1 }) {
   nodes.push(biasStep, createElement("p", "forward-takeaway", `What we learned: W₁e is not new arithmetic. It repeats the dot product from Step 2 once for each hidden-neuron row, producing [${weightedTotals.map((value) => formatNumber(value, 3)).join(", ")}].`));
 
   panel.replaceChildren(...nodes);
+}
+
+function scoringRoleCard(number, title, symbol, values, description, status, className = "") {
+  const card = createElement("article", `scoring-role-card ${className}`.trim());
+  card.append(
+    createElement("span", "scoring-role-number", number),
+    createElement("h4", "", title),
+    createElement("code", "scoring-role-symbol", symbol)
+  );
+  const valueList = createElement("div", "scoring-role-values");
+  values.forEach((value) => valueList.append(createElement("code", "", value)));
+  card.append(valueList, createElement("p", "", description), createElement("strong", "scoring-role-status", status));
+  return card;
+}
+
+function scoringRoleArrow(label) {
+  const arrow = createElement("div", "scoring-role-arrow");
+  arrow.append(createElement("span", "", "→"), createElement("small", "", label));
+  return arrow;
+}
+
+function renderScoringRolesPanel({ wordA, wordB, embA, embB, hidden, logits, candidateFocus }) {
+  if (!dom.scoringRolesPanel) return;
+  const candidate = forwardCandidates[candidateFocus];
+  const outputWeights = forwardW2.map((row) => row[candidateFocus]);
+  const flow = createElement("div", "scoring-role-flow");
+  flow.append(
+    scoringRoleCard(
+      "1",
+      "Input lookup",
+      "embedding table E",
+      [
+        `${wordA} → [${embA.map((value) => formatNumber(value, 2)).join(", ")}]`,
+        `${wordB} → [${embB.map((value) => formatNumber(value, 2)).join(", ")}]`
+      ],
+      "Token IDs select stored rows that represent the context words entering the network.",
+      "Stored learned parameters",
+      "is-input-role"
+    ),
+    scoringRoleArrow("join rows; hidden layer computes"),
+    scoringRoleCard(
+      "2",
+      "Context summary",
+      "hidden state h",
+      [`h = [${hidden.map((value) => formatNumber(value, 3)).join(", ")}]`],
+      `This vector is computed fresh for the current context “${wordA} ${wordB}”. It is not a vocabulary row and is not itself a stored parameter.`,
+      "Computed signal",
+      "is-hidden-role"
+    ),
+    scoringRoleArrow(`score candidate “${candidate}”`),
+    scoringRoleCard(
+      "3",
+      "Output scoring",
+      `candidate scorer for “${candidate}”`,
+      [
+        `W₂ weights = [${outputWeights.map((value) => formatNumber(value, 2)).join(", ")}]`,
+        `b₂ = ${formatNumber(forwardB2[candidateFocus], 2)} → logit = ${formatNumber(logits[candidateFocus], 3)}`
+      ],
+      `These separate output parameters compare h with the candidate “${candidate}” and produce its raw logit.`,
+      "Stored learned parameters",
+      "is-output-role"
+    )
+  );
+  const rule = createElement("p", "scoring-role-rule", "Keep the roles separate: E supplies context-token rows; h is the context-dependent result of computation; W₂ and b₂ score candidate next words. In this toy, the input and output parameter sets are not shared.");
+  dom.scoringRolesPanel.replaceChildren(flow, rule);
 }
 
 function renderNetworkSvg(contextWords, hidden, candidates, logits, opts = {}) {
@@ -2178,7 +2542,7 @@ const byHandSteps = [
     id: "sat-blame",
     phase: "backward pass",
     prompt: "Step 9: find the output blame for \"sat\".",
-    instruction: "Softmax plus cross-entropy gives a very clean output-blame rule. For the true word \"sat\", the target value is 1. What value is <strong>&delta;<sub>sat</sub></strong>, the blame flowing backward from the sat score?",
+    instruction: "Softmax plus cross-entropy gives <strong>&delta;<sub>i</sub> = (q<sub>i</sub> - y<sub>i</sub>) / T</strong> on each original logit. This worksheet uses <strong>T = 1</strong>, so the factor is 1. For the true word \"sat\", the target is 1. What blame flows backward from its score?",
     derivationTitle: "Why is output blame probability minus target?",
     derivation: [
       { type: "p", html: "First name the pieces. <strong>z<sub>word</sub></strong> is a raw score, also called a logit. <strong>q<sub>word</sub></strong> is the probability after softmax. <strong>y<sub>word</sub></strong> is the target label: 1 for the correct word and 0 for every other word. <strong>&delta;<sub>word</sub></strong> is the blame sent backward into that word's raw score." },
@@ -2206,7 +2570,7 @@ const byHandSteps = [
       { type: "code", html: "= -y<sub>i</sub> + q<sub>i</sub>&Sigma;<sub>j</sub>y<sub>j</sub>" },
       { type: "p", html: "For one correct next word, the target vector has exactly one 1, so <strong>&Sigma;<sub>j</sub>y<sub>j</sub> = 1</strong>." },
       { type: "code", html: "&part;L / &part;z<sub>i</sub> = q<sub>i</sub> - y<sub>i</sub>" },
-      { type: "p", html: "That is why the output blame for any word is predicted probability minus target." }
+      { type: "p", html: "That is the blame on the scaled score. If temperature first made <strong>s<sub>i</sub> = z<sub>i</sub> / T</strong>, one final chain-rule factor gives <strong>&part;L / &part;z<sub>i</sub> = (q<sub>i</sub> - y<sub>i</sub>) / T</strong>. Here <strong>T = 1</strong>, so output blame is predicted probability minus target." }
     ],
     answer: byHandValues.outputBlame[0],
     tolerance: 0.005,
@@ -2397,7 +2761,12 @@ function revealByHandSolution() {
 
 function moveByHandStep(delta) {
   const next = clamp(state.byHand.index + delta, 0, byHandSteps.length - 1);
-  if (delta > 0 && !byHandStepDone()) return;
+  if (delta > 0 && !byHandStepDone()) {
+    const step = byHandSteps[state.byHand.index];
+    setByHandFeedback(step, "Before moving on, enter a value and press Check, or use Show solution. Next will unlock when this step is resolved.", "is-guidance");
+    renderByHandLab();
+    return;
+  }
   state.byHand.index = next;
   renderByHandLab();
   dom.byHandAnswer.focus();
@@ -2601,7 +2970,9 @@ function renderByHandLab() {
   setByHandHtml(dom.byHandHintPanel, hintCount > 0 ? step.hints.slice(0, hintCount).join(" ") : "");
   dom.byHandHintButton.disabled = hintCount >= step.hints.length;
   dom.byHandPrevButton.disabled = state.byHand.index === 0;
-  dom.byHandNextButton.disabled = !done || state.byHand.index === byHandSteps.length - 1;
+  dom.byHandNextButton.disabled = state.byHand.index === byHandSteps.length - 1;
+  dom.byHandNextButton.setAttribute("aria-disabled", String(!done || state.byHand.index === byHandSteps.length - 1));
+  dom.byHandNextButton.classList.toggle("is-blocked", !done && state.byHand.index < byHandSteps.length - 1);
   dom.byHandNextButton.textContent = state.byHand.index === byHandSteps.length - 1 ? "Finished" : "Next";
   renderByHandMiniFacts();
   renderByHandSvg(step);
@@ -2751,7 +3122,7 @@ function setTrainingProgress(done, total, phase = "ready") {
     dom.trainingProgressText.textContent = `Epoch ${done} of ${total}. Cross-entropy, accuracy, and the decision map update as the network learns.`;
   } else if (phase === "complete") {
     dom.trainingProgress.querySelector("strong").textContent = "Training complete";
-    dom.trainingProgressText.textContent = `Finished ${total} epochs. Click once again when you want another run.`;
+    dom.trainingProgressText.textContent = `Finished ${total} epoch${total === 1 ? "" : "s"}. Click once again when you want another run.`;
   } else {
     dom.trainingProgress.querySelector("strong").textContent = "Ready to train";
     dom.trainingProgressText.textContent = "One click runs the selected epochs and updates the map as it learns.";
@@ -2881,7 +3252,7 @@ function renderNetworkLab() {
   }
   const summary = networkSummary();
   dom.networkStatus.textContent = state.network.epochs === 0 ? "untrained" : "trained";
-  dom.networkEpochLabel.textContent = `${state.network.epochs} epochs`;
+  dom.networkEpochLabel.textContent = `${state.network.epochs} epoch${state.network.epochs === 1 ? "" : "s"}`;
   renderMetricCards(dom.networkMetrics, [
     {
       label: "train cross-entropy",
@@ -3149,7 +3520,8 @@ function buildNextWordData() {
 
 function nextWordParamCount() {
   const inputDim = NW_DIM * NW_CONTEXT;
-  return nwModel.V * NW_DIM + inputDim * NW_HIDDEN + NW_HIDDEN + NW_HIDDEN * nwModel.V + nwModel.V;
+  const vocabularySize = nwModel?.V ?? nwData.vocab.length;
+  return vocabularySize * NW_DIM + inputDim * NW_HIDDEN + NW_HIDDEN + NW_HIDDEN * vocabularySize + vocabularySize;
 }
 
 function makeNextWordModel(seed) {
@@ -3482,6 +3854,12 @@ function renderCorpusPreview() {
     dom.nwCorpusPreview.append(createElement("code", "", line));
   });
   if (dom.nwCorpusCount) dom.nwCorpusCount.textContent = `${NW_SENTENCES.length} sentences`;
+  const numberFormat = new Intl.NumberFormat("en-US");
+  if (dom.nwTrainingSentenceCount) dom.nwTrainingSentenceCount.textContent = numberFormat.format(NW_SENTENCES.length);
+  if (dom.nwTrainingExampleCount) dom.nwTrainingExampleCount.textContent = numberFormat.format(nwData.examples.length);
+  if (dom.nwTrainingExampleCountInline) dom.nwTrainingExampleCountInline.textContent = numberFormat.format(nwData.examples.length);
+  if (dom.nwTrainingVocabCount) dom.nwTrainingVocabCount.textContent = numberFormat.format(nwData.vocab.length);
+  if (dom.nwTrainingParamCount) dom.nwTrainingParamCount.textContent = numberFormat.format(nextWordParamCount());
 }
 
 function renderNwLossHistory() {
@@ -3604,6 +3982,45 @@ function formatResultValue(key, value) {
   return formatNumber(value, Math.abs(value) < 1 ? 3 : 2);
 }
 
+function renderOutputLossCurve(values) {
+  const losses = values.filter(Number.isFinite);
+  if (losses.length < 2) return null;
+  const width = 360;
+  const height = 126;
+  const padX = 28;
+  const padY = 24;
+  const minLoss = Math.min(...losses);
+  const maxLoss = Math.max(...losses);
+  const range = Math.max(maxLoss - minLoss, 1e-9);
+  const toX = (index) => padX + (index / (losses.length - 1)) * (width - padX * 2);
+  const toY = (loss) => padY + ((maxLoss - loss) / range) * (height - padY * 2);
+
+  const panel = createElement("div", "output-loss-curve");
+  panel.append(createElement("strong", "", "Cross-entropy from epoch 0"));
+  const svg = createSvgElement("svg", {
+    class: "output-loss-spark",
+    viewBox: `0 0 ${width} ${height}`,
+    role: "img",
+    "aria-label": `Cross-entropy falls from ${formatNumber(losses[0], 3)} at epoch 0 to ${formatNumber(losses[losses.length - 1], 3)} after ${losses.length - 1} epochs`
+  });
+  svg.append(
+    createSvgElement("line", { class: "output-loss-axis", x1: padX, y1: height - padY, x2: width - padX, y2: height - padY }),
+    createSvgElement("polyline", {
+      class: "output-loss-line",
+      points: losses.map((loss, index) => `${toX(index)},${toY(loss)}`).join(" ")
+    }),
+    createSvgElement("circle", { class: "output-loss-start", cx: toX(0), cy: toY(losses[0]), r: 4 }),
+    createSvgElement("circle", { class: "output-loss-end", cx: toX(losses.length - 1), cy: toY(losses[losses.length - 1]), r: 4 })
+  );
+  const startLabel = createSvgElement("text", { class: "output-loss-label", x: padX, y: 14, "text-anchor": "start" });
+  startLabel.textContent = `epoch 0: ${formatNumber(losses[0], 3)}`;
+  const endLabel = createSvgElement("text", { class: "output-loss-label", x: width - padX, y: height - 6, "text-anchor": "end" });
+  endLabel.textContent = `epoch ${losses.length - 1}: ${formatNumber(losses[losses.length - 1], 3)}`;
+  svg.append(startLabel, endLabel);
+  panel.append(svg);
+  return panel;
+}
+
 function renderCodeResult(output, result) {
   const data = result && typeof result === "object" ? result : { value: result };
   const status = createElement("div", "output-status");
@@ -3627,6 +4044,11 @@ function renderCodeResult(output, result) {
       metrics.append(item);
     });
     visual.append(metrics);
+  }
+
+  if (Array.isArray(data.lossCurve)) {
+    const curve = renderOutputLossCurve(data.lossCurve);
+    if (curve) visual.append(curve);
   }
 
   if (typeof data.sample === "string") {
@@ -3658,15 +4080,46 @@ function wireEvents() {
   });
   dom.embeddingLookupSelect.addEventListener("change", renderEmbeddingLookup);
   [dom.slopeSlider, dom.interceptSlider, dom.lineRateSlider].forEach((slider) => {
-    slider.addEventListener("input", () => { state.hasExploredGradient = true; renderGradient(); });
+    slider.addEventListener("input", () => {
+      if (state.autoLineTimer) stopAutoGradient("stopped", "Auto train stopped because you changed a control. Press Auto train to begin a fresh bounded run from these values.");
+      state.hasExploredGradient = true;
+      renderGradient();
+    });
   });
   dom.gradientStepButton.addEventListener("click", () => { state.hasExploredGradient = true; stepGradientDescent(); });
   dom.gradientAutoButton.addEventListener("click", () => { state.hasExploredGradient = true; toggleAutoGradient(); });
   dom.gradientResetButton.addEventListener("click", resetGradient);
+  dom.gradientBackButton.addEventListener("click", () => setGradientWalkthroughStep(state.gradientWalkthroughStep - 1));
+  dom.gradientNextButton.addEventListener("click", () => setGradientWalkthroughStep(state.gradientWalkthroughStep + 1));
+  dom.gradientPlayButton.addEventListener("click", toggleGradientWalkthroughPlayback);
+  dom.gradientReplayButton.addEventListener("click", resetGradientWalkthrough);
+  dom.gradientStepButtons.forEach((button) => {
+    button.addEventListener("click", () => setGradientWalkthroughStep(Number(button.dataset.gradientStep)));
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && state.gradientWalkthroughTimer) stopGradientWalkthroughPlayback();
+    if (document.hidden && state.softmaxPlayTimer) stopSoftmaxPlayback();
+    if (document.hidden && state.autoLineTimer) {
+      const steps = state.autoLineRun?.steps || 0;
+      stopAutoGradient("paused", `Auto train stopped after ${steps} steps because the page became inactive.`);
+    }
+  });
+  window.addEventListener("pagehide", () => {
+    stopGradientWalkthroughPlayback();
+    stopSoftmaxPlayback();
+    stopAutoGradient();
+  });
   [dom.logitA, dom.logitB, dom.logitC, dom.temperatureSlider].forEach((slider) => {
     slider.addEventListener("input", renderSoftmax);
   });
   dom.correctClassSelect.addEventListener("change", renderSoftmax);
+  dom.softmaxBackButton.addEventListener("click", () => setSoftmaxStep(state.softmaxStep - 1));
+  dom.softmaxNextButton.addEventListener("click", () => setSoftmaxStep(state.softmaxStep + 1));
+  dom.softmaxPlayButton.addEventListener("click", toggleSoftmaxPlayback);
+  dom.softmaxReplayButton.addEventListener("click", resetSoftmaxWalkthrough);
+  dom.softmaxStepButtons.forEach((button) => {
+    button.addEventListener("click", () => setSoftmaxStep(Number(button.dataset.softmaxStep)));
+  });
   [dom.forwardCtxA, dom.forwardCtxB].forEach((select) => {
     select.addEventListener("change", resetForwardWalkthrough);
   });
@@ -3702,9 +4155,7 @@ function wireEvents() {
   dom.hiddenUnitsSlider.addEventListener("input", () => resetNetwork());
   dom.networkRateSlider.addEventListener("input", renderNetworkControls);
   dom.epochBatchSlider.addEventListener("input", renderNetworkControls);
-  dom.trainOneEpochButton.addEventListener("pointerdown", beginOneEpochTraining);
   dom.trainOneEpochButton.addEventListener("click", beginOneEpochTraining);
-  dom.trainBatchButton.addEventListener("pointerdown", beginBatchTraining);
   dom.trainBatchButton.addEventListener("click", beginBatchTraining);
   dom.resetNetworkButton.addEventListener("click", () => resetNetwork());
   dom.newDataButton.addEventListener("click", () => resetNetwork({ newData: true }));
@@ -3712,9 +4163,7 @@ function wireEvents() {
     select.addEventListener("change", renderNwPrediction);
   });
   dom.nwTempSlider.addEventListener("input", renderNextWordLab);
-  dom.nwTrainButton.addEventListener("pointerdown", beginNextWordTraining);
   dom.nwTrainButton.addEventListener("click", beginNextWordTraining);
-  dom.nwTrainStepButton.addEventListener("pointerdown", beginNextWordStep);
   dom.nwTrainStepButton.addEventListener("click", beginNextWordStep);
   dom.nwResetButton.addEventListener("click", resetNextWord);
   dom.nwGenerateButton.addEventListener("click", handleGenerate);
