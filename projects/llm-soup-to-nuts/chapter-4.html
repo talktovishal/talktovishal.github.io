@@ -43,7 +43,7 @@
   </aside>
 
   <main id="top">
-    <section id="overview" class="workbench-band" aria-labelledby="page-title" frozen="no">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title" frozen="yes">
       <div class="workbench">
         <article class="intro-copy">
           <p class="eyebrow">Learning by doing</p>
@@ -172,7 +172,7 @@
       </div>
     </section>
 
-    <section id="math-toolkit" class="band" aria-labelledby="math-title" frozen="no">
+    <section id="math-toolkit" class="band" aria-labelledby="math-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">1. Surprise and the next word</p>
@@ -467,7 +467,7 @@
       </div>
     </section>
 
-    <section id="vectors" class="band band-muted" aria-labelledby="vectors-title">
+    <section id="vectors" class="band band-muted" aria-labelledby="vectors-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">2. Words as vectors</p>
@@ -658,7 +658,7 @@
       </div>
     </section>
 
-    <section id="neural-networks" class="band" aria-labelledby="nn-title">
+    <section id="neural-networks" class="band" aria-labelledby="nn-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">3. Build the forward pass</p>
@@ -702,7 +702,7 @@
           </p>
         </div>
 
-        <section id="forward-walkthrough" class="forward-walkthrough" aria-labelledby="forward-step-title">
+        <section id="forward-walkthrough" class="forward-walkthrough" aria-labelledby="forward-step-title" frozen="yes">
           <div class="forward-stepper-head">
             <div>
               <p class="eyebrow">Learner-controlled walkthrough</p>
@@ -893,7 +893,7 @@
 
 
 
-    <section id="softmax" class="band band-muted" aria-labelledby="softmax-title">
+    <section id="softmax" class="band band-muted" aria-labelledby="softmax-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">4. Softmax and cross-entropy</p>
@@ -1004,7 +1004,7 @@
           </div>
         </div>
 
-        <section id="softmax-walkthrough" class="softmax-walkthrough" aria-labelledby="softmax-step-title">
+        <section id="softmax-walkthrough" class="softmax-walkthrough" aria-labelledby="softmax-step-title" frozen="yes">
           <div class="forward-stepper-head">
             <div>
               <p class="eyebrow">Learner-controlled walkthrough</p>
@@ -1150,7 +1150,7 @@
       <p>We now have the full forward story: token IDs selected embedding rows, the network produced logits, Softmax made probabilities, and cross-entropy calculated one loss. Nothing has learned yet. The next two sections calculate which way every trainable number should move, then apply those moves.</p>
     </div>
 
-    <section id="gradients" class="band" aria-labelledby="gradients-title">
+    <section id="gradients" class="band" aria-labelledby="gradients-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
 
@@ -1257,7 +1257,7 @@
           </div>
         </div>
 
-        <section id="gradient-walkthrough" class="gradient-walkthrough" aria-labelledby="gradient-step-title">
+        <section id="gradient-walkthrough" class="gradient-walkthrough" aria-labelledby="gradient-step-title" frozen="yes">
           <div class="forward-stepper-head">
             <div>
               <p class="eyebrow">One gradient step, under your control</p>
@@ -1408,7 +1408,7 @@
       </div>
     </section>
 
-    <section id="backpropagation" class="band band-muted" aria-labelledby="backprop-title">
+    <section id="backpropagation" class="band band-muted" aria-labelledby="backprop-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">6. Backpropagation</p>
@@ -1762,7 +1762,7 @@
               subtracting positive competitor gradients lowers theirs.
             </p>
           </div>
-          <section id="backprop-pass-map" class="backprop-pass-map" aria-labelledby="backprop-pass-map-title">
+          <section id="backprop-pass-map" class="backprop-pass-map" aria-labelledby="backprop-pass-map-title" frozen="yes">
             <div class="backprop-pass-map-intro">
               <p class="eyebrow">The whole algorithm at a glance</p>
               <h4 id="backprop-pass-map-title">Forward calculates the loss. Backward calculates every gradient.</h4>
@@ -3021,7 +3021,7 @@
       </div>
     </section>
 
-    <section id="train-lab" class="band" aria-labelledby="train-title">
+    <section id="train-lab" class="band" aria-labelledby="train-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">7. The final build</p>
@@ -3135,7 +3135,7 @@
           <p class="microcopy"><strong>Fixed architecture:</strong> two-token context, 12 numbers per embedding, 24 tanh hidden units, full Softmax over all 512 model tokens, and learning rate 0.015. These are browser-speed choices, not production recommendations.</p>
         </div>
 
-        <section class="trainer nn-trainer" aria-label="Next-word model training controls">
+        <section class="trainer nn-trainer" aria-label="Next-word model training controls" frozen="yes">
           <div class="trainer-head">
             <div>
               <h3>Training controls</h3>
@@ -3239,7 +3239,7 @@
 
 
 
-    <section id="references" class="band" aria-labelledby="references-title">
+    <section id="references" class="band" aria-labelledby="references-title" frozen="yes">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">8. Going deeper</p>
@@ -3293,7 +3293,7 @@
       </div>
     </section>
 
-    <section class="chapter-nav-band" aria-label="Chapter navigation">
+    <section class="chapter-nav-band" aria-label="Chapter navigation" frozen="yes">
       <div class="section-shell">
         <nav class="chapter-nav">
           <a class="chapter-nav-card" href="chapter-3.html">
