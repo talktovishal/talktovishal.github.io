@@ -1,0 +1,426 @@
+:root {
+  --print-ink: #171512;
+  --print-muted: #5f5a53;
+  --print-line: #b9b1a7;
+  --print-green: #27664a;
+  --print-green-soft: #edf5ef;
+  --print-gold-soft: #fff7df;
+  --print-coral-soft: #fff0eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.print-builder-page {
+  margin: 0;
+  background: #f4f1ea;
+  color: var(--print-ink);
+}
+
+.print-build-status {
+  display: grid;
+  gap: 4px;
+  width: min(760px, calc(100% - 32px));
+  margin: 48px auto;
+  padding: 18px 20px;
+  border: 1px solid var(--print-line);
+  background: #fff;
+}
+
+.print-builder-page.is-ready .print-build-status,
+.print-source-frame {
+  display: none;
+}
+
+.print-edition {
+  display: none;
+  width: min(900px, calc(100% - 32px));
+  margin: 24px auto 72px;
+  background: #fff;
+}
+
+.print-builder-page.is-ready .print-edition {
+  display: block;
+}
+
+.print-cover {
+  display: grid;
+  align-content: center;
+  min-height: 820px;
+  padding: 72px 64px;
+  border-top: 10px solid var(--print-green);
+}
+
+.print-cover .eyebrow {
+  color: var(--print-green);
+}
+
+.print-cover h1 {
+  max-width: 760px;
+  margin: 12px 0 18px;
+  font-size: 3rem;
+  letter-spacing: 0;
+  line-height: 1.02;
+}
+
+.print-cover-deck {
+  max-width: 680px;
+  color: var(--print-muted);
+  font-size: 1.2rem;
+  line-height: 1.55;
+}
+
+.print-live-link {
+  margin-top: 28px;
+  padding: 14px 16px;
+  border-left: 4px solid var(--print-green);
+  background: var(--print-green-soft);
+}
+
+.print-live-link a {
+  color: #174f38;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+}
+
+.print-toc {
+  padding: 42px 56px;
+  border-top: 1px solid var(--print-line);
+  border-bottom: 1px solid var(--print-line);
+}
+
+.print-toc ol {
+  columns: 2;
+  column-gap: 38px;
+  padding-left: 22px;
+}
+
+.print-toc li {
+  break-inside: avoid;
+  margin: 0 0 10px;
+}
+
+.print-toc a {
+  color: var(--print-ink);
+  text-decoration: none;
+}
+
+.print-chapter {
+  padding: 0 42px 48px;
+}
+
+.print-chapter > section {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.print-transcript {
+  margin: 24px 0;
+  padding: 20px;
+  border: 1px solid var(--print-line);
+  background: #fff;
+}
+
+.print-transcript-head {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--print-green);
+}
+
+.print-transcript-head h3 {
+  margin: 3px 0 6px;
+}
+
+.print-state-list {
+  display: grid;
+  gap: 14px;
+}
+
+.print-state {
+  break-inside: avoid;
+  padding: 14px;
+  border: 1px solid var(--print-line);
+  border-left: 4px solid var(--print-green);
+  background: #fff;
+}
+
+.print-state h4 {
+  margin: 0 0 5px;
+  color: var(--print-ink);
+  font-size: 1.02rem;
+  letter-spacing: 0;
+}
+
+.print-state-copy {
+  margin: 0 0 10px;
+  color: var(--print-muted);
+  font-size: 0.9rem;
+}
+
+.print-state .forward-panel,
+.print-state .softmax-step-panel,
+.print-state .gradient-step-panel {
+  margin-top: 8px;
+}
+
+.print-worksheet-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.print-worksheet-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.print-worksheet-step {
+  break-inside: avoid;
+  padding: 12px;
+  border: 1px solid var(--print-line);
+  background: #fff;
+}
+
+.print-worksheet-step h4 {
+  margin: 4px 0 6px;
+  font-size: 0.98rem;
+}
+
+.print-worksheet-step .by-hand-feedback {
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--print-green-soft);
+}
+
+.print-quiz-answer {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border-left: 3px solid var(--print-green);
+  background: var(--print-green-soft);
+}
+
+.print-correct-answer {
+  border-color: var(--print-green) !important;
+  background: var(--print-green-soft) !important;
+  color: #174f38 !important;
+  font-weight: 850;
+}
+
+.print-interactive-note {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--print-green);
+  background: var(--print-green-soft);
+  color: #174f38;
+  font-size: 0.86rem;
+}
+
+.print-edition :is(button, input, select, textarea, .stepper-row, .forward-step-jumps, .softmax-step-jumps, .gradient-step-jumps, .quiz-skip, .feedback-fab) {
+  display: none !important;
+}
+
+.print-edition .range-row,
+.print-edition .select-row,
+.print-edition .number-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.print-edition details {
+  display: block;
+}
+
+.print-edition details > summary {
+  display: none;
+}
+
+.print-edition details > *:not(summary) {
+  display: block !important;
+}
+
+.print-edition .code-quiz {
+  break-inside: avoid;
+}
+
+.print-edition .quiz-options {
+  display: grid !important;
+}
+
+.print-edition .quiz-option {
+  display: block !important;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--print-line);
+  text-align: left;
+}
+
+.print-edition .quiz-feedback {
+  display: none !important;
+}
+
+.print-edition :is(figure, table, .metric-card-grid, .formula-stack, .reference-list li) {
+  break-inside: avoid;
+}
+
+.print-edition .lesson-toc,
+.print-edition .topbar,
+.print-edition .chapter-nav-band,
+.print-edition .progress-banner {
+  display: none !important;
+}
+
+.print-edition a::after {
+  content: none;
+}
+
+.print-failure {
+  margin: 48px;
+  padding: 20px;
+  border: 2px solid #b03d28;
+  background: var(--print-coral-soft);
+}
+
+@page {
+  size: letter;
+  margin: 0.55in 0.5in 0.65in;
+}
+
+@media print {
+  html,
+  body,
+  .print-builder-page {
+    background: #fff !important;
+    color: #111 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-edition {
+    display: block !important;
+    width: auto;
+    margin: 0;
+  }
+
+  .print-chapter {
+    font-size: 9.4pt;
+    line-height: 1.4;
+  }
+
+  .print-chapter :is(p, li, dd, dt) {
+    line-height: 1.4;
+  }
+
+  .print-chapter p {
+    margin-top: 0.45em;
+    margin-bottom: 0.55em;
+  }
+
+  .print-chapter h2 {
+    font-size: 17pt;
+    line-height: 1.12;
+  }
+
+  .print-chapter h3 {
+    font-size: 13pt;
+    line-height: 1.18;
+  }
+
+  .print-chapter h4 {
+    font-size: 10.5pt;
+    line-height: 1.2;
+  }
+
+  .print-chapter :is(code, pre, .formula-stack) {
+    font-size: 8.5pt;
+  }
+
+  .print-chapter :is(.section-shell, .workbench) {
+    width: 100%;
+    max-width: none;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .print-chapter :is(.band, .workbench-band) {
+    padding-top: 0.22in;
+    padding-bottom: 0.22in;
+  }
+
+  .print-chapter :is(.panel, .worked-example, .math-formal, .example-note, .insight-note) {
+    padding: 10px 12px;
+  }
+
+  .print-chapter :is(figure, .formula-stack, .symbol-glossary) {
+    margin-top: 0.55em;
+    margin-bottom: 0.65em;
+  }
+
+  .print-chapter .katex-display {
+    margin-top: 0.55em;
+    margin-bottom: 0.55em;
+  }
+
+  .print-live-link,
+  .print-interactive-note {
+    padding: 8px 10px;
+  }
+
+  .print-transcript {
+    padding: 14px;
+  }
+
+  .print-state-list {
+    gap: 10px;
+  }
+
+  .print-state {
+    padding: 10px 11px;
+  }
+
+  .print-worksheet-steps {
+    gap: 8px;
+  }
+
+  .print-worksheet-step {
+    padding: 9px;
+  }
+
+  .print-cover {
+    min-height: 9.2in;
+    break-after: page;
+  }
+
+  .print-toc {
+    break-after: page;
+  }
+
+  .print-chapter {
+    padding: 0;
+  }
+
+  .print-chapter > section {
+    break-before: page;
+  }
+
+  .print-chapter > section:first-child {
+    break-before: auto;
+  }
+
+  .print-transcript {
+    break-before: page;
+  }
+
+  .print-state,
+  .print-worksheet-step,
+  .print-edition .code-quiz {
+    break-inside: avoid;
+  }
+
+  .print-builder-page:not(.is-ready) .print-build-status {
+    display: block;
+  }
+}
