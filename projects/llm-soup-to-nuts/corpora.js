@@ -1,7 +1,7 @@
 window.LESSON_CORPORA = [
   {
     "id": "alice-gutenberg-sample",
-    "title": "Alice in Wonderland sample",
+    "title": "Alice’s Adventures in Wonderland (complete)",
     "author": "Lewis Carroll",
     "sourceName": "Public-domain text source",
     "sourceUrl": "https://www.gutenberg.org/ebooks/11",

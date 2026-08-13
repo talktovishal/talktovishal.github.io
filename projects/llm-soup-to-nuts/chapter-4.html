@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260726">
-  <link rel="stylesheet" href="chapter4.css?v=20260811s">
-  <link rel="stylesheet" href="review-diff.css?v=20260808b">
+  <link rel="stylesheet" href="chapter4.css?v=20260812z">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -38,72 +37,12 @@
       <a href="#softmax"><span>04</span>Softmax and cross-entropy</a>
       <a href="#gradients"><span>05</span>Gradients, gradient descent, and loss</a>
       <a href="#backpropagation"><span>06</span>Backpropagation</a>
-      <a href="#warmup-lab"><span>07</span>The final build, in two acts</a>
-      <a href="#train-lab"><span>08</span>The same loop on real words</a>
-      <a href="#references"><span>09</span>Going deeper</a>
+      <a href="#train-lab"><span>07</span>Train on a real book</a>
+      <a href="#references"><span>08</span>Going deeper</a>
     </nav>
   </aside>
 
   <main id="top">
-    <div class="progress-banner" role="status">
-      <span class="progress-banner-badge">In Progress</span>
-      <p class="progress-banner-text">This chapter is still being written and reviewed, so it is not finished yet and parts may be rough or change. <a href="index.html#stay-notified">Get notified</a> when it is officially published.</p>
-    </div>
-    <aside class="review-queue" aria-labelledby="review-queue-title">
-      <div class="review-queue-inner">
-        <p class="eyebrow">Final changes awaiting review</p>
-        <h2 id="review-queue-title">Sections 7–9 and whole-chapter checks</h2>
-        <p class="review-queue-intro">The conceptual core through Backpropagation is approved. These final cards cover the two-act build, trainer behavior, further reading, and release readiness.</p>
-        <article id="section-7-review" class="review-comparison" aria-labelledby="section-7-review-title">
-          <div class="review-comparison-meta">
-            <strong>Affected area: 7. The final build, Act 1</strong>
-            <a href="#warmup-lab">Jump to Act 1</a>
-          </div>
-          <p class="eyebrow">Act 1 batch - make generalization the new idea</p>
-          <h4 id="section-7-review-title">Keep the classifier because it makes overfitting visible</h4>
-          <div class="review-diff-demo-grid">
-            <div class="review-block review-remove" inert><strong>Earlier emphasis</strong><p>The learner could read Act 1 as another generic “watch a network train” lab, and reset behavior was implicit.</p></div>
-            <div class="review-block review-add"><strong>Proposed emphasis</strong><p>Name generalization as the one new concept, connect a wiggly boundary to memorization, and state exactly what Reset network and New data split clear.</p></div>
-          </div>
-        </article>
-        <article id="section-8-review" class="review-comparison" aria-labelledby="section-8-review-title">
-          <div class="review-comparison-meta">
-            <strong>Affected area: 8. The same loop on real words</strong>
-            <a href="#train-lab">Jump to Act 2</a>
-          </div>
-          <p class="eyebrow">Act 2 batch - make every training number explain itself</p>
-          <h4 id="section-8-review-title">Expose the corpus, model, epoch, update rule, optimizer, and honest baseline</h4>
-          <div class="review-diff-demo-grid">
-            <div class="review-block review-remove" inert><strong>Earlier behavior</strong><p>The lab said “dozens,” “a few thousand,” and “each pass,” while the code cell called epoch 1 its starting loss and trainer buttons had duplicate pointer/click bindings.</p></div>
-            <div class="review-block review-add"><strong>Proposed behavior</strong><p>Show live counts, define epoch/SGD/mini-batch, explain the vanilla optimizer and alternatives, record epoch 0 in the code cell, render its loss curve, simplify training events, and make reset behavior explicit.</p></div>
-          </div>
-        </article>
-        <article id="section-9-review" class="review-comparison" aria-labelledby="section-9-review-title">
-          <div class="review-comparison-meta">
-            <strong>Affected area: 9. Going deeper</strong>
-            <a href="#references">Jump to references</a>
-          </div>
-          <p class="eyebrow">References batch - add the book that grounded the math audit</p>
-          <h4 id="section-9-review-title">Recommend Math for Deep Learning without reproducing it</h4>
-          <div class="review-diff-demo-grid">
-            <div class="review-block review-remove" inert><strong>Earlier list</strong><p>The references linked papers and tutorials but omitted Ronald T. Kneusel’s book.</p></div>
-            <div class="review-block review-add"><strong>Proposed list</strong><p>Add the publisher page and point readers to linear algebra, differential and matrix calculus, backpropagation, gradient descent, and optimizers.</p></div>
-          </div>
-        </article>
-        <article id="chapter-final-review" class="review-comparison" aria-labelledby="chapter-final-review-title">
-          <div class="review-comparison-meta">
-            <strong>Affected area: whole chapter</strong>
-            <a href="#overview">Jump to the beginning</a>
-          </div>
-          <p class="eyebrow">Release gate - verification now, publication after approval</p>
-          <h4 id="chapter-final-review-title">Formula, interaction, voice, reset, and responsive checks are staged together</h4>
-          <div class="review-diff-demo-grid">
-            <div class="review-block review-remove" inert><strong>Earlier state</strong><p>Several completed teaching changes remained unchecked in the work plan, and the final trainers had not received one consolidated reset/event/formula pass.</p></div>
-            <div class="review-block review-add"><strong>Proposed state</strong><p>Close verified checklist lag, decline the floating calculator as unnecessary chrome, and record the complete test matrix. Freezing, removing the In Progress banner, deleting the plan, committing, and publishing still wait for explicit approval.</p></div>
-          </div>
-        </article>
-      </div>
-    </aside>
     <section id="overview" class="workbench-band" aria-labelledby="page-title" frozen="no">
       <div class="workbench">
         <article class="intro-copy">
@@ -293,9 +232,10 @@
             rewrites this cross-entropy metric on a much friendlier, intuitive scale. While "bits of surprise" can feel abstract, perplexity translates those bits back into an effective vocabulary size. Mathematically, it is simply the exponentiation of cross-entropy (e.g., 2<sup>cross-entropy</sup>). If a model has a perplexity of 4 on a given text, it means that, on average, the model felt as confused as if it were choosing blindly between 4 equally likely words. A perfect model that knows exactly what comes next has a perplexity of 1. In this chapter, it stays beside cross-entropy as a readable translation of the same surprise, not as a separate training objective.
           </p>
           <p class="example-note">
-            <em>Now feel it for yourself.</em> The left sliders are the evidence - how
-            often each word actually followed the context. The right sliders are the
-            model's guesses. Drag a guess away from the evidence and watch cross-entropy
+            <em>Now feel it for yourself.</em> The sliders under <strong>Evidence p</strong> are what actually
+            happened - how often each word really followed the context. The sliders under
+            <strong>Model q</strong> are the model's guesses.
+            Drag a guess away from the evidence and watch cross-entropy
             climb; drag it back and watch the surprise fall toward the entropy floor.
             That falling number is exactly what training will do for us, automatically,
             thousands of times over.
@@ -384,7 +324,7 @@
         <div class="math-formal" aria-label="Surprise in symbols">
           <h3>The same idea, in symbols</h3>
           <p>
-            Everything we just discussed has a compact mathematical form. The core building block is the <em>surprise</em> of a single word. <del class="review-remove">If our model assigns a probability \(q\) to a specific word, the surprise of seeing that word is measured as \(-\log_2(q)\) bits.</del> <ins class="review-add">If our model assigns probability \(q\) to a word, its surprise is \(-\log_2(q)\) bits of <em>ideal information</em>. That value can be fractional; it is not claiming that one real codeword or one game of 20 Questions literally uses a fractional question.</ins> Notice how this aligns with our intuition: if the model is highly confident (\(q\) is close to 1), the surprise drops to nearly zero. But if the model thinks a word is almost impossible (\(q\) is close to 0), the resulting surprise penalty is massive.
+            Everything we just discussed has a compact mathematical form. The core building block is the <em>surprise</em> of a single word. If our model assigns probability \(q\) to a word, its surprise is \(-\log_2(q)\) bits of <em>ideal information</em>. That value can be fractional; it is not claiming that one real codeword or one game of 20 Questions literally uses a fractional question. Notice how this aligns with our intuition: if the model is highly confident (\(q\) is close to 1), the surprise drops to nearly zero. But if the model thinks a word is almost impossible (\(q\) is close to 0), the resulting surprise penalty is massive.
           </p>
           <p>
             To evaluate the model's overall performance, we don't just look at one word; we calculate the <em>expected</em> (or average) surprise. We take the surprise of every possible next word and weight it by how often that word <strong>truly</strong> appears in the evidence (\(p\)). Adding all these weighted surprises together gives us the Entropy (if using the true probabilities \(p\) for the surprise) or Cross-Entropy (if using the model's imperfect guesses \(q\) for the surprise):
@@ -533,7 +473,7 @@
           <p class="eyebrow">2. Words as vectors</p>
           <h2 id="vectors-title">Representing words as vectors - a list of numbers.</h2>
           <p>
-            <del class="review-remove">Entrophy</del><ins class="review-add">Entropy</ins> tells us <em>how wrong</em> our guess was. But before the model can
+            Entropy tells us <em>how wrong</em> our guess was. But before the model can
             guess at all, it needs a way to tell words apart - and, more usefully, to
             notice when two words are <em>alike</em>. You already do this without
             thinking: <code>cat</code> and <code>dog</code> feel like cousins, while
@@ -686,7 +626,7 @@
         <div class="math-formal" aria-label="Comparison in symbols">
           <h3>The same comparison, in symbols</h3>
           <p>
-            Why does multiplying and adding numbers measure meaning? <del class="review-remove">Fort now</del><ins class="review-add">For now</ins>, imagine a coordinate trying to measure a hidden trait such as "furriness" or "royalty." Chapter 2's important caveat still applies: real dimensions are not individually labelled features; the useful pattern is distributed across the whole vector. This is just for us to get an intuition. When you multiply matching components, you are checking for shared coordinates. If both <code>cat</code> and <code>dog</code> score high on "furry," multiplying those values produces a large number. Adding these up across all dimensions yields the <strong>dot product</strong>—a raw score of alignment in this intuition.
+            Why does multiplying and adding numbers measure meaning? For now, imagine a coordinate trying to measure a hidden trait such as "furriness" or "royalty." Chapter 2's important caveat still applies: real dimensions are not individually labelled features; the useful pattern is distributed across the whole vector. This is just for us to get an intuition. When you multiply matching components, you are checking for shared coordinates. If both <code>cat</code> and <code>dog</code> score high on "furry," multiplying those values produces a large number. Adding these up across all dimensions yields the <strong>dot product</strong>—a raw score of alignment in this intuition.
           </p>
           <p>
             This mathematical trick wasn't invented for language. In the 1880s, physicists like Josiah Willard Gibbs formulated vector algebra to calculate how much of one physical force aligns with another (like wind pushing against a sail). They proved that the dot product inherently captures the geometric <strong>angle</strong> (\(\theta\)) between two arrows.
@@ -753,7 +693,12 @@
             or MLP.
           </p>
           <p>
-            This is the part of the forward pass we will build in this section: look up an <strong>embedding</strong> row for each context (adjoining) word, join the rows, push them through a hidden layer with an activation, and produce one <strong>logit</strong>, or raw pre-probability score, for each candidate word. Use Back and Next below to inspect every multiply-and-add. Then change the context or activation and replay the same five steps. These weights are fixed and illustrative for now; we will learn to adjust them later.
+            This is the part of the forward pass we will build in this section: look up an <strong>embedding</strong> row for
+            each of the two context words - the two words immediately before the one we are trying to
+            predict - then lay those rows end to end to make a single longer row. That laying-end-to-end move is
+            called <strong>concatenation</strong>, and it is worth knowing by name because you will meet it
+            everywhere; here it turns two 2-number rows into one 4-number input. We then push that input
+            through a hidden layer with an activation, and produce one <strong>logit</strong>, or raw pre-probability score, for each candidate word. Use Back and Next below to inspect every multiply-and-add. Then change the context or activation and replay the same five steps. These weights are fixed and illustrative for now; we will learn to adjust them later.
           </p>
         </div>
 
@@ -851,7 +796,7 @@
             <div id="forwardPanel" class="forward-panel" aria-live="polite"></div>
           </div>
 
-          <div class="model-shape-bridge" aria-label="Bridge from toy network dimensions to Transformer model-card symbols">
+          <div id="shape-bridge" class="model-shape-bridge" aria-label="Bridge from toy network dimensions to Transformer model-card symbols">
           <div>
             <p class="eyebrow">Shape bridge</p>
             <h3>The same math grows into model-card numbers.</h3>
@@ -885,9 +830,9 @@
               <em>real LLMs: dozens or more</em>
             </div>
             <div class="shape-symbol-card">
-              <strong>\(H\)</strong>
-              <span>attention heads in a Transformer block</span>
-              <em>toy: not used yet</em>
+              <strong>\(n_{\text{heads}}\)</strong>
+              <span>attention heads in a Transformer block, often written \(H\) in papers</span>
+              <em>toy: not used yet. Careful: from Section 6 onward this chapter uses \(H\) for the hidden width instead</em>
             </div>
           </div>
           <p class="insight-note">
@@ -916,7 +861,7 @@
           </details>
         </div>
 
-        <div class="math-formal" aria-label="Forward pass in symbols">
+        <div id="forward-symbols" class="math-formal" aria-label="Forward pass in symbols">
           <h3>The whole forward pass, in symbols</h3>
           <p>
             A single neuron takes its inputs \(x\), weights them, adds a bias, and runs
@@ -926,17 +871,22 @@
           <p>
             Stack those into the tiny next-word network. Look up an embedding row for
             each of the two context words and join them, pass through one hidden layer
-            with a \(\tanh\) activation, and produce one raw score per vocabulary word.
+            with the activation \(f\) you picked above, and produce one raw score per vocabulary word.
             The softmax conversion appears in the next section:
           </p>
-          $$e = \big[\,E_{w_1}\,;\,E_{w_2}\,\big] \qquad h = \tanh(W_1 e + b_1)$$
+          $$e = \big[\,E_{w_1}\,;\,E_{w_2}\,\big] \qquad h = f(W_1 e + b_1)$$
           $$z = W_2 h + b_2$$
           <ul class="symbol-glossary">
             <li>\(E_{w}\): the embedding row looked up for word \(w\); \(e\): the two rows joined.</li>
-            <li>\(W_1, b_1\): the hidden layer's weights and bias; \(\tanh\): its activation \(f\).</li>
+            <li>\(W_1, b_1\): the hidden layer's weights and bias; \(f\): its activation.</li>
             <li>\(W_2, b_2\): the output weights and bias that turn the hidden layer into logits \(z\).</li>
             <li>\(z\): one raw logit per candidate word. The next section turns these logits into the model distribution \(q\).</li>
           </ul>
+          <p class="microcopy">
+            Which \(f\)? Whichever one you choose. The walkthrough above starts on ReLU, the backpropagation
+            section stays on ReLU because its slope is a tidy 1 or 0, and the model we train at the end of the
+            chapter uses \(\tanh\). Only \(f\) changes; every other symbol on this page stays exactly where it is.
+          </p>
         </div>
       </div>
     </section>
@@ -1194,7 +1144,7 @@
       </div>
     </section>
 
-    <div class="chapter-midpoint review-block review-add" aria-label="Chapter midpoint">
+    <div class="chapter-midpoint" aria-label="Chapter midpoint">
       <p class="eyebrow">Midpoint: the guess is complete</p>
       <h2>Part A made a guess. Part B will make it learn.</h2>
       <p>We now have the full forward story: token IDs selected embedding rows, the network produced logits, Softmax made probabilities, and cross-entropy calculated one loss. Nothing has learned yet. The next two sections calculate which way every trainable number should move, then apply those moves.</p>
@@ -1471,104 +1421,1056 @@
           </p>
         </div>
 
-        <div class="computational-graph" aria-labelledby="computational-graph-title">
+        <div id="backpropNudgeLab" class="backprop-nudge-lab" aria-labelledby="backprop-nudge-title">
           <div class="section-title-row">
-            <div><p class="eyebrow">One graph, two directions</p><h3 id="computational-graph-title">Each box remembers one local slope.</h3></div>
-            <span class="pill">automatic differentiation</span>
+            <div>
+              <p class="eyebrow">Start with one familiar path</p>
+              <h3 id="backprop-nudge-title">What if we turn just one weight?</h3>
+            </div>
+            <span class="pill">one tiny nudge</span>
           </div>
-          <div class="computational-graph-flow" aria-label="Values flow forward and local derivatives flow backward">
-            <div><strong>\(x\)</strong><span>joined input</span></div><b>&rarr;</b>
-            <div><strong>\(r=W_1x+b_1\)</strong><span>affine operation</span></div><b>&rarr;</b>
-            <div><strong>\(h=f(r)\)</strong><span>activation</span></div><b>&rarr;</b>
-            <div><strong>\(z=W_2h+b_2\)</strong><span>logits</span></div><b>&rarr;</b>
-            <div><strong>\(q=\operatorname{softmax}(z/T)\)</strong><span>probabilities</span></div><b>&rarr;</b>
-            <div><strong>\(L=-\ln q_{true}\)</strong><span>loss</span></div>
+          <figure class="backprop-focus-figure">
+            <svg class="backprop-focus-svg backprop-focus-svg-desktop" viewBox="0 0 900 410" role="img" aria-labelledby="backprop-focus-title backprop-focus-desc">
+              <title id="backprop-focus-title">The canonical worksheet network with one path highlighted</title>
+              <desc id="backprop-focus-desc">Two inputs x sub m feed hidden pre-activations r sub j through weights W sub h j comma x m and biases b sub h j. ReLU produces hidden values h sub j. Those values feed five logits z sub i through weights W sub i comma h j and biases b sub i. Softmax produces q sub i, and the one-hot target y sub i meets q at loss L. The highlighted path uses W h1 x1 equals 0.40 and W sat h1 equals 0.80.</desc>
+              <defs>
+                <marker id="backpropFocusArrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+                  <path d="M0,0 L7,3 L0,6 Z" fill="var(--teal)"></path>
+                </marker>
+                <marker id="backpropTargetArrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+                  <path d="M0,0 L7,3 L0,6 Z" fill="#9c5a00"></path>
+                </marker>
+              </defs>
+
+              <text class="backprop-focus-layer" x="78" y="28">inputs x_m</text>
+              <text class="backprop-focus-layer" x="300" y="28">r_j → ReLU → h_j</text>
+              <text class="backprop-focus-layer" x="575" y="28">logits z_i</text>
+              <text class="backprop-focus-layer" x="705" y="28">probabilities q_i</text>
+              <text class="backprop-focus-layer" x="842" y="28">loss L</text>
+
+              <g class="backprop-focus-muted-routes" aria-hidden="true">
+                <line x1="105" y1="145" x2="273" y2="285"></line>
+                <line x1="105" y1="285" x2="273" y2="145"></line>
+                <line x1="105" y1="285" x2="273" y2="285"></line>
+                <line x1="327" y1="145" x2="530" y2="102"></line>
+                <line x1="327" y1="145" x2="530" y2="168"></line>
+                <line x1="327" y1="145" x2="530" y2="234"></line>
+                <line x1="327" y1="145" x2="530" y2="300"></line>
+                <line x1="327" y1="285" x2="530" y2="74"></line>
+                <line x1="327" y1="285" x2="530" y2="102"></line>
+                <line x1="327" y1="285" x2="530" y2="168"></line>
+                <line x1="327" y1="285" x2="530" y2="234"></line>
+                <line x1="327" y1="285" x2="530" y2="300"></line>
+                <line x1="620" y1="102" x2="660" y2="74"></line>
+                <line x1="620" y1="168" x2="660" y2="74"></line>
+                <line x1="620" y1="234" x2="660" y2="74"></line>
+                <line x1="620" y1="300" x2="660" y2="74"></line>
+              </g>
+
+              <g class="backprop-focus-active-route">
+                <line x1="105" y1="145" x2="273" y2="145" marker-end="url(#backpropFocusArrow)"></line>
+                <line x1="327" y1="145" x2="530" y2="74" marker-end="url(#backpropFocusArrow)"></line>
+                <line x1="620" y1="74" x2="660" y2="74" marker-end="url(#backpropFocusArrow)"></line>
+                <line x1="750" y1="74" x2="805" y2="74" marker-end="url(#backpropFocusArrow)"></line>
+              </g>
+
+              <g class="backprop-focus-target-route">
+                <line x1="842" y1="126" x2="842" y2="99" marker-end="url(#backpropTargetArrow)"></line>
+              </g>
+
+              <g class="backprop-focus-weight">
+                <rect x="132" y="115" width="134" height="26" rx="6"></rect>
+                <text x="199" y="133">W_h1,x1 = 0.40</text>
+                <rect x="370" y="92" width="148" height="26" rx="6"></rect>
+                <text x="444" y="110">W_sat,h1 = 0.80</text>
+              </g>
+
+              <g class="backprop-focus-node is-input">
+                <circle cx="78" cy="145" r="28"></circle>
+                <text class="backprop-focus-node-name" x="78" y="141">x1</text>
+                <text class="backprop-focus-node-value" x="78" y="159">0.50</text>
+              </g>
+              <g class="backprop-focus-node is-input is-muted">
+                <circle cx="78" cy="285" r="28"></circle>
+                <text class="backprop-focus-node-name" x="78" y="281">x2</text>
+                <text class="backprop-focus-node-value" x="78" y="299">0.20</text>
+              </g>
+              <g class="backprop-focus-node is-hidden">
+                <circle cx="300" cy="145" r="28"></circle>
+                <text class="backprop-focus-node-name" x="300" y="141">h1</text>
+                <text class="backprop-focus-node-value" x="300" y="159">0.180</text>
+              </g>
+              <g class="backprop-focus-node is-hidden is-muted">
+                <circle cx="300" cy="285" r="28"></circle>
+                <text class="backprop-focus-node-name" x="300" y="281">h2</text>
+                <text class="backprop-focus-node-value" x="300" y="299">0</text>
+              </g>
+
+              <g class="backprop-focus-node is-word is-target">
+                <rect x="530" y="51" width="90" height="46" rx="8"></rect>
+                <text class="backprop-focus-node-name" x="575" y="70">sat</text>
+                <text class="backprop-focus-node-value" x="575" y="87">z=0.244</text>
+              </g>
+              <g class="backprop-focus-node is-word is-muted">
+                <rect x="530" y="117" width="90" height="46" rx="8"></rect>
+                <text class="backprop-focus-node-name" x="575" y="136">ran</text>
+                <text class="backprop-focus-node-value" x="575" y="153">z=0.036</text>
+              </g>
+              <g class="backprop-focus-node is-word is-muted">
+                <rect x="530" y="183" width="90" height="46" rx="8"></rect>
+                <text class="backprop-focus-node-name" x="575" y="202">slept</text>
+                <text class="backprop-focus-node-value" x="575" y="219">z=-0.122</text>
+              </g>
+              <g class="backprop-focus-node is-word is-muted">
+                <rect x="530" y="249" width="90" height="46" rx="8"></rect>
+                <text class="backprop-focus-node-name" x="575" y="268">purred</text>
+                <text class="backprop-focus-node-value" x="575" y="285">z=0.128</text>
+              </g>
+              <g class="backprop-focus-node is-word is-muted">
+                <rect x="530" y="315" width="90" height="46" rx="8"></rect>
+                <text class="backprop-focus-node-name" x="575" y="334">meowed</text>
+                <text class="backprop-focus-node-value" x="575" y="351">z=-0.038</text>
+              </g>
+
+              <g class="backprop-focus-node is-softmax">
+                <rect x="660" y="49" width="90" height="50" rx="9"></rect>
+                <text class="backprop-focus-node-name" x="705" y="69">Softmax q</text>
+                <text class="backprop-focus-node-value" x="705" y="87">q_sat=0.241</text>
+              </g>
+              <g class="backprop-focus-node is-loss">
+                <rect x="805" y="49" width="74" height="50" rx="9"></rect>
+                <text class="backprop-focus-node-name" x="842" y="69">L</text>
+                <text class="backprop-focus-node-value" x="842" y="87">1.423</text>
+              </g>
+              <g class="backprop-focus-node is-target-value">
+                <rect x="804" y="126" width="76" height="42" rx="8"></rect>
+                <text class="backprop-focus-node-name" x="842" y="144">target y_i</text>
+                <text class="backprop-focus-node-value" x="842" y="160">y_sat=1</text>
+              </g>
+              <g class="backprop-focus-legend">
+                <line x1="70" y1="390" x2="112" y2="390"></line>
+                <text x="122" y="394">path we follow first</text>
+                <line class="is-muted" x1="287" y1="390" x2="329" y2="390"></line>
+                <text x="339" y="394">other routes still exist</text>
+              </g>
+            </svg>
+            <svg class="backprop-focus-svg backprop-focus-svg-mobile" viewBox="0 0 320 700" role="img" aria-labelledby="backprop-focus-mobile-title backprop-focus-mobile-desc">
+              <title id="backprop-focus-mobile-title">The canonical worksheet network with one vertical path highlighted</title>
+              <desc id="backprop-focus-mobile-desc">A vertical mobile view of the same network and notation. Inputs x sub m feed r sub j through W h j x m and b h j. ReLU produces h sub j. Hidden values feed logits z sub i through W i h j and b i. Softmax produces q sub i, which meets target y sub i at loss L. The selected weights are W h1 x1 equals 0.40 and W sat h1 equals 0.80.</desc>
+              <defs>
+                <marker id="backpropFocusMobileArrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+                  <path d="M0,0 L7,3 L0,6 Z" fill="var(--teal)"></path>
+                </marker>
+                <marker id="backpropFocusMobileTargetArrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+                  <path d="M0,0 L7,3 L0,6 Z" fill="#9c5a00"></path>
+                </marker>
+              </defs>
+
+              <text class="backprop-focus-layer" x="160" y="22">inputs x_m</text>
+              <text class="backprop-focus-layer" x="160" y="154">r_j → ReLU → h_j</text>
+              <text class="backprop-focus-layer" x="160" y="273">logits z_i</text>
+              <text class="backprop-focus-layer" x="160" y="358">probabilities q_i</text>
+              <text class="backprop-focus-layer" x="80" y="473">loss L</text>
+              <text class="backprop-focus-layer" x="250" y="473">target y_i</text>
+
+              <g class="backprop-focus-muted-routes" aria-hidden="true">
+                <line x1="91" y1="79" x2="229" y2="181"></line>
+                <line x1="229" y1="79" x2="91" y2="181"></line>
+                <line x1="229" y1="79" x2="229" y2="181"></line>
+                <line x1="83" y1="206" x2="97" y2="286"></line>
+                <line x1="90" y1="206" x2="160" y2="286"></line>
+                <line x1="97" y1="206" x2="223" y2="286"></line>
+                <line x1="103" y1="204" x2="286" y2="286"></line>
+                <line x1="217" y1="204" x2="34" y2="286"></line>
+                <line x1="223" y1="206" x2="97" y2="286"></line>
+                <line x1="230" y1="206" x2="160" y2="286"></line>
+                <line x1="237" y1="206" x2="223" y2="286"></line>
+                <line x1="244" y1="204" x2="286" y2="286"></line>
+                <line x1="97" y1="332" x2="160" y2="375"></line>
+                <line x1="160" y1="332" x2="160" y2="375"></line>
+                <line x1="223" y1="332" x2="160" y2="375"></line>
+                <line x1="286" y1="332" x2="160" y2="375"></line>
+              </g>
+
+              <g class="backprop-focus-active-route">
+                <line x1="91" y1="79" x2="91" y2="181" marker-end="url(#backpropFocusMobileArrow)"></line>
+                <line x1="83" y1="206" x2="34" y2="286" marker-end="url(#backpropFocusMobileArrow)"></line>
+                <line x1="34" y1="332" x2="130" y2="375" marker-end="url(#backpropFocusMobileArrow)"></line>
+                <line x1="145" y1="423" x2="93" y2="490" marker-end="url(#backpropFocusMobileArrow)"></line>
+              </g>
+
+              <g class="backprop-focus-target-route">
+                <line x1="200" y1="515" x2="120" y2="515" marker-end="url(#backpropFocusMobileTargetArrow)"></line>
+              </g>
+
+              <g class="backprop-focus-weight">
+                <rect x="96" y="111" width="128" height="25" rx="6"></rect>
+                <text x="160" y="128">W_h1,x1 = 0.40</text>
+                <rect x="5" y="225" width="132" height="25" rx="6"></rect>
+                <text x="71" y="242">W_sat,h1 = 0.80</text>
+              </g>
+
+              <g class="backprop-focus-node is-input">
+                <circle cx="80" cy="70" r="27"></circle>
+                <text class="backprop-focus-node-name" x="80" y="67">x1</text>
+                <text class="backprop-focus-node-value" x="80" y="84">0.50</text>
+              </g>
+              <g class="backprop-focus-node is-input is-muted">
+                <circle cx="240" cy="70" r="27"></circle>
+                <text class="backprop-focus-node-name" x="240" y="67">x2</text>
+                <text class="backprop-focus-node-value" x="240" y="84">0.20</text>
+              </g>
+              <g class="backprop-focus-node is-hidden">
+                <circle cx="80" cy="190" r="27"></circle>
+                <text class="backprop-focus-node-name" x="80" y="187">h1</text>
+                <text class="backprop-focus-node-value" x="80" y="204">0.180</text>
+              </g>
+              <g class="backprop-focus-node is-hidden is-muted">
+                <circle cx="240" cy="190" r="27"></circle>
+                <text class="backprop-focus-node-name" x="240" y="187">h2</text>
+                <text class="backprop-focus-node-value" x="240" y="204">0</text>
+              </g>
+
+              <g class="backprop-focus-node is-word is-target">
+                <rect x="7" y="286" width="54" height="46" rx="7"></rect>
+                <text class="backprop-focus-node-name" x="34" y="305">sat</text>
+                <text class="backprop-focus-node-value" x="34" y="322">0.244</text>
+              </g>
+              <g class="backprop-focus-node is-word is-muted">
+                <rect x="70" y="286" width="54" height="46" rx="7"></rect>
+                <text class="backprop-focus-node-name" x="97" y="305">ran</text>
+                <text class="backprop-focus-node-value" x="97" y="322">0.036</text>
+              </g>
+              <g class="backprop-focus-node is-word is-muted">
+                <rect x="133" y="286" width="54" height="46" rx="7"></rect>
+                <text class="backprop-focus-node-name" x="160" y="305">slept</text>
+                <text class="backprop-focus-node-value" x="160" y="322">-0.122</text>
+              </g>
+              <g class="backprop-focus-node is-word is-muted">
+                <rect x="196" y="286" width="54" height="46" rx="7"></rect>
+                <text class="backprop-focus-node-name" x="223" y="305">purred</text>
+                <text class="backprop-focus-node-value" x="223" y="322">0.128</text>
+              </g>
+              <g class="backprop-focus-node is-word is-muted">
+                <rect x="259" y="286" width="54" height="46" rx="7"></rect>
+                <text class="backprop-focus-node-name" x="286" y="305">meowed</text>
+                <text class="backprop-focus-node-value" x="286" y="322">-0.038</text>
+              </g>
+
+              <g class="backprop-focus-node is-softmax">
+                <rect x="95" y="375" width="130" height="48" rx="9"></rect>
+                <text class="backprop-focus-node-name" x="160" y="395">Softmax q</text>
+                <text class="backprop-focus-node-value" x="160" y="414">q_sat=0.241</text>
+              </g>
+              <g class="backprop-focus-node is-loss">
+                <rect x="40" y="490" width="80" height="50" rx="9"></rect>
+                <text class="backprop-focus-node-name" x="80" y="510">L</text>
+                <text class="backprop-focus-node-value" x="80" y="528">1.423</text>
+              </g>
+              <g class="backprop-focus-node is-target-value">
+                <rect x="200" y="494" width="100" height="42" rx="8"></rect>
+                <text class="backprop-focus-node-name" x="250" y="512">target y_i</text>
+                <text class="backprop-focus-node-value" x="250" y="528">y_sat=1</text>
+              </g>
+
+              <g class="backprop-focus-legend">
+                <line x1="35" y1="620" x2="75" y2="620"></line>
+                <text x="85" y="624">path we follow first</text>
+                <line class="is-muted" x1="35" y1="655" x2="75" y2="655"></line>
+                <text x="85" y="659">other routes still exist</text>
+              </g>
+            </svg>
+            <figcaption>
+              This is the exact network used by the equations below. Input index \(m\)
+              selects \(x_m\), hidden index \(j\) selects \(r_j\) and \(h_j\), and word
+              index \(i\) selects \(z_i,q_i,y_i\). Every input connects to every hidden
+              unit through \(W_{h_j,x_m}\), with bias \(b_{h_j}\); every hidden unit
+              connects to every word logit through \(W_{i,h_j}\), with bias \(b_i\).
+              The highlighted route is
+              \(x_1\xrightarrow{W_{h1,x1}=0.40}r_1\rightarrow h_1
+              \xrightarrow{W_{sat,h1}=0.80}z_{sat}\rightarrow q_{sat}\rightarrow L\),
+              where \(y_{sat}=1\).
+            </figcaption>
+          </figure>
+          <p>
+            We have already pushed this example forward. The first hidden neuron is
+            \(h_1=0.180\). Its weight into the true word <strong>sat</strong> is
+            \(W_{sat,h1}=0.800\), and the model ends at loss \(L=1.423\). Freeze every
+            other number. Now raise only that one weight by \(0.01\) and watch the
+            consequence travel to the right.
+          </p>
+          <div class="backprop-known-path" aria-label="Known forward values from h1 through the sat score and probability to the loss">
+            <article><span>signal already computed</span><strong>\(h_1=0.180\)</strong></article>
+            <b>&rarr;</b>
+            <article><span>the knob we turn</span><strong>\(W_{sat,h1}=0.800\)</strong></article>
+            <b>&rarr;</b>
+            <article><span>raw sat score</span><strong>\(z_{sat}=0.244\)</strong></article>
+            <b>&rarr;</b>
+            <article><span>sat probability</span><strong>\(q_{sat}=0.241\)</strong></article>
+            <b>&rarr;</b>
+            <article><span>cross-entropy loss</span><strong>\(L=1.423\)</strong></article>
           </div>
-          <div class="computational-graph-backward">
-            <strong>Backward:</strong> start with how \(L\) changes, multiply by each box's local slope, and add contributions when paths meet. Libraries such as PyTorch and TensorFlow record this graph during the forward pass, then compose those local rules in reverse. That is <em>automatic differentiation</em>; the later parameter update is gradient descent.
+          <div class="stepper-row backprop-nudge-actions">
+            <button id="backpropNudgeButton" class="primary-button" type="button">Nudge +0.01</button>
+            <button id="backpropNudgeResetButton" class="ghost-button" type="button">Reset</button>
+            <span id="backpropNudgeStatus" class="microcopy" aria-live="polite">Press Nudge to run the same forward path with one changed weight.</span>
+          </div>
+          <div id="backpropNudgeComparison" class="backprop-nudge-comparison" aria-live="polite"></div>
+          <div class="backprop-autodiff-note">
+            <p>
+              Auto-differentiation in libraries: PyTorch and TensorFlow record this dependency picture during the forward
+              pass as a <em>computational graph</em>. Each operation remembers its local
+              slope; <a href="https://en.wikipedia.org/wiki/Automatic_differentiation" target="_blank" rel="noreferrer">reverse-mode automatic differentiation</a> composes those slopes
+              from \(L\) back to every parameter. That is how software performs
+              backpropagation. It calculates the gradients; gradient descent applies them
+              afterward to update the parameters.
+            </p>
           </div>
         </div>
 
-        <div class="backprop-shape-primer" aria-labelledby="backprop-shape-title">
-          <p class="eyebrow">The exact worksheet network</p>
-          <h3 id="backprop-shape-title">Keep one small shape map beside the arithmetic.</h3>
-          <p>The worksheet below is our canonical by-hand network: input width \(D=2\), hidden width \(H=2\), vocabulary size \(V=5\), ReLU activation, true word <strong>sat</strong>, and temperature \(T=1\).</p>
-          <div class="backprop-shape-grid">
-            <article><code>x: D&times;1 = 2&times;1</code><span>two input numbers</span></article>
-            <article><code>W<sub>1</sub>: H&times;D = 2&times;2</code><span>input-to-hidden weights</span></article>
-            <article><code>h: H&times;1 = 2&times;1</code><span>two hidden signals</span></article>
-            <article><code>W<sub>2</sub>: V&times;H = 5&times;2</code><span>hidden-to-word weights</span></article>
-            <article><code>z,q,&delta;: V&times;1 = 5&times;1</code><span>one value per candidate word</span></article>
+        <div class="backprop-scalar-story" aria-labelledby="backprop-scalar-title">
+          <div>
+            <p class="eyebrow">Now follow the effect backward</p>
+            <h3 id="backprop-scalar-title">One gradient answers "how sensitive is the loss?"</h3>
+            <p>
+              The nudge experiment gives us a rate: the loss changed by about
+              \(-0.001366\) when the weight changed by \(+0.01\). Their ratio is about
+              \(-0.1366\). Calculus asks what that ratio becomes for an infinitesimally
+              small nudge and writes it as \(\partial L/\partial W_{sat,h1}\).
+            </p>
           </div>
-          <div class="backprop-operation-grid">
-            <article><strong>Transpose \((\top)\)</strong><p>Flip rows into columns. \(W_2^\top\) is \(2\times5\), so \(W_2^\top\delta\) gathers five word blames into two hidden blames.</p></article>
-            <article><strong>Element-wise multiply \((\odot)\)</strong><p>Pair matching positions. Hidden blame \((2\times1)\) pairs with two ReLU slopes \((2\times1)\), one gate per hidden neuron.</p></article>
-            <article><strong>Outer product</strong><p>Multiply every blame by every incoming signal. \(\delta h^\top\) is \((5\times1)(1\times2)=5\times2\), exactly the shape of \(W_2\).</p></article>
+          <div class="backprop-output-wishes" aria-label="What each output score should do for this training example">
+            <div>
+              <h4>The true score should rise; every competing score should fall.</h4>
+              <p>
+                This one example says <strong>sat</strong> really came next. Its target is
+                1, while every other target is 0. The size of each request is
+                \(q_i-y_i\): a badly wrong output asks for a larger correction; an
+                already-good output asks for a smaller one.
+              </p>
+            </div>
+            <div class="backprop-output-wish-grid">
+              <article class="is-up"><strong>sat</strong><span>\(0.241-1=-0.759\)</span><em>raise this score</em></article>
+              <article class="is-down"><strong>ran</strong><span>\(0.196-0=+0.196\)</span><em>lower this score</em></article>
+              <article class="is-down"><strong>slept</strong><span>\(0.167-0=+0.167\)</span><em>lower this score</em></article>
+              <article class="is-down"><strong>purred</strong><span>\(0.215-0=+0.215\)</span><em>lower this score</em></article>
+              <article class="is-down"><strong>meowed</strong><span>\(0.182-0=+0.182\)</span><em>lower this score</em></article>
+            </div>
+            <p class="microcopy">
+              The signs are gradients, so gradient descent later moves in the opposite
+              direction: subtracting the negative <em>sat</em> gradient raises its score;
+              subtracting positive competitor gradients lowers theirs.
+            </p>
           </div>
-          <div class="temperature-gradient-bridge">
-            <h4>The output error that starts the backward pass</h4>
-            <p>The Softmax section scaled each logit with \(s_i=z_i/T\). Softmax plus cross-entropy gives \(\partial L/\partial s_i=q_i-y_i\). The chain rule through \(s_i=z_i/T\) adds \(1/T\):</p>
-            $$\delta_i=\frac{\partial L}{\partial z_i}=\frac{q_i-y_i}{T}$$
-            <p>The worksheet uses \(T=1\), so its output blame is the familiar \(\delta=q-y\). Nothing has been dropped; the temperature factor simply equals 1 here.</p>
-            <details class="backprop-output-proof">
-              <summary>Why does Softmax plus cross-entropy simplify to \(q-y\)?</summary>
-              <div class="backprop-output-proof-body">
-                <p>
-                  This is the detailed cancellation that used to appear in the Softmax
-                  section. It belongs here because it calculates a derivative. Work first
-                  with the temperature-scaled score \(s_i=z_i/T\). The stable maximum
-                  subtraction from the forward pass does not change \(q\), so we can write
-                  ordinary Softmax compactly as
-                  \(q_i=e^{s_i}/\sum_j e^{s_j}\).
-                </p>
-                <p>
-                  Let \(c\) be the index of the true word. Cross-entropy for this one
-                  example is \(L=-\ln q_c\). Substitute the Softmax definition, then use
-                  \(\ln(a/b)=\ln a-\ln b\):
-                </p>
-                $$L=-\ln\frac{e^{s_c}}{\sum_j e^{s_j}}
-                =-s_c+\ln\sum_j e^{s_j}$$
-                <p>
-                  Now ask how \(L\) changes when one scaled score \(s_i\) moves. The two
-                  terms make different contributions:
-                </p>
-                <ul class="symbol-glossary">
-                  <li>
-                    \(\dfrac{\partial}{\partial s_i}(-s_c)=-y_i\): this term touches
-                    only the true word. It contributes \(-1\) when \(i=c\) and 0 for
-                    every other candidate.
-                  </li>
-                  <li>
-                    \(\dfrac{\partial}{\partial s_i}\ln\sum_j e^{s_j}
-                    =\dfrac{e^{s_i}}{\sum_j e^{s_j}}=q_i\): the derivative of the
-                    shared log-sum is the Softmax probability itself.
-                  </li>
-                </ul>
-                <p>Add those two contributions:</p>
-                $$\frac{\partial L}{\partial s_i}=q_i-y_i$$
-                <p>
-                  Finally carry that derivative through the temperature operation
-                  \(s_i=z_i/T\). Its local derivative is \(1/T\):
-                </p>
-                $$\frac{\partial L}{\partial z_i}
-                =\frac{\partial L}{\partial s_i}\frac{\partial s_i}{\partial z_i}
-                =(q_i-y_i)\frac{1}{T}$$
-                <p>
-                  In plain words: raise the true word's logit and lower every other logit
-                  in proportion to the probability it currently holds. The correction is
-                  self-scaling. For the true word it is \(q_c-1\): small when the model is
-                  already confident, and close to \(-1\) when it gave the truth almost no
-                  probability. For other words it is \(q_i\), so an incorrect word that is
-                  hogging probability receives the largest downward correction.
-                </p>
-                <p>
-                  As \(q\) approaches the one-hot target \(y\), every \(q_i-y_i\)
-                  approaches 0 and the output gradient vanishes. The worksheet's backward
-                  half begins by calculating exactly this \(T=1\) error vector.
-                </p>
+          <section id="backprop-pass-map" class="backprop-pass-map" aria-labelledby="backprop-pass-map-title">
+            <div class="backprop-pass-map-intro">
+              <p class="eyebrow">The whole algorithm at a glance</p>
+              <h4 id="backprop-pass-map-title">Forward calculates the loss. Backward calculates every gradient.</h4>
+              <p>
+                This is the complete scalar map for one training example in our
+                two-input, two-hidden-unit, five-word network. Read the left column from
+                inputs to loss, then read the right column from that loss back to every
+                trainable number. The four steps below derive these same lines with the
+                actual arithmetic. As everywhere in this worked example, temperature is
+                fixed at \(T=1\).
+              </p>
+            </div>
+
+            <p class="backprop-pass-table-note">
+              Both directions visit the same four stages, so here they are once, side by side. Each column starts
+              with a picture of that direction, so the numbers and variable names stay in front of you. Then read
+              a row across: the forward equation on the left, and the derivative of <em>that exact equation</em>
+              on the right. Forward runs 1 to 4 down the page; backward starts at the bottom row and climbs back
+              up. Each output blame also drops off a parameter gradient as it passes:
+              \(\partial L/\partial W_{i,h_j}=\delta_ih_j=-0.137\) on the traced output weight.
+            </p>
+
+            <div class="backprop-pass-table">
+              <div class="backprop-pass-table-head">
+                <span>Stage</span>
+                <span>Forward &darr; calculates the loss</span>
+                <span>Backward &uarr; calculates every gradient</span>
               </div>
-            </details>
+
+              <div class="backprop-pass-row is-figures" id="backprop-both-ways">
+                <div class="backprop-pass-stage">The whole network, both ways
+                  <span>Every number in these two pictures, and in every row below, comes from the one example we have been following: the context <code>the cat</code>, with <code>sat</code> as the word that really came next.</span>
+                </div>
+              <figure class="backprop-path-figure is-forward" aria-labelledby="backprop-forward-map-title">
+                <figcaption id="backprop-forward-map-title"><strong>Forward &darr;</strong> values fall from the inputs to the loss.</figcaption>
+                <svg class="backprop-path-svg" viewBox="0 0 340 500" role="img" aria-labelledby="fwd-net-t fwd-net-d">
+                  <title id="fwd-net-t">The forward pass through the tiny network</title>
+                  <desc id="fwd-net-d">Two input nodes x1 = 0.50 and x2 = 0.20 connect to two hidden nodes h1 = 0.180 and h2 = 0 through the weights W h j x m. The hidden nodes connect to five word score nodes sat 0.244, ran 0.036, slept -0.122, purred 0.128 and meowed -0.038 through the weights W i h j. Softmax turns those into probabilities, q for sat is 0.241, and cross-entropy against the target y sat equals 1 gives the loss L of 1.423. The traced route runs x1 to h1 to sat to the loss.</desc>
+                  <defs>
+                    <marker id="fwdNetArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                      <path d="M0,0 L6,3 L0,6 Z" fill="var(--teal)"></path>
+                    </marker>
+                  </defs>
+
+                  <g class="backprop-focus-muted-routes" aria-hidden="true">
+                    <line x1="80" y1="68" x2="250" y2="136"></line>
+                    <line x1="250" y1="68" x2="80" y2="136"></line>
+                    <line x1="250" y1="68" x2="250" y2="136"></line>
+                    <line x1="80" y1="184" x2="107" y2="240"></line>
+                    <line x1="80" y1="184" x2="170" y2="240"></line>
+                    <line x1="80" y1="184" x2="233" y2="240"></line>
+                    <line x1="80" y1="184" x2="296" y2="240"></line>
+                    <line x1="250" y1="184" x2="44" y2="240"></line>
+                    <line x1="250" y1="184" x2="107" y2="240"></line>
+                    <line x1="250" y1="184" x2="170" y2="240"></line>
+                    <line x1="250" y1="184" x2="233" y2="240"></line>
+                    <line x1="250" y1="184" x2="296" y2="240"></line>
+                    <line x1="107" y1="284" x2="170" y2="316"></line>
+                    <line x1="170" y1="284" x2="170" y2="316"></line>
+                    <line x1="233" y1="284" x2="170" y2="316"></line>
+                    <line x1="296" y1="284" x2="170" y2="316"></line>
+                  </g>
+
+                  <g class="backprop-path-layers">
+                    <rect class="backprop-path-layer-bg" x="128" y="0" width="84" height="19"></rect>
+                    <text class="backprop-focus-layer" x="170" y="14">inputs x_m</text>
+                    <rect class="backprop-path-layer-bg" x="95" y="99" width="170" height="19"></rect>
+                    <text class="backprop-focus-layer" x="180" y="113">hidden: r_j &#8594; ReLU &#8594; h_j</text>
+                    <rect class="backprop-path-layer-bg" x="112" y="215" width="124" height="19"></rect>
+                    <text class="backprop-focus-layer" x="174" y="229">word scores z_i</text>
+                    <rect class="backprop-path-layer-bg" x="137" y="291" width="126" height="19"></rect>
+                    <text class="backprop-focus-layer" x="200" y="305">probabilities q_i</text>
+                  </g>
+
+                  <g class="backprop-focus-active-route">
+                    <line x1="80" y1="68" x2="80" y2="132" marker-end="url(#fwdNetArrow)"></line>
+                    <line x1="80" y1="184" x2="47" y2="236" marker-end="url(#fwdNetArrow)"></line>
+                    <line x1="44" y1="284" x2="155" y2="313" marker-end="url(#fwdNetArrow)"></line>
+                    <line x1="150" y1="358" x2="101" y2="389" marker-end="url(#fwdNetArrow)"></line>
+                    <line x1="192" y1="415" x2="150" y2="415" marker-end="url(#fwdNetArrow)"></line>
+                  </g>
+
+                  <g class="backprop-focus-weight">
+                    <rect x="96" y="72" width="132" height="19" rx="5"></rect>
+                    <text x="162" y="85">W_h1,x1 = 0.40</text>
+                    <rect x="100" y="188" width="140" height="19" rx="5"></rect>
+                    <text x="170" y="201">W_sat,h1 = 0.80</text>
+                  </g>
+
+                  <g class="backprop-focus-node is-input">
+                    <circle cx="80" cy="44" r="24"></circle>
+                    <text class="backprop-focus-node-name" x="80" y="41">x1</text>
+                    <text class="backprop-focus-node-value" x="80" y="56">0.50</text>
+                  </g>
+                  <g class="backprop-focus-node is-input is-muted">
+                    <circle cx="250" cy="44" r="24"></circle>
+                    <text class="backprop-focus-node-name" x="250" y="41">x2</text>
+                    <text class="backprop-focus-node-value" x="250" y="56">0.20</text>
+                  </g>
+
+                  <g class="backprop-focus-node is-hidden">
+                    <circle cx="80" cy="160" r="24"></circle>
+                    <text class="backprop-focus-node-name" x="80" y="157">h1</text>
+                    <text class="backprop-focus-node-value" x="80" y="172">0.180</text>
+                  </g>
+                  <g class="backprop-focus-node is-hidden is-muted">
+                    <circle cx="250" cy="160" r="24"></circle>
+                    <text class="backprop-focus-node-name" x="250" y="157">h2</text>
+                    <text class="backprop-focus-node-value" x="250" y="172">0</text>
+                  </g>
+
+                  <g class="backprop-focus-node is-word is-target">
+                    <rect x="14" y="240" width="60" height="44" rx="7"></rect>
+                    <text class="backprop-focus-node-name" x="44" y="258">sat</text>
+                    <text class="backprop-focus-node-value" x="44" y="274">0.244</text>
+                  </g>
+                  <g class="backprop-focus-node is-word is-muted">
+                    <rect x="77" y="240" width="60" height="44" rx="7"></rect>
+                    <text class="backprop-focus-node-name" x="107" y="258">ran</text>
+                    <text class="backprop-focus-node-value" x="107" y="274">0.036</text>
+                  </g>
+                  <g class="backprop-focus-node is-word is-muted">
+                    <rect x="140" y="240" width="60" height="44" rx="7"></rect>
+                    <text class="backprop-focus-node-name" x="170" y="258">slept</text>
+                    <text class="backprop-focus-node-value" x="170" y="274">-0.122</text>
+                  </g>
+                  <g class="backprop-focus-node is-word is-muted">
+                    <rect x="203" y="240" width="60" height="44" rx="7"></rect>
+                    <text class="backprop-focus-node-name" x="233" y="258">purred</text>
+                    <text class="backprop-focus-node-value" x="233" y="274">0.128</text>
+                  </g>
+                  <g class="backprop-focus-node is-word is-muted">
+                    <rect x="266" y="240" width="60" height="44" rx="7"></rect>
+                    <text class="backprop-focus-node-name" x="296" y="258">meowed</text>
+                    <text class="backprop-focus-node-value" x="296" y="274">-0.038</text>
+                  </g>
+
+                  <g class="backprop-focus-node is-softmax">
+                    <rect x="100" y="316" width="140" height="42" rx="8"></rect>
+                    <text class="backprop-focus-node-name" x="170" y="334">Softmax</text>
+                    <text class="backprop-focus-node-value" x="170" y="350">q_sat = 0.241</text>
+                  </g>
+
+                  <g class="backprop-focus-node is-loss">
+                    <rect x="32" y="392" width="112" height="46" rx="9"></rect>
+                    <text class="backprop-focus-node-name" x="88" y="412">loss L</text>
+                    <text class="backprop-focus-node-value" x="88" y="428">1.423</text>
+                  </g>
+                  <g class="backprop-focus-node is-target-value">
+                    <rect x="196" y="392" width="112" height="46" rx="9"></rect>
+                    <text class="backprop-focus-node-name" x="252" y="412">target y_i</text>
+                    <text class="backprop-focus-node-value" x="252" y="428">y_sat = 1</text>
+                  </g>
+
+                  <g class="backprop-focus-legend">
+                    <line x1="16" y1="468" x2="46" y2="468"></line>
+                    <text x="54" y="472">the route we trace</text>
+                    <line class="is-muted" x1="186" y1="468" x2="216" y2="468"></line>
+                    <text x="224" y="472">other routes</text>
+                  </g>
+                </svg>
+                <figcaption>Every input reaches every hidden unit, and every hidden unit reaches all five word scores. The bold route is the one we follow by hand.</figcaption>
+              </figure>
+
+              <figure class="backprop-path-figure is-backward" aria-labelledby="backprop-backward-map-title">
+                <figcaption id="backprop-backward-map-title"><strong>Backward &uarr;</strong> gradients climb the same wires, starting at the loss.</figcaption>
+                <svg class="backprop-path-svg" viewBox="0 0 340 500" role="img" aria-labelledby="bwd-net-t bwd-net-d">
+                  <title id="bwd-net-t">The backward pass through the same network</title>
+                  <desc id="bwd-net-d">Starting at the loss L, each word score receives its blame delta equal to q minus y: sat -0.759, ran +0.196, slept +0.167, purred +0.215, meowed +0.182. Those blames travel back along the same weights to the hidden nodes, giving -0.524 at h1 while the ReLU gate is shut at h2. The traced weights receive the gradients minus 0.137 on W sat h1 and minus 0.262 on W h1 x1, and the gradient continues into the input embedding coordinates.</desc>
+                  <defs>
+                    <marker id="bwdNetArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                      <path d="M0,0 L6,3 L0,6 Z" fill="#9c5a00"></path>
+                    </marker>
+                  </defs>
+
+                  <g class="backprop-focus-muted-routes" aria-hidden="true">
+                    <line x1="80" y1="68" x2="250" y2="136"></line>
+                    <line x1="250" y1="68" x2="80" y2="136"></line>
+                    <line x1="250" y1="68" x2="250" y2="136"></line>
+                    <line x1="107" y1="240" x2="82" y2="184"></line>
+                    <line x1="170" y1="240" x2="84" y2="184"></line>
+                    <line x1="233" y1="240" x2="86" y2="184"></line>
+                    <line x1="296" y1="240" x2="88" y2="184"></line>
+                    <line x1="44" y1="240" x2="250" y2="184"></line>
+                    <line x1="107" y1="240" x2="250" y2="184"></line>
+                    <line x1="170" y1="240" x2="250" y2="184"></line>
+                    <line x1="233" y1="240" x2="250" y2="184"></line>
+                    <line x1="296" y1="240" x2="250" y2="184"></line>
+                    <line x1="170" y1="316" x2="107" y2="284"></line>
+                    <line x1="170" y1="316" x2="170" y2="284"></line>
+                    <line x1="170" y1="316" x2="233" y2="284"></line>
+                    <line x1="170" y1="316" x2="296" y2="284"></line>
+                  </g>
+
+                  <g class="backprop-path-layers">
+                    <rect class="backprop-path-layer-bg" x="88" y="0" width="164" height="19"></rect>
+                    <text class="backprop-focus-layer" x="170" y="14">on into the embeddings</text>
+                    <rect class="backprop-path-layer-bg" x="92" y="99" width="176" height="19"></rect>
+                    <text class="backprop-focus-layer" x="180" y="113">dL/dh_j &#8594; gate &#8594; dL/dr_j</text>
+                    <rect class="backprop-path-layer-bg" x="90" y="215" width="168" height="19"></rect>
+                    <text class="backprop-focus-layer" x="174" y="229">output blame q_i - y_i</text>
+                    <rect class="backprop-path-layer-bg" x="130" y="291" width="140" height="19"></rect>
+                    <text class="backprop-focus-layer" x="200" y="305">where blame is born</text>
+                  </g>
+
+                  <g class="backprop-focus-target-route">
+                    <line x1="101" y1="389" x2="150" y2="360" marker-end="url(#bwdNetArrow)"></line>
+                    <line x1="155" y1="313" x2="47" y2="286" marker-end="url(#bwdNetArrow)"></line>
+                    <line x1="47" y1="236" x2="78" y2="186" marker-end="url(#bwdNetArrow)"></line>
+                    <line x1="80" y1="132" x2="80" y2="70" marker-end="url(#bwdNetArrow)"></line>
+                  </g>
+
+                  <g class="backprop-focus-weight">
+                    <rect x="96" y="72" width="146" height="19" rx="5"></rect>
+                    <text x="169" y="85">dL/dW_h1,x1 = -0.262</text>
+                    <rect x="100" y="188" width="150" height="19" rx="5"></rect>
+                    <text x="175" y="201">dL/dW_sat,h1 = -0.137</text>
+                  </g>
+
+                  <g class="backprop-focus-node is-input">
+                    <circle cx="80" cy="44" r="24"></circle>
+                    <text class="backprop-focus-node-name" x="80" y="41">x1</text>
+                    <text class="backprop-focus-node-value" x="80" y="56">0.50</text>
+                  </g>
+                  <g class="backprop-focus-node is-input is-muted">
+                    <circle cx="250" cy="44" r="24"></circle>
+                    <text class="backprop-focus-node-name" x="250" y="41">x2</text>
+                    <text class="backprop-focus-node-value" x="250" y="56">0.20</text>
+                  </g>
+
+                  <g class="backprop-focus-node is-hidden">
+                    <circle cx="80" cy="160" r="24"></circle>
+                    <text class="backprop-focus-node-name" x="80" y="157">h1</text>
+                    <text class="backprop-focus-node-value" x="80" y="172">-0.524</text>
+                  </g>
+                  <g class="backprop-focus-node is-hidden is-muted">
+                    <circle cx="250" cy="160" r="24"></circle>
+                    <text class="backprop-focus-node-name" x="250" y="157">h2</text>
+                    <text class="backprop-focus-node-value" x="250" y="172">shut</text>
+                  </g>
+
+                  <g class="backprop-focus-node is-word is-target">
+                    <rect x="14" y="240" width="60" height="44" rx="7"></rect>
+                    <text class="backprop-focus-node-name" x="44" y="258">sat</text>
+                    <text class="backprop-focus-node-value" x="44" y="274">-0.759</text>
+                  </g>
+                  <g class="backprop-focus-node is-word is-muted">
+                    <rect x="77" y="240" width="60" height="44" rx="7"></rect>
+                    <text class="backprop-focus-node-name" x="107" y="258">ran</text>
+                    <text class="backprop-focus-node-value" x="107" y="274">+0.196</text>
+                  </g>
+                  <g class="backprop-focus-node is-word is-muted">
+                    <rect x="140" y="240" width="60" height="44" rx="7"></rect>
+                    <text class="backprop-focus-node-name" x="170" y="258">slept</text>
+                    <text class="backprop-focus-node-value" x="170" y="274">+0.167</text>
+                  </g>
+                  <g class="backprop-focus-node is-word is-muted">
+                    <rect x="203" y="240" width="60" height="44" rx="7"></rect>
+                    <text class="backprop-focus-node-name" x="233" y="258">purred</text>
+                    <text class="backprop-focus-node-value" x="233" y="274">+0.215</text>
+                  </g>
+                  <g class="backprop-focus-node is-word is-muted">
+                    <rect x="266" y="240" width="60" height="44" rx="7"></rect>
+                    <text class="backprop-focus-node-name" x="296" y="258">meowed</text>
+                    <text class="backprop-focus-node-value" x="296" y="274">+0.182</text>
+                  </g>
+
+                  <g class="backprop-focus-node is-softmax">
+                    <rect x="100" y="316" width="140" height="42" rx="8"></rect>
+                    <text class="backprop-focus-node-name" x="170" y="334">Softmax + loss</text>
+                    <text class="backprop-focus-node-value" x="170" y="350">collapse to q - y</text>
+                  </g>
+
+                  <g class="backprop-focus-node is-loss">
+                    <rect x="32" y="392" width="112" height="46" rx="9"></rect>
+                    <text class="backprop-focus-node-name" x="88" y="412">loss L</text>
+                    <text class="backprop-focus-node-value" x="88" y="428">start here</text>
+                  </g>
+                  <g class="backprop-focus-node is-target-value">
+                    <rect x="196" y="392" width="112" height="46" rx="9"></rect>
+                    <text class="backprop-focus-node-name" x="252" y="412">target y_i</text>
+                    <text class="backprop-focus-node-value" x="252" y="428">y_sat = 1</text>
+                  </g>
+
+                  <g class="backprop-focus-legend">
+                    <line x1="16" y1="468" x2="46" y2="468"></line>
+                    <text x="54" y="472">blame we trace</text>
+                    <line class="is-muted" x1="166" y1="468" x2="196" y2="468"></line>
+                    <text x="204" y="472">the same wires</text>
+                  </g>
+                </svg>
+                <figcaption>The wires never move. Only the direction changes, and each node now holds a gradient instead of a value.</figcaption>
+              </figure>
+              </div>
+
+              <div class="backprop-pass-row">
+                <div class="backprop-pass-stage">Inputs and the hidden pre-activation</div>
+                <div class="backprop-pass-cell is-forward">
+                  <span class="backprop-map-step-label">Forward 1. Combine every input at hidden unit \(j\)</span>
+                  <div class="backprop-map-equation">\(r_j=\displaystyle\sum_{m=1}^{D}W_{h_j,x_m}x_m+b_{h_j}\)</div>
+                  <p>Each hidden unit forms one weighted sum before its activation.</p>
+                </div>
+                <div class="backprop-pass-cell is-backward">
+                  <span class="backprop-map-step-label">Backward 4. Finish at input-layer parameters and embeddings</span>
+                  <div class="backprop-map-equation">\(\dfrac{\partial L}{\partial W_{h_j,x_m}}=\dfrac{\partial L}{\partial r_j}x_m\)</div>
+                  <div class="backprop-map-equation">\(\dfrac{\partial L}{\partial b_{h_j}}=\dfrac{\partial L}{\partial r_j}\)</div>
+                  <div class="backprop-map-equation">\(\dfrac{\partial L}{\partial x_m}=\displaystyle\sum_{j=1}^{H}\dfrac{\partial L}{\partial r_j}W_{h_j,x_m}\)</div>
+                  <p>If \(x_m\) came from an embedding lookup, the last gradient continues into that embedding coordinate.</p>
+                </div>
+              </div>
+
+              <div class="backprop-pass-row">
+                <div class="backprop-pass-stage">The hidden activation</div>
+                <div class="backprop-pass-cell is-forward">
+                  <span class="backprop-map-step-label">Forward 2. Apply the ReLU gate</span>
+                  <div class="backprop-map-equation">\(h_j=\operatorname{ReLU}(r_j)=\max(0,r_j)\)</div>
+                  <p>Positive signals pass through; negative signals become zero.</p>
+                </div>
+                <div class="backprop-pass-cell is-backward">
+                  <span class="backprop-map-step-label">Backward 3. Pass back through the same gate</span>
+                  <div class="backprop-map-equation">\(\dfrac{\partial L}{\partial r_j}=\dfrac{\partial L}{\partial h_j}\operatorname{ReLU}'(r_j)\)</div>
+                  <div class="backprop-map-equation">\(\operatorname{ReLU}'(r_j)=1\text{ if }r_j&gt;0;\ 0\text{ if }r_j&lt;0\)</div>
+                  <p>A closed gate blocks the gradient; an open gate passes it through. At exactly \(r_j=0\), we use the common software convention \(\operatorname{ReLU}'(0)=0\).</p>
+                </div>
+              </div>
+
+              <div class="backprop-pass-row">
+                <div class="backprop-pass-stage">Hidden layer to word logits</div>
+                <div class="backprop-pass-cell is-forward">
+                  <span class="backprop-map-step-label">Forward 3. Calculate every word logit \(i\)</span>
+                  <div class="backprop-map-equation">\(z_i=\displaystyle\sum_{j=1}^{H}W_{i,h_j}h_j+b_i\)</div>
+                  <p>The hidden signals combine into one raw score for each candidate word.</p>
+                </div>
+                <div class="backprop-pass-cell is-backward">
+                  <span class="backprop-map-step-label">Backward 2. Calculate output parameters, then gather hidden blame</span>
+                  <div class="backprop-map-equation">\(\dfrac{\partial L}{\partial W_{i,h_j}}=\delta_i h_j\)</div>
+                  <div class="backprop-map-equation">\(\dfrac{\partial L}{\partial b_i}=\delta_i\)</div>
+                  <div class="backprop-map-equation">\(\dfrac{\partial L}{\partial h_j}=\displaystyle\sum_{i=1}^{V}\delta_iW_{i,h_j}\)</div>
+                  <p>Each parameter gets blame times input; every output route into hidden unit \(j\) then adds.</p>
+                </div>
+              </div>
+
+              <div class="backprop-pass-row">
+                <div class="backprop-pass-stage">Logits, probabilities, and the loss</div>
+                <div class="backprop-pass-cell is-forward">
+                  <span class="backprop-map-step-label">Forward 4. Normalize, then calculate loss</span>
+                  <div class="backprop-map-equation">\(q_i=\dfrac{e^{z_i}}{\sum_{k=1}^{V}e^{z_k}}\)</div>
+                  <div class="backprop-map-equation">\(L=-\displaystyle\sum_{i=1}^{V}y_i\ln(q_i)=-\ln(q_{\mathrm{true}})\)</div>
+                  <p>Softmax makes one distribution; with a one-hot target, only the true word's surprise remains.</p>
+                </div>
+                <div class="backprop-pass-cell is-backward">
+                  <span class="backprop-map-step-label">Backward 1. Start here, with each output's blame</span>
+                  <div class="backprop-map-equation">\(\delta_i=\dfrac{\partial L}{\partial z_i}=q_i-y_i\)</div>
+                  <p>Softmax plus one-hot cross-entropy collapses to probability minus target.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="backprop-map-update">
+              <div>
+                <span>Backpropagation stops after calculating the gradients.</span>
+                <strong>Gradient descent applies every one of them afterward:</strong>
+              </div>
+              <div class="backprop-map-equation">\(\theta_{\mathrm{new}}=\theta_{\mathrm{old}}-\eta\dfrac{\partial L}{\partial\theta}\)</div>
+              <p class="backprop-map-update-example">With \(\eta=0.10\), the two traced weights move \(W_{h_1,x_1}:\ 0.400\rightarrow0.426\) and \(W_{\mathrm{sat},h_1}:\ 0.800\rightarrow0.814\). Every other weight and bias moves the same way in the same sweep.</p>
+            </div>
+
+            <div class="backprop-map-key">
+              <strong>How to read the symbols</strong>
+              <span>\(m=1\ldots D\): input positions; here \(D=2\)</span>
+              <span>\(j=1\ldots H\): hidden units; here \(H=2\)</span>
+              <span>\(i,k=1\ldots V\): candidate words; here \(V=5\)</span>
+              <span>\(r\): before ReLU</span>
+              <span>\(h\): after ReLU</span>
+              <span>\(z\): logits</span>
+              <span>\(q\): probabilities</span>
+              <span>\(y\): one-hot target</span>
+              <span>\(\delta\): a gradient being passed backward</span>
+              <span>\(\theta\): any trainable weight, bias, or looked-up embedding value</span>
+              <span>\(\eta\): learning rate</span>
+            </div>
+
+            <p class="microcopy backprop-map-handoff">
+              Two rules explain the entire right column: <strong>multiply along one path;
+              add where paths meet.</strong> Steps 1–4 below now prove each line using the
+              same numbers. The later optional matrix view only performs these scalar
+              operations for many values at once.
+            </p>
+          </section>
+          <article class="backprop-story-step">
+            <span class="backprop-story-number">1</span>
+            <div>
+              <h4>Start with the loss, then find the blame on every output score.</h4>
+              <p>
+                Let us write down the complete forward calculation before taking a single
+                derivative. We keep the same word order everywhere:
+                <strong>sat, ran, slept, purred, meowed</strong>. The five raw output
+                scores are the logits \(\mathbf z\), and the one-hot target \(\mathbf y\)
+                puts a 1 beside the word that really came next:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-three">
+                <span>\(z_{\mathrm{sat}}=0.244,\quad y_{\mathrm{sat}}=1\)</span>
+                <span>\(z_{\mathrm{ran}}=0.036,\quad y_{\mathrm{ran}}=0\)</span>
+                <span>\(z_{\mathrm{slept}}=-0.122,\quad y_{\mathrm{slept}}=0\)</span>
+                <span>\(z_{\mathrm{purred}}=0.128,\quad y_{\mathrm{purred}}=0\)</span>
+                <span>\(z_{\mathrm{meowed}}=-0.038,\quad y_{\mathrm{meowed}}=0\)</span>
+              </div>
+              <p>
+                This example uses temperature \(T=1\), so Softmax exponentiates each
+                logit and divides by one shared denominator. Call that denominator
+                \(S\):
+              </p>
+              <div class="formula-stack backprop-equation-grid is-three">
+                <span>\(S=\sum_j e^{z_j}\)</span>
+                <span class="is-wide">\(S=e^{0.244}+e^{0.036}+e^{-0.122}+e^{0.128}+e^{-0.038}\)</span>
+                <span class="is-wide">\(S\approx1.276+1.037+0.885+1.137+0.963=5.297\)</span>
+                <span>\(q_i=\dfrac{e^{z_i}}{S}\)</span>
+                <span>\(q_{\mathrm{sat}}=\dfrac{e^{0.244}}{5.297}=0.241\)</span>
+                <span>\(q_{\mathrm{ran}}=\dfrac{e^{0.036}}{5.297}=0.196\)</span>
+                <span>\(q_{\mathrm{slept}}=\dfrac{e^{-0.122}}{5.297}=0.167\)</span>
+                <span>\(q_{\mathrm{purred}}=\dfrac{e^{0.128}}{5.297}=0.215\)</span>
+                <span>\(q_{\mathrm{meowed}}=\dfrac{e^{-0.038}}{5.297}=0.182\)</span>
+              </div>
+              <p>
+                Cross-entropy now compares that probability distribution \(\mathbf q\)
+                with the target distribution \(\mathbf y\). For one example its full
+                loss equation is:
+              </p>
+              $$L=-\sum_i y_i\ln(q_i)$$
+              <p>
+                Only the <strong>sat</strong> term survives because its target is 1 and
+                every competing target is 0:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-two">
+                <span>\(-y_{\mathrm{sat}}\ln(q_{\mathrm{sat}})=-(1)\ln(0.241)=1.423\)</span>
+                <span>\(-y_{\mathrm{ran}}\ln(q_{\mathrm{ran}})=-(0)\ln(0.196)=0\)</span>
+                <span>\(-y_{\mathrm{slept}}\ln(q_{\mathrm{slept}})=-(0)\ln(0.167)=0\)</span>
+                <span>\(-y_{\mathrm{purred}}\ln(q_{\mathrm{purred}})=-(0)\ln(0.215)=0\)</span>
+                <span>\(-y_{\mathrm{meowed}}\ln(q_{\mathrm{meowed}})=-(0)\ln(0.182)=0\)</span>
+                <span>\(L=1.423+0+0+0+0=1.423\)</span>
+              </div>
+              <p>
+                Now we can ask how the loss changes when one logit changes. Substituting
+                \(q_{\mathrm{sat}}=e^{z_{\mathrm{sat}}}/S\) into the loss makes every
+                dependency visible:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-three">
+                <span>\(L=-\ln\!\left(\dfrac{e^{z_{\mathrm{sat}}}}{S}\right)\)</span>
+                <span>\(L=-z_{\mathrm{sat}}+\ln(S)\)</span>
+                <span>\(\dfrac{\partial S}{\partial z_i}=e^{z_i}\)</span>
+              </div>
+              <p>
+                For the true-word logit, both terms in \(L=-z_{\mathrm{sat}}+\ln S\)
+                depend on that logit. The derivative of the first term is \(-1\); the
+                derivative of the shared \(\ln S\) term is its Softmax probability:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-two">
+                <span>\(\dfrac{\partial L}{\partial z_{\mathrm{sat}}}=-1+\dfrac{1}{S}\dfrac{\partial S}{\partial z_{\mathrm{sat}}}\)</span>
+                <span>\(\dfrac{\partial L}{\partial z_{\mathrm{sat}}}=-1+\dfrac{e^{z_{\mathrm{sat}}}}{S}=-1+q_{\mathrm{sat}}\)</span>
+                <span>\(\delta_{\mathrm{sat}}=\dfrac{\partial L}{\partial z_{\mathrm{sat}}}=0.241-1=-0.759\)</span>
+              </div>
+              <p>
+                For a competing logit such as <strong>ran</strong>, the
+                \(-z_{\mathrm{sat}}\) term contributes 0 because it does not contain
+                \(z_{\mathrm{ran}}\). Only the shared denominator changes:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-two">
+                <span>\(\dfrac{\partial L}{\partial z_{\mathrm{ran}}}=0+\dfrac{1}{S}\dfrac{\partial S}{\partial z_{\mathrm{ran}}}\)</span>
+                <span>\(\dfrac{\partial L}{\partial z_{\mathrm{ran}}}=\dfrac{e^{z_{\mathrm{ran}}}}{S}=q_{\mathrm{ran}}=0.196\)</span>
+              </div>
+              <p>
+                The same reasoning gives the compact rule
+                \(\delta_i=\partial L/\partial z_i=q_i-y_i\). Written out for all five
+                outputs, the arriving gradient is:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-three">
+                <span>\(\delta_{\mathrm{sat}}=0.241-1=-0.759\)</span>
+                <span>\(\delta_{\mathrm{ran}}=0.196-0=+0.196\)</span>
+                <span>\(\delta_{\mathrm{slept}}=0.167-0=+0.167\)</span>
+                <span>\(\delta_{\mathrm{purred}}=0.215-0=+0.215\)</span>
+                <span>\(\delta_{\mathrm{meowed}}=0.182-0=+0.182\)</span>
+              </div>
+              <p>
+                Negative blame on <strong>sat</strong> means raising its score would
+                lower the loss. Positive blame on every competitor means raising that
+                score would raise the loss. This is the complete source of the first
+                chain-rule factor used in the next step.
+              </p>
+            </div>
+          </article>
+          <article class="backprop-story-step">
+            <span class="backprop-story-number">2</span>
+            <div>
+              <h4>Walk backward through this one weight.</h4>
+              <p>
+                We are differentiating the loss with respect to
+                \(W_{\mathrm{sat},h1}\), the highlighted weight from \(h_1\) to the
+                <strong>sat</strong> logit. Its complete dependency path is:
+              </p>
+              $$W_{\mathrm{sat},h1}\longrightarrow z_{\mathrm{sat}}
+              \longrightarrow \mathbf q\longrightarrow L$$
+              <p>
+                The first factor comes from the loss calculation we just derived:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-two">
+                <span>\(L=-\sum_i y_i\ln(q_i)=-\ln(q_{\mathrm{sat}})\)</span>
+                <span>\(\dfrac{\partial L}{\partial z_{\mathrm{sat}}}=q_{\mathrm{sat}}-1\)</span>
+                <span>\(\dfrac{\partial L}{\partial z_{\mathrm{sat}}}=0.241-1=-0.759\)</span>
+              </div>
+              <p>
+                Next write the forward equation that this particular weight appears in.
+                The <strong>sat</strong> logit receives both hidden signals and a bias:
+              </p>
+              $$z_{\mathrm{sat}}
+              =W_{\mathrm{sat},h1}h_1+W_{\mathrm{sat},h2}h_2+b_{\mathrm{sat}}$$
+              <p>
+                In our frozen example, \(h_1=0.180\), \(h_2=0\),
+                \(W_{\mathrm{sat},h1}=0.800\), and \(b_{\mathrm{sat}}=0.100\):
+              </p>
+              <div class="formula-stack backprop-equation-grid is-two">
+                <span>\(z_{\mathrm{sat}}=(0.800)(0.180)+W_{\mathrm{sat},h2}(0)+0.100\)</span>
+                <span>\(z_{\mathrm{sat}}=0.144+0+0.100=0.244\)</span>
+              </div>
+              <p>
+                When taking the partial derivative with respect to
+                \(W_{\mathrm{sat},h1}\), we turn only that weight and hold every other
+                quantity fixed. The terms containing \(W_{\mathrm{sat},h2}\) and the
+                bias therefore contribute 0:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-two">
+                <span>\(\dfrac{\partial(W_{\mathrm{sat},h1}h_1)}{\partial W_{\mathrm{sat},h1}}=h_1\)</span>
+                <span>\(\dfrac{\partial(W_{\mathrm{sat},h2}h_2)}{\partial W_{\mathrm{sat},h1}}=0\)</span>
+                <span>\(\dfrac{\partial b_{\mathrm{sat}}}{\partial W_{\mathrm{sat},h1}}=0\)</span>
+                <span>\(\dfrac{\partial z_{\mathrm{sat}}}{\partial W_{\mathrm{sat},h1}}=h_1+0+0=0.180\)</span>
+              </div>
+              <p>
+                The chain rule now multiplies the loss sensitivity arriving at the logit
+                by the logit's sensitivity to this weight:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-one">
+                <span>\(\dfrac{\partial L}{\partial W_{\mathrm{sat},h1}}=\dfrac{\partial L}{\partial z_{\mathrm{sat}}}\dfrac{\partial z_{\mathrm{sat}}}{\partial W_{\mathrm{sat},h1}}\)</span>
+                <span>\(\dfrac{\partial L}{\partial W_{\mathrm{sat},h1}}=(q_{\mathrm{sat}}-1)h_1\)</span>
+                <span>\(\dfrac{\partial L}{\partial W_{\mathrm{sat},h1}}=(-0.759)(0.180)=-0.13662\approx-0.137\)</span>
+              </div>
+              <p>
+                That is the exact version of our experimental slope \(-0.1366\). One
+                path means multiply the local slopes along that path. Notice the
+                \(h_1=0.180\) factor: a weight carrying a larger incoming signal has more
+                leverage, because the same tiny weight change produces a larger score
+                change. Here \(h_2=0\), so this example gives every
+                \(h_2\)-to-word weight a gradient of 0.
+              </p>
+              <p class="backprop-bias-note">
+                <strong>Biases are the easy case.</strong> A score bias is the same as a
+                weight whose incoming signal is always 1. Since
+                \(z_{\mathrm{sat}}=\cdots+b_{\mathrm{sat}}\), the bias's local derivative
+                is 1. Its complete chain is:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-two">
+                <span>\(\dfrac{\partial z_{\mathrm{sat}}}{\partial b_{\mathrm{sat}}}=1\)</span>
+                <span>\(\dfrac{\partial L}{\partial b_{\mathrm{sat}}}=\dfrac{\partial L}{\partial z_{\mathrm{sat}}}\dfrac{\partial z_{\mathrm{sat}}}{\partial b_{\mathrm{sat}}}\)</span>
+                <span>\(\dfrac{\partial L}{\partial b_{\mathrm{sat}}}=(-0.759)(1)=-0.759\)</span>
+              </div>
+            </div>
+          </article>
+          <article class="backprop-story-step">
+            <span class="backprop-story-number">3</span>
+            <div>
+              <h4>Move one layer earlier, where the path branches.</h4>
+              <p>
+                Hidden signal \(h_1\) fed all five word scores. Each output sends its own
+                request backward through its connecting weight. Those requests can agree
+                or compete, so now the routes add. Start with the generic forward equation
+                for each word \(i\):
+              </p>
+              $$z_i=W_{i,h1}h_1+W_{i,h2}h_2+b_i$$
+              <p>
+                If we vary \(h_1\) while holding \(h_2\), the weights, and the biases
+                fixed, the local derivative is the coefficient attached to \(h_1\):
+              </p>
+              <div class="formula-stack backprop-equation-grid is-three">
+                <span>\(\dfrac{\partial z_i}{\partial h_1}=W_{i,h1}\)</span>
+                <span>\(\dfrac{\partial z_{\mathrm{sat}}}{\partial h_1}=0.80\)</span>
+                <span>\(\dfrac{\partial z_{\mathrm{ran}}}{\partial h_1}=0.20\)</span>
+                <span>\(\dfrac{\partial z_{\mathrm{slept}}}{\partial h_1}=-0.40\)</span>
+                <span>\(\dfrac{\partial z_{\mathrm{purred}}}{\partial h_1}=0.60\)</span>
+                <span>\(\dfrac{\partial z_{\mathrm{meowed}}}{\partial h_1}=-0.10\)</span>
+              </div>
+              <p>
+                The multivariable chain rule says to follow every route from \(h_1\) to
+                the loss and add the results:
+              </p>
+              $$\frac{\partial L}{\partial h_1}
+              =\sum_i\frac{\partial L}{\partial z_i}
+              \frac{\partial z_i}{\partial h_1}$$
+              <p>Now substitute the five arriving gradients from Step 1 and the five local slopes above:</p>
+              <div class="formula-stack backprop-equation-grid is-three">
+                <span><strong>sat route:</strong> \((-0.759)(0.80)=-0.6072\)</span>
+                <span><strong>ran route:</strong> \((+0.196)(0.20)=+0.0392\)</span>
+                <span><strong>slept route:</strong> \((+0.167)(-0.40)=-0.0668\)</span>
+                <span><strong>purred route:</strong> \((+0.215)(0.60)=+0.1290\)</span>
+                <span><strong>meowed route:</strong> \((+0.182)(-0.10)=-0.0182\)</span>
+                <span>\(-0.6072+0.0392=-0.5680\)</span>
+                <span>\(-0.5680-0.0668=-0.6348\)</span>
+                <span>\(-0.6348+0.1290=-0.5058\)</span>
+                <span>\(-0.5058-0.0182=-0.5240\)</span>
+                <span>\(\dfrac{\partial L}{\partial h_1}\approx-0.5240\)</span>
+              </div>
+              <p>
+                This is the second rule to keep: <strong>multiply along one path; add
+                where paths meet.</strong> We cannot directly turn \(h_1\); it is a value
+                produced by earlier weights and a bias. The sum \(-0.524\) is therefore a
+                desired change that we carry one layer farther back to the parameters we
+                can actually update.
+              </p>
+            </div>
+          </article>
+          <article class="backprop-story-step">
+            <span class="backprop-story-number">4</span>
+            <div>
+              <h4>Pass through the ReLU gate and reach the earlier weight.</h4>
+              <p>
+                We now continue from \(h_1\) to the earlier weight
+                \(W_{h1,x1}\). First write the full hidden-neuron equation. The weighted
+                input sum \(r_1\) is the value <em>before</em> ReLU:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-two">
+                <span>\(r_1=W_{h1,x1}x_1+W_{h1,x2}x_2+b_{h1}\)</span>
+                <span>\(r_1=(0.40)(0.50)+(-0.10)(0.20)+0\)</span>
+                <span>\(r_1=0.200-0.020=0.180\)</span>
+                <span>\(h_1=\operatorname{ReLU}(r_1)=\max(0,r_1)=0.180\)</span>
+              </div>
+              <p>
+                ReLU passes positive inputs through unchanged and replaces non-positive
+                inputs with 0. Its local slope is therefore:
+              </p>
+              $$\frac{\partial h_1}{\partial r_1}
+              =\operatorname{ReLU}'(r_1)
+              =\begin{cases}1,&r_1>0\\0,&r_1<0\end{cases}$$
+              <p>
+                Here \(r_1=0.180>0\), so the gate is open and
+                \(\partial h_1/\partial r_1=1\). Next differentiate the weighted sum
+                with respect to the one earlier weight we are following:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-two">
+                <span>\(\dfrac{\partial(W_{h1,x1}x_1)}{\partial W_{h1,x1}}=x_1\)</span>
+                <span>\(\dfrac{\partial(W_{h1,x2}x_2)}{\partial W_{h1,x1}}=0\)</span>
+                <span>\(\dfrac{\partial b_{h1}}{\partial W_{h1,x1}}=0\)</span>
+                <span>\(\dfrac{\partial r_1}{\partial W_{h1,x1}}=x_1+0+0=0.50\)</span>
+              </div>
+              <p>
+                We now have all three factors, each traced to the equation that created it:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-one">
+                <span>\(\dfrac{\partial L}{\partial W_{h1,x1}}=\dfrac{\partial L}{\partial h_1}\dfrac{\partial h_1}{\partial r_1}\dfrac{\partial r_1}{\partial W_{h1,x1}}\)</span>
+                <span>\(\dfrac{\partial L}{\partial W_{h1,x1}}\approx(-0.524)(1)(0.50)\)</span>
+                <span>\(\dfrac{\partial L}{\partial W_{h1,x1}}\approx-0.262\)</span>
+              </div>
+              <p>
+                Backpropagation has now <strong>calculated</strong> this weight's gradient.
+                Only afterward does gradient descent <strong>apply</strong> it. With
+                learning rate \(\eta=0.10\), the general update rule and this specific
+                update are:
+              </p>
+              <div class="formula-stack backprop-equation-grid is-two">
+                <span class="is-wide">\(W_{\mathrm{new}}=W_{\mathrm{old}}-\eta\dfrac{\partial L}{\partial W}\)</span>
+                <span>\(W_{h1,x1}^{\mathrm{new}}=0.400-(0.10)(-0.262)\)</span>
+                <span>\(W_{h1,x1}^{\mathrm{new}}=0.400+0.0262=0.4262\approx0.426\)</span>
+              </div>
+              <p>
+                The gradient is negative, so subtracting it increases the weight. That
+                is not a separate sign trick: it is exactly what the downhill update rule
+                says to do when increasing this weight is predicted to lower the loss.
+              </p>
+            </div>
+          </article>
+          <div class="backprop-example-vote">
+            <p class="eyebrow">One example casts one vote</p>
+            <h4>This backward pass does not speak for the whole corpus.</h4>
+            <p>
+              Every number above answers: "How should the network change for this one
+              example, where <strong>sat</strong> was the true next word?" Another example
+              may ask the same weight to move differently. Full-batch gradient descent
+              averages all those per-example gradients before one update. Mini-batches
+              average a smaller random group; the browser trainer later uses
+              one-example-at-a-time SGD, so it applies each noisy vote immediately.
+            </p>
           </div>
+          <details class="backprop-output-proof">
+            <summary>Optional proof: why does Softmax plus cross-entropy give \(q-y\)?</summary>
+            <div class="backprop-output-proof-body">
+              <p>
+                Let \(s_i=z_i/T\) be the temperature-scaled score and let \(c\) be the
+                true-word index. With \(q_i=e^{s_i}/\sum_j e^{s_j}\), the one-example
+                cross-entropy loss can be rewritten as:
+              </p>
+              $$L=-\ln q_c=-s_c+\ln\sum_j e^{s_j}$$
+              <p>The first term contributes \(-y_i\); the shared log-sum contributes \(q_i\):</p>
+              $$\frac{\partial L}{\partial s_i}=-y_i+\frac{e^{s_i}}{\sum_j e^{s_j}}=q_i-y_i$$
+              <p>Finally, \(\partial s_i/\partial z_i=1/T\), so the general result is:</p>
+              $$\frac{\partial L}{\partial z_i}=\frac{q_i-y_i}{T}$$
+              <p>
+                Here \(T=1\), so the factor is 1. The shared Softmax denominator is why
+                changing one score affects every probability; the compact \(q-y\) vector
+                already accounts for that coupling.
+              </p>
+            </div>
+          </details>
         </div>
 
         <div class="by-hand-lab" id="byHandLab" aria-labelledby="by-hand-title">
@@ -1580,14 +2482,16 @@
             <span id="byHandProgress" class="pill">step 1 of 13</span>
           </div>
           <p class="microcopy">
-            This worksheet is the main story, and now you hold the pencil. Follow the canonical \(D=2, H=2, V=5\) network above from two input numbers to five possible next words, then carry the loss backward. Type each number, check it, ask for progressive hints, and reveal a solution only when you are ready.
+            Now rehearse the whole training step with the same numbers. The first eight
+            steps verify the frozen forward values; the final five make you calculate the
+            output blame, one output-weight gradient, the hidden path sum, one earlier
+            gradient, and the update yourself. Type each number, ask for progressive
+            hints, and reveal a solution only when you are ready.
           </p>
-          <aside class="by-hand-math-refresher" aria-labelledby="by-hand-math-title">
-            <div>
-              <p class="eyebrow">Math refresher</p>
-              <h4 id="by-hand-math-title">The tiny calculus toolkit for the backward half.</h4>
-              <p>When you reach Step 9, these are the local rules we use. You can read them as a cheat sheet while the worksheet asks you to do the actual arithmetic.</p>
-            </div>
+          <details class="by-hand-math-refresher">
+            <summary id="by-hand-math-title">Need help at Step 9? Open the calculus toolkit</summary>
+            <div class="by-hand-math-body">
+            <p>These are the local rules used in the backward half. Open only the proof you need while the worksheet asks you to do the arithmetic.</p>
             <dl class="by-hand-math-list">
               <div>
                 <dt>Partial derivative</dt>
@@ -1761,7 +2665,8 @@
               </div>
             </dl>
             <p class="by-hand-refresher-note">One small notation note: \(\mathbb{1}_{i=j}\) is just an on/off switch. It equals 1 when the two indexes match and 0 otherwise.</p>
-          </aside>
+            </div>
+          </details>
           <div class="by-hand-layout">
             <div class="by-hand-visual-panel">
               <svg id="byHandSvg" class="by-hand-svg" viewBox="0 0 760 430" role="img" aria-label="A small neural network for a by-hand forward and backward pass"></svg>
@@ -1792,378 +2697,230 @@
           </div>
         </div>
 
-        <div class="backprop-worksheet-handoff">
-          <p class="eyebrow">From one worked path to every weight</p>
-          <h3>You have already stepped through the mechanism.</h3>
-          <p>The worksheet's Previous and Next controls let you revisit every forward value, output blame, hidden-path sum, gradient, and update. The optional proof below scales those same moves into matrix notation; the live panel then applies them to every weight and shows whether loss actually falls.</p>
-        </div>
+        <details id="backprop-matrix-rules" class="backprop-deep-dive backprop-matrix-dive">
+          <summary>Optional deep dive: turn the same scalar work into matrix rules</summary>
+          <div class="math-formal" aria-label="Optional matrix derivation of the worksheet's backpropagation step">
+            <h3>Nothing new is happening here. We are doing every path at once.</h3>
+            <p>
+              The worksheet used input width \(D=2\), hidden width \(H=2\), and
+              vocabulary size \(V=5\). It calculated one output-weight gradient and one
+              input-weight gradient as scalars. A real implementation needs all ten
+              entries of \(W_2\) and all four entries of \(W_1\), so linear algebra packs
+              those repeated scalar operations into grids.
+            </p>
+            <p>
+              And ten is nothing. A real language model does not have ten weights, it has billions. Walking
+              them one at a time in a <code>for</code> loop is not slow, it is hopeless - you would still be
+              waiting years later. Matrices are how we say "do all of that at once", and the hardware in a GPU
+              is built for exactly this shape of work. So the goal here is not new math. It is the same
+              arithmetic you just did by hand, written so a machine can do a million copies of it in one breath.
+            </p>
 
-        <details class="backprop-deep-dive">
-          <summary>Optional deep dive: repeat one cropped path, then prove the matrix rules</summary>
-        <div class="math-formal" aria-label="Optional backpropagation derivation in symbols">
-          <h3>A Step-by-Step Backpropagation Walkthrough</h3>
-          <p>
-            To truly demystify backpropagation, we are going to start by ditching the abstract algebra and crunching real numbers step-by-step (an approach heavily inspired by <a href="https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/" target="_blank" rel="noreferrer">Matt Mazur's classic backpropagation tutorial</a>, but adapted for our language model). Once we prove the math works for a single weight, we will scale it up using matrices—revealing why operations like "transpose" are the secret weapons that make modern AI possible.
-          </p>
-          <p>
-            We will trace exactly how a mistake at the end of the network flows backward to fix a weight at the very beginning.
-          </p>
-          
-          <figure class="build-network-figure backprop-chain-figure">
-            <svg class="mlp-svg" viewBox="0 0 560 270" role="img" aria-labelledby="chain-fig-t chain-fig-d">
-              <title id="chain-fig-t">One weight inside the forward-pass network</title>
-              <desc id="chain-fig-d">The same forward-pass network: two context words feed a hidden layer through the weights W1, the hidden layer feeds the output score z through the weights W2, softmax turns z into probabilities q, and a loss L sits on the end. One weight w inside W1 is highlighted; its influence reaches the loss along the path w to h to z to L. The forward pass runs left to right and the backward pass multiplies the local slopes from right to left.</desc>
-              <defs>
-                <marker id="chainFwd" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
-                  <path d="M0,0 L6,3 L0,6 Z" fill="var(--teal)"></path>
-                </marker>
-                <marker id="chainBack" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto">
-                  <path d="M0,0 L6,3 L0,6 Z" fill="#9c5a00"></path>
-                </marker>
-              </defs>
-
-              <text class="mlp-axis" x="280" y="18">the forward-pass network above, with a loss L on the end</text>
-
-              <!-- Network Edges -->
-              <line class="network-edge is-muted" x1="78" y1="88" x2="189" y2="130"></line>
-              <line class="network-edge is-muted" x1="78" y1="88" x2="189" y2="190"></line>
-              <line class="network-edge is-muted" x1="78" y1="172" x2="189" y2="70"></line>
-              <line class="network-edge is-muted" x1="78" y1="172" x2="189" y2="130"></line>
-              <line class="network-edge is-muted" x1="78" y1="172" x2="189" y2="190"></line>
-              <line class="network-edge is-muted" x1="223" y1="130" x2="336" y2="130"></line>
-              <line class="network-edge is-muted" x1="223" y1="190" x2="336" y2="130"></line>
-
-              <!-- Active Highlighted Path -->
-              <line class="network-edge is-active" x1="78" y1="88" x2="189" y2="70" marker-end="url(#chainFwd)"></line>
-              <line class="network-edge is-active" x1="223" y1="70" x2="336" y2="130" marker-end="url(#chainFwd)"></line>
-              <line class="network-edge is-active" x1="384" y1="130" x2="452" y2="130" marker-end="url(#chainFwd)"></line>
-
-              <!-- Layer Labels -->
-              <text class="network-value" x="54" y="42" style="font-weight:bold;">x</text>
-              <text class="network-value" x="132" y="42" style="font-weight:bold;">W&#8321;</text>
-              <text class="network-value" x="206" y="42" style="font-weight:bold;">h</text>
-              <text class="network-value" x="286" y="42" style="font-weight:bold;">W&#8322;</text>
-              
-              <!-- Highlighted Single Weight -->
-              <text x="133" y="73" style="fill:#111111;font-size:13px;font-weight:900;text-anchor:middle">w</text>
-
-              <!-- Input Layer -->
-              <circle class="network-node is-input" cx="54" cy="88" r="24"></circle>
-              <text class="network-label" x="54" y="93">word 1</text>
-              <circle class="network-node is-input" cx="54" cy="172" r="24"></circle>
-              <text class="network-label" x="54" y="177">word 2</text>
-              
-              <!-- Hidden Layer -->
-              <circle class="network-node is-hidden" cx="206" cy="70" r="17"></circle>
-              <text class="network-label" x="206" y="75">h&#8321;</text>
-              <circle class="network-node is-hidden" cx="206" cy="130" r="17"></circle>
-              <text class="network-label" x="206" y="135">h&#8322;</text>
-              <circle class="network-node is-hidden" cx="206" cy="190" r="17"></circle>
-              <text class="network-label" x="206" y="195">h&#8323;</text>
-              
-              <!-- Output Logits -->
-              <circle class="network-node is-hidden" cx="360" cy="130" r="24"></circle>
-              <text class="network-label" x="360" y="135">z</text>
-              
-              <!-- Loss Function -->
-              <rect class="network-node is-output" x="454" y="106" width="76" height="48" rx="12"></rect>
-              <text class="network-label" x="492" y="135">L</text>
-
-              <!-- Final Output Descriptions -->
-              <text class="network-value" x="360" y="170">softmax (q)</text>
-              <text class="network-value" x="492" y="170">loss</text>
-              <text class="mlp-axis" x="54" y="226">2 context words</text>
-              <text class="mlp-axis" x="206" y="226">hidden layer &middot; tanh</text>
-
-              <!-- Backpropagation Arrow and Blame -->
-              <line class="backprop-flow" x1="492" y1="246" x2="56" y2="246" marker-end="url(#chainBack)"></line>
-              <text x="274" y="238" style="fill:#9c5a00; font-size:14px; font-weight:bold; text-anchor:middle;">&delta; (blame flow)</text>
-              <text class="mlp-axis" x="280" y="263">chain rule paths: &part;L/&part;w = &part;L/&part;z &middot; &part;z/&part;h &middot; &part;h/&part;w</text>
-            </svg>
-            <figcaption>
-              To find the gradient for a weight deep in the network (like \(w\)), backprop follows the chain rule backward (gold arrow) along every path that connects that weight to the final error.
-            </figcaption>
-          </figure>
-
-          <p>To see this sweep in action, we need to unwind the forward pass we just built. Here is our network's forward logic, read from bottom to top:</p>
-          $$x = [\,E_{w_1};E_{w_2}\,] \qquad h = f(W_1 x + b_1)$$
-          $$z = W_2 h + b_2 \qquad q = \text{softmax}(z)$$
-          $$L = -\ln q_c$$
-          
-          <ul class="symbol-glossary">
-            <li>\(x\): the two context-word vectors joined (the input); \(h\): the hidden activation.</li>
-            <li>\(f\): the activation function (like ReLU or tanh). The raw value inside it, \(W_1 x + b_1\), is what we differentiate through.</li>
-            <li>\(z, q\): the output logits and softmax probabilities; \(y\): the one-hot target (\(1\) at the true word \(c\)); \(L = -\ln q_c\): the final loss.</li>
-          </ul>
-
-          <h3>Part 1: Replay one cropped path</h3>
-          <p>This is not a new network. It crops the worksheet's \(D=2, H=2, V=5\) graph down to one visible input, one hidden neuron, and two output words so we can repeat one chain-rule path without carrying every number. We'll set the learning rate \(\eta\) to \(0.1\), assume biases are \(0\), and use the same ReLU activation:</p>
-          <ul class="symbol-glossary">
-            <li><strong>Input Data:</strong> \(x_1 = 0.5\)</li>
-            <li><strong>Hidden layer weight (W1):</strong> \(w_1 = 0.4\) (connects input \(x_1\) to hidden neuron \(h_1\)).</li>
-            <li><strong>Output layer weights (W2):</strong> \(w_2 = 0.6\) (connects \(h_1\) to word 1's score \(z_1\)). \(w_3 = -0.5\) (connects \(h_1\) to word 2's score \(z_2\)).</li>
-            <li><strong>The Target:</strong> Word 1 is the correct next word (\(y_1 = 1,\ y_2 = 0\)).</li>
-          </ul>
-
-          <p><strong>1. The Forward Pass</strong><br>We push the data forward through the pipes to get our prediction:</p>
-          
-          <figure class="build-network-figure" style="margin-top: 1.5rem; margin-bottom: 2rem;">
-            <svg class="mlp-svg" viewBox="0 0 560 210" role="img" aria-label="Forward pass diagram">
-              <defs>
-                <marker id="fwdF1" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--teal)"></path></marker>
-              </defs>
-              <!-- Edges -->
-              <line class="network-edge is-active" x1="80" y1="100" x2="190" y2="100" marker-end="url(#fwdF1)"></line>
-              <line class="network-edge is-active" x1="238" y1="92" x2="330" y2="62" marker-end="url(#fwdF1)"></line>
-              <line class="network-edge is-active" x1="238" y1="108" x2="330" y2="138" marker-end="url(#fwdF1)"></line>
-              <line class="network-edge is-active" x1="378" y1="62" x2="444" y2="90" marker-end="url(#fwdF1)"></line>
-              <line class="network-edge is-active" x1="378" y1="138" x2="444" y2="110" marker-end="url(#fwdF1)"></line>
-
-              <!-- Values -->
-              <text class="network-value" x="135" y="90">w₁ = 0.4</text>
-              <text class="network-value" x="280" y="65">w₂ = 0.6</text>
-              <text class="network-value" x="280" y="140">w₃ = -0.5</text>
-              
-              <!-- Nodes -->
-              <circle class="network-node is-input" cx="56" cy="100" r="24"></circle>
-              <text class="network-label" x="56" y="105">x₁</text>
-              <text class="network-value" x="56" y="145" style="font-weight:bold;">0.5</text>
-              
-              <circle class="network-node is-hidden" cx="214" cy="100" r="24"></circle>
-              <text class="network-label" x="214" y="105">h₁</text>
-              <text class="network-value" x="214" y="145" style="font-weight:bold;">0.2</text>
-              
-              <circle class="network-node is-hidden" cx="354" cy="55" r="24"></circle>
-              <text class="network-label" x="354" y="60">z₁</text>
-              <text class="network-value" x="354" y="20" style="font-weight:bold;">0.12</text>
-              
-              <circle class="network-node is-hidden" cx="354" cy="145" r="24"></circle>
-              <text class="network-label" x="354" y="150">z₂</text>
-              <text class="network-value" x="354" y="190" style="font-weight:bold;">-0.1</text>
-              
-              <rect class="network-node is-output" x="444" y="76" width="76" height="48" rx="12"></rect>
-              <text class="network-label" x="482" y="105">L</text>
-              <text class="network-value" x="482" y="145" style="font-weight:bold;">0.589</text>
-            </svg>
-            <figcaption>Forward pass: calculating the output and total loss from left to right.</figcaption>
-          </figure>
-
-          <div class="formula-stack">
-            <span>\(\text{Hidden Input } (net_{h1}) = x_1 \times w_1 = 0.5 \times 0.4 = 0.2\)</span>
-            <span>\(\text{Hidden Output } (h_1) = \text{ReLU}(0.2) = 0.2\)</span>
-            <span>\(\text{Word 1 Logit } (z_1) = h_1 \times w_2 = 0.2 \times 0.6 = 0.12\)</span>
-            <span>\(\text{Word 2 Logit } (z_2) = h_1 \times w_3 = 0.2 \times -0.5 = -0.1\)</span>
-          </div>
-          <p>Pass logits through Softmax to get probabilities (\(q\)) and Cross-Entropy for Loss (\(L\)):</p>
-          <div class="formula-stack">
-            <span>\(\text{Softmax denominator: } e^{0.12} + e^{-0.1} \approx 2.032\)</span>
-            <span>\(q_1 = 1.127 / 2.032 \approx 0.555 \quad \text{(Model is 55.5\% confident in Word 1)}\)</span>
-            <span>\(q_2 = 0.905 / 2.032 \approx 0.445 \quad \text{(Model is 44.5\% confident in Word 2)}\)</span>
-            <span>\(L = -\ln(q_1) = -\ln(0.555) \approx 0.589\)</span>
-          </div>
-
-          <p><strong>2. The Backward Pass (Output Weight \(w_2\))</strong><br>Our goal is to update \(w_2\) so the loss decreases. The formal mathematical rules for this step dictate exactly what we calculate:</p>
-          
-          <div class="formula-stack" style="background-color: var(--surface-2); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-            <span>\(1.\ \delta = q - y \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Find the Output Blame)</span></span>
-            <span>\(2.\ \nabla W_2 = \delta h^{\top} \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Calculate Output Weight Gradient)</span></span>
-            <span>\(5.\ \theta \leftarrow \theta - \eta \nabla \theta \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Update weight downhill)</span></span>
-          </div>
-
-          <figure class="build-network-figure" style="margin-top: 1.5rem; margin-bottom: 2rem;">
-            <svg class="mlp-svg" viewBox="0 0 560 210" role="img" aria-label="Backward pass output weight">
-              <defs>
-                <marker id="bwdB2" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9c5a00"></path></marker>
-              </defs>
-              <!-- Muted Forward Edges -->
-              <line class="network-edge is-muted" x1="80" y1="100" x2="190" y2="100"></line>
-              <line class="network-edge is-muted" x1="238" y1="92" x2="330" y2="62"></line>
-              <line class="network-edge is-muted" x1="238" y1="108" x2="330" y2="138"></line>
-              <line class="network-edge is-muted" x1="378" y1="62" x2="444" y2="90"></line>
-              <line class="network-edge is-muted" x1="378" y1="138" x2="444" y2="110"></line>
-
-              <!-- Backprop Edges -->
-              <line class="backprop-flow" x1="444" y1="75" x2="378" y2="47" marker-end="url(#bwdB2)"></line>
-              <line class="backprop-flow" x1="330" y1="47" x2="238" y2="77" marker-end="url(#bwdB2)"></line>
-              
-              <!-- Annotations -->
-              <text class="network-value" x="420" y="40" style="fill:#9c5a00; font-weight:bold;">&delta;&#8321; = -0.445</text>
-              <text class="network-value" x="290" y="35" style="fill:#9c5a00; font-weight:bold;">&part;L/&part;w&#8322; = -0.089</text>
-              
-              <!-- Nodes -->
-              <circle class="network-node is-input" cx="56" cy="100" r="24"></circle>
-              <text class="network-label" x="56" y="105">x₁</text>
-              <circle class="network-node is-hidden" cx="214" cy="100" r="24"></circle>
-              <text class="network-label" x="214" y="105">h₁</text>
-              <circle class="network-node is-hidden" cx="354" cy="55" r="24"></circle>
-              <text class="network-label" x="354" y="60">z₁</text>
-              <circle class="network-node is-hidden" cx="354" cy="145" r="24"></circle>
-              <text class="network-label" x="354" y="150">z₂</text>
-              <rect class="network-node is-output" x="444" y="76" width="76" height="48" rx="12"></rect>
-              <text class="network-label" x="482" y="105">L</text>
-            </svg>
-            <figcaption>Backward pass for output weight \(w_2\): multiplying the blame \(\delta\) at \(z_1\) by the signal from \(h_1\).</figcaption>
-          </figure>
-
-          <p>The chain rule tells us to multiply the blame at the end by the signal that fed the weight (\(\frac{\partial L}{\partial w_2} = \frac{\partial L}{\partial z_1} \times \frac{\partial z_1}{\partial w_2}\)). Let's execute the rules:</p>
-          <div class="formula-stack">
-            <span>\(\text{Piece 1 (The Blame } \delta_1\text{): } \frac{\partial L}{\partial z_1} = q_1 - y_1 = 0.555 - 1 = -0.445\)</span>
-            <span>\(\text{Piece 2 (The Signal } h_1\text{): } \frac{\partial z_1}{\partial w_2} = h_1 = 0.2\)</span>
-            <span>\(\textbf{Gradient for } \mathbf{w_2} \left( \frac{\partial L}{\partial w_2} \right) = -0.445 \times 0.2 = -0.089\)</span>
-            <span>\(\text{Update: } w_2^+ = 0.6 - (0.1 \times -0.089) = 0.6089\)</span>
-          </div>
-          <p class="microcopy">The weight increased, meaning next time, the network will naturally give a higher score to the correct word.</p>
-
-          <p><strong>3. The Backward Pass (Hidden Weight \(w_1\))</strong><br>This is where it gets interesting. \(w_1\) is buried deep in the network. The formal mathematical rules for passing blame deeper look scary at first glance:</p>
-          
-          <div class="formula-stack" style="background-color: var(--surface-2); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-            <span>\(3.\ \delta^{(1)} = (W_2^{\top} \delta) \odot f' \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Pass Blame down to Hidden Layer)</span></span>
-            <span>\(4.\ \nabla W_1 = \delta^{(1)} x^{\top} \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Calculate Hidden Weight Gradient)</span></span>
-            <span>\(5.\ \theta \leftarrow \theta - \eta \nabla \theta \qquad\) <span style="color: var(--text-muted); font-size: 0.9em;">(Update weight downhill)</span></span>
-          </div>
-
-          <figure class="build-network-figure" style="margin-top: 1.5rem; margin-bottom: 2rem;">
-            <svg class="mlp-svg" viewBox="0 0 560 210" role="img" aria-label="Backward pass hidden weight">
-              <defs>
-                <marker id="bwdB3" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9c5a00"></path></marker>
-              </defs>
-              <!-- Muted Forward Edges -->
-              <line class="network-edge is-muted" x1="80" y1="100" x2="190" y2="100"></line>
-              <line class="network-edge is-muted" x1="238" y1="92" x2="330" y2="62"></line>
-              <line class="network-edge is-muted" x1="238" y1="108" x2="330" y2="138"></line>
-              <line class="network-edge is-muted" x1="378" y1="62" x2="444" y2="90"></line>
-              <line class="network-edge is-muted" x1="378" y1="138" x2="444" y2="110"></line>
-
-              <!-- Backprop Edges -->
-              <line class="backprop-flow" x1="444" y1="75" x2="378" y2="47" marker-end="url(#bwdB3)"></line>
-              <line class="backprop-flow" x1="444" y1="125" x2="378" y2="153" marker-end="url(#bwdB3)"></line>
-              
-              <line class="backprop-flow" x1="330" y1="47" x2="238" y2="77" marker-end="url(#bwdB3)"></line>
-              <line class="backprop-flow" x1="330" y1="153" x2="238" y2="123" marker-end="url(#bwdB3)"></line>
-              
-              <line class="backprop-flow" x1="190" y1="90" x2="80" y2="90" marker-end="url(#bwdB3)"></line>
-              
-              <!-- Annotations -->
-              <text class="network-value" x="420" y="40" style="fill:#9c5a00; font-weight:bold;">&delta;&#8321; = -0.445</text>
-              <text class="network-value" x="420" y="175" style="fill:#9c5a00; font-weight:bold;">&delta;&#8322; = +0.445</text>
-              <text class="network-value" x="214" y="145" style="fill:#9c5a00; font-weight:bold;">&Sigma; = -0.4895</text>
-              <text class="network-value" x="135" y="80" style="fill:#9c5a00; font-weight:bold;">&part;L/&part;w&#8321; = -0.245</text>
-              
-              <!-- Nodes -->
-              <circle class="network-node is-input" cx="56" cy="100" r="24"></circle>
-              <text class="network-label" x="56" y="105">x₁</text>
-              <circle class="network-node is-hidden" cx="214" cy="100" r="24"></circle>
-              <text class="network-label" x="214" y="105">h₁</text>
-              <circle class="network-node is-hidden" cx="354" cy="55" r="24"></circle>
-              <text class="network-label" x="354" y="60">z₁</text>
-              <circle class="network-node is-hidden" cx="354" cy="145" r="24"></circle>
-              <text class="network-label" x="354" y="150">z₂</text>
-              <rect class="network-node is-output" x="444" y="76" width="76" height="48" rx="12"></rect>
-              <text class="network-label" x="482" y="105">L</text>
-            </svg>
-            <figcaption>Backward pass for hidden weight \(w_1\): the blame must be summed from both output paths before passing through the ReLU gate.</figcaption>
-          </figure>
-
-          <p>That matrix multiplication \((W_2^{\top} \delta)\) is just the formal way to say <em>"sum up the blame from all the paths it connects to"</em>. Because the hidden neuron \(h_1\) connects to <em>both</em> \(z_1\) and \(z_2\), it must accept blame from both paths! We must sum them up.</p>
-          $$\frac{\partial L}{\partial h_1} = \left( \frac{\partial L}{\partial z_1} \times \frac{\partial z_1}{\partial h_1} \right) + \left( \frac{\partial L}{\partial z_2} \times \frac{\partial z_2}{\partial h_1} \right)$$
-          <p>The derivative of a logit with respect to its hidden input is simply its connecting weight (\(w_2\) and \(w_3\)). Let's execute the rules:</p>
-          <div class="formula-stack">
-            <span>\(\text{Piece 1 (Gathering Blame } W_2^{\top}\delta \text{): } \frac{\partial L}{\partial h_1} = (-0.445 \times 0.6) + (0.445 \times -0.5) = -0.4895\)</span>
-            <span>\(\text{Piece 2 (Activation Gate } f' \text{): } \frac{\partial h_1}{\partial net_{h1}} = 1 \quad \text{(Since } 0.2 > 0 \text{, ReLU slope is 1)}\)</span>
-            <span>\(\text{Piece 3 (The Signal } x \text{): } \frac{\partial net_{h1}}{\partial w_1} = x_1 = 0.5\)</span>
-            <span>\(\textbf{Gradient for } \mathbf{w_1} \left( \frac{\partial L}{\partial w_1} \right) = -0.4895 \times 1 \times 0.5 \approx -0.245\)</span>
-            <span>\(\text{Update: } w_1^+ = 0.4 - (0.1 \times -0.245) = 0.4245\)</span>
-          </div>
-
-          <h3>Part 2: The Macro View (Scaling to Matrices)</h3>
-          <p>
-            The step-by-step math proves there is no magic happening. But an LLM doesn't have 3 weights; it has billions. Calculating that "Gathering Blame" sum (\( \frac{\partial L}{\partial z_1}w_2 + \frac{\partial L}{\partial z_2}w_3 + \dots \)) one-by-one with a `for` loop would take years. 
-          </p>
-          <p>
-            To execute those 5 formal rules instantly, we use <strong>Matrices</strong> and a secret weapon called the <strong>Transpose</strong> (\(\top\)). Transposing simply flips a grid of numbers on its side, turning columns into rows. 
-          </p>
-          <p>
-            Let's expand our example to a hidden layer with <strong>3 neurons</strong> (\(h\)) and an output layer with <strong>5 vocabulary words</strong> (\(z\)). To connect them, we need a <strong>\(5 \times 3\) weight matrix</strong> (\(W_2\)). In the forward pass, the shapes align perfectly:
-          </p>
-          $$\underbrace{\begin{bmatrix} 1 & 0 & 2 \\ -1 & 1 & 0 \\ 0 & 0 & 1 \\ 2 & -1 & -1 \\ 0 & 1 & 1 \end{bmatrix}}_{W_2 \ (5 \times 3)} \times \underbrace{\begin{bmatrix} 2 \\ 1 \\ 0 \end{bmatrix}}_{h \ (3 \times 1)} = \underbrace{\begin{bmatrix} 2 \\ -1 \\ 0 \\ 3 \\ 1 \end{bmatrix}}_{z \ (5 \times 1)}$$
-          <p>
-            But when we go backward to "Gather Blame" (Rule 3), the shapes clash. We have 5 pieces of output blame (\(\delta\)) that need to flow back to the 3 hidden neurons. We cannot mathematically multiply a \(5 \times 3\) grid by a column of 5 blames. 
-          </p>
-          <p>
-            By transposing the weights into a \(3 \times 5\) grid (\(W_2^\top\)), we run the plumbing in exact reverse. Notice how the columns of \(W_2\) become the rows of \(W_2^\top\):
-          </p>
-          $$\underbrace{\begin{bmatrix} 1 & -1 & 0 & 2 & 0 \\ 0 & 1 & 0 & -1 & 1 \\ 2 & 0 & 1 & -1 & 1 \end{bmatrix}}_{W_2^\top \ (3 \times 5)} \times \underbrace{\begin{bmatrix} 0.1 \\ 0 \\ -0.2 \\ 0 \\ 0.1 \end{bmatrix}}_{\delta \ (5 \times 1)} = \underbrace{\begin{bmatrix} 0.1 \\ 0.1 \\ 0.1 \end{bmatrix}}_{\text{hidden blame } (3 \times 1)}$$
-          <p class="microcopy">
-            Look closely at that matrix multiplication: it is performing the exact "Gathering Blame" sum we did by hand in Step 3, but it does it for all 3 neurons simultaneously!
-          </p>
-
-          <p>
-            We use Transpose again to calculate the final weight gradients (Rule 4). To fix the weights, every single one of the 5 output blames must multiply with every single one of the 3 hidden signals. If we stand the 5 blames up in a vertical column and lay the 3 signals flat in a horizontal row (\(h^\top\)), multiplying them draws a full \(5 \times 3\) grid of answers:
-          </p>
-          $$\underbrace{\begin{bmatrix} 0.1 \\ 0 \\ -0.2 \\ 0 \\ 0.1 \end{bmatrix}}_{\delta \ (5 \times 1)} \times \underbrace{\begin{bmatrix} 2 & 1 & 0 \end{bmatrix}}_{h^\top \ (1 \times 3)} = \underbrace{\begin{bmatrix} 0.2 & 0.1 & 0 \\ 0 & 0 & 0 \\ -0.4 & -0.2 & 0 \\ 0 & 0 & 0 \\ 0.2 & 0.1 & 0 \end{bmatrix}}_{\text{weight updates } (5 \times 3)}$$
-          <p class="microcopy">
-            This matches the exact shape of our original \(W_2\) matrix, calculating the perfect gradient for all 15 weights in a single mathematical breath. 
-          </p>
-
-          <details class="math-proof-accordion" style="background-color: var(--surface-2); padding: 1rem; border-radius: 8px; margin-top: 1.5rem; margin-bottom: 2rem; cursor: pointer; border: 1px solid var(--border-color);">
-            <summary style="font-weight: bold; color: var(--text-main); user-select: none;">Click to expand: The Mathematical Proof of the Transpose</summary>
-            <div style="margin-top: 1rem; cursor: text;">
-              <p>The appearance of the transpose (\(\top\)) isn't an arbitrary matrix trick—it is the mathematically unavoidable result of applying the multivariable chain rule to every number in the grid simultaneously.</p>
-              
-              <p>Let's look at our simple linear layer: \(z = Wx\). In this chapter's output layer, the generic \(M\) below is vocabulary size \(V\), and \(N\) is hidden width \(H\).<br>
-              Let \(W\) be a matrix of size \(M \times N\).<br>
-              Let \(x\) be a column vector of size \(N \times 1\).<br>
-              Let \(z\) be a column vector of size \(M \times 1\).<br>
-              Let \(\delta = \frac{\partial L}{\partial z}\) be the column vector of blame arriving at \(z\) (size \(M \times 1\)).</p>
-
-              <p><strong>Proof 1: The Weight Update (\(\nabla W = \delta x^\top\))</strong></p>
-              <p>To find how a single specific weight, \(W_{ij}\) (the weight in row \(i\), column \(j\)), affects the final loss \(L\), we use the chain rule. Since weight \(W_{ij}\) <em>only</em> connects to one specific output neuron \(z_i\), the chain rule simplifies to a single path:</p>
-              $$\frac{\partial L}{\partial W_{ij}} = \frac{\partial L}{\partial z_i} \times \frac{\partial z_i}{\partial W_{ij}}$$
-              
-              <ol>
-                <li>We already know \(\frac{\partial L}{\partial z_i} = \delta_i\).</li>
-                <li>The formula for output neuron \(z_i\) is \(z_i = (W_{i1}x_1) + \dots + (W_{ij}x_j) + \dots\). If we take the derivative of that sum with respect to \(W_{ij}\), everything else drops away, leaving only the input signal \(x_j\). So, \(\frac{\partial z_i}{\partial W_{ij}} = x_j\).</li>
-              </ol>
-              <p>Plugging those in gives us: \(\frac{\partial L}{\partial W_{ij}} = \delta_i x_j\)</p>
-              
-              <p><strong>The Matrix Connection:</strong> This tells us that the gradient for <em>any</em> weight in the grid is just its corresponding row's blame (\(\delta_i\)) multiplied by its corresponding column's input (\(x_j\)). In linear algebra, the operation that multiplies every element of an \(M \times 1\) column vector (\(\delta\)) by every element of a \(1 \times N\) row vector (\(x^\top\)) to create a full \(M \times N\) grid is called the <strong>Outer Product</strong>. Therefore, written as full matrices, \(\frac{\partial L}{\partial W} = \delta x^\top\).</p>
-
-              <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
-
-              <p><strong>Proof 2: Passing Blame (\(\nabla x = W^\top \delta\))</strong></p>
-              <p>Now we want to find how a single input signal, \(x_j\), affects the final loss \(L\) so we can pass the blame backward to it. Using the multivariable chain rule, we must sum up its effect across all output paths. Unlike a single weight, an input signal \(x_j\) fans out and connects to <strong>every single output neuron</strong> (\(z_1, \dots, z_M\)).</p>
-              
-              <p>So, the chain rule requires a sum over all \(M\) outputs:</p>
-              $$\frac{\partial L}{\partial x_j} = \sum_{i=1}^{M} \left( \frac{\partial L}{\partial z_i} \times \frac{\partial z_i}{\partial x_j} \right)$$
-              
-              <ol>
-                <li>Again, \(\frac{\partial L}{\partial z_i} = \delta_i\).</li>
-                <li>As before, \(z_i = (W_{i1}x_1) + \dots + (W_{ij}x_j) + \dots\). The derivative of \(z_i\) with respect to \(x_j\) is simply the connecting weight: \(W_{ij}\).</li>
-              </ol>
-              <p>Plugging those in gives us: \(\frac{\partial L}{\partial x_j} = \sum_{i=1}^{M} \delta_i W_{ij}\)</p>
-              
-              <p><strong>The Matrix Connection:</strong> Look closely at that sum. We are multiplying the elements of a column vector (\(\delta\)) by the elements of a column from our weight matrix (\(W_{1j}, W_{2j}, \dots\)). Standard matrix multiplication requires us to multiply a <em>row</em> by a <em>column</em>. To make the math legal so the computer can calculate the sums for every \(x\) simultaneously, we have to take the \(W\) matrix and lay its columns down horizontally into rows. Flipping columns into rows is exactly what the <strong>Transpose</strong> (\(W^\top\)) does! Therefore, written as full matrices, \(\frac{\partial L}{\partial x} = W^\top \delta\).</p>
+            <div class="backprop-shape-primer" aria-labelledby="backprop-shape-title">
+              <p class="eyebrow">The worksheet's number arrangements</p>
+              <h3 id="backprop-shape-title">Every result must match the parameter grid it will update.</h3>
+              <div class="backprop-shape-grid">
+                <article><code>x: D&times;1 = 2&times;1</code><span>two input signals</span></article>
+                <article><code>W<sub>1</sub>: H&times;D = 2&times;2</code><span>input-to-hidden weights</span></article>
+                <article><code>h: H&times;1 = 2&times;1</code><span>two hidden signals</span></article>
+                <article><code>W<sub>2</sub>: V&times;H = 5&times;2</code><span>hidden-to-word weights</span></article>
+                <article><code>z,q,&delta;: V&times;1 = 5&times;1</code><span>one value per word</span></article>
+              </div>
+              <div class="backprop-operation-grid">
+                <article><strong>Transpose \((\top)\)</strong><p>Flip rows into columns. \(W_2^\top\delta\) performs the five-path sum for both hidden neurons.</p></article>
+                <article><strong>Element-wise multiply \((\odot)\)</strong><p>Pair matching positions. Each hidden blame meets its own ReLU slope.</p></article>
+                <article><strong>Outer product</strong><p>Multiply every blame by every incoming signal. The result has one gradient for every weight.</p></article>
+              </div>
             </div>
-          </details>
 
-          <h3>The Golden Rules of Backprop</h3>
-          <p>Because of the magic of matrices, the tedious math we did by hand collapses into the clean formal rules we introduced above. Let \(\delta\) represent the blame arriving at any layer. As we sweep backward, every layer applies these steps:</p>
-          <ul class="symbol-glossary">
-            <li><strong>1. The Weight Update Rule:</strong> To find a layer's weight updates, multiply the incoming blame column by the transposed signal row (\(h^\top\) or \(x^\top\)) that fed into it. </li>
-            <li><strong>2. The Blame-Passing Rule:</strong> To pass blame to the layer below, multiply the transposed weights (\(W^\top\)) by the current blame, then multiply by the activation function's local slope (\(f'\)).</li>
-          </ul>
+            <div>
+              <h3>Forward, the shapes fit. Turn around and they clash.</h3>
+              <p>
+                This is the moment the transpose earns its keep, so it is worth watching closely. Going forward,
+                nothing is awkward. Lay the \(5\times2\) output grid against the \(2\times1\) hidden column, add the
+                bias, and out comes exactly one score per word - the same five logits the worksheet produced:
+              </p>
+              $$\underbrace{\begin{bmatrix}0.8 &amp; -0.2\\0.2 &amp; 0.5\\-0.4 &amp; 0.1\\0.6 &amp; -0.3\\-0.1 &amp; 0.4\end{bmatrix}}_{W_2\ (5\times2)}
+              \underbrace{\begin{bmatrix}0.180\\0\end{bmatrix}}_{h\ (2\times1)}
+              +\underbrace{\begin{bmatrix}0.10\\0\\-0.05\\0.02\\-0.02\end{bmatrix}}_{b_2\ (5\times1)}
+              =\underbrace{\begin{bmatrix}0.244\\0.036\\-0.122\\0.128\\-0.038\end{bmatrix}}_{z\ (5\times1)}$$
+              <p>
+                Now turn around. We are holding five blames, one per word, stacked in a \(5\times1\) column, and
+                they need to travel back into two hidden neurons. Try it with the grid as it stands and the
+                multiplication is simply not legal - a \(5\times2\) grid has nothing to pair with a \(5\times1\)
+                column:
+              </p>
+              $$\underbrace{(5\times2)}_{W_2}\times\underbrace{(5\times1)}_{\delta}\ \Rightarrow\ \text{undefined}
+              \qquad
+              \underbrace{(2\times5)}_{W_2^\top}\times\underbrace{(5\times1)}_{\delta}=\underbrace{(2\times1)}_{\text{blame at }h}$$
+              <p>
+                Nothing is broken. The wires are the same wires; we are just reading them in the other
+                direction, so we lay the grid on its side first. That sideways flip is the whole trick, and the
+                next three steps are simply that idea applied carefully.
+              </p>
+            </div>
 
-          <h3>A Final Warning</h3>
-          <p>
-            This algorithm—<a href="https://en.wikipedia.org/wiki/Automatic_differentiation" target="_blank" rel="noreferrer">reverse-mode automatic differentiation</a>—is incredibly efficient. However, look closely at Rule 3. Every time we step backward through a layer, we multiply by an activation slope (\(f'\)). If your network is very deep, you are multiplying fraction after fraction. The blame signal gets smaller and smaller until it entirely vanishes before reaching the first layers. This is the infamous <a href="https://en.wikipedia.org/wiki/Vanishing_gradient_problem" target="_blank" rel="noreferrer">vanishing gradient problem</a>, and it is exactly why the modern architectures we cover in Chapter 5 rely heavily on skip connections and normalization to keep the blame flowing clearly.
-          </p>
-        </div>
+            <h3>1. Start with the five output blames</h3>
+            <p>
+              In word order <strong>sat, ran, slept, purred, meowed</strong>, the worksheet
+              produced \(\delta=q-y\):
+            </p>
+            $$\delta=
+            \begin{bmatrix}
+            -0.759\\0.196\\0.167\\0.215\\0.182
+            \end{bmatrix}
+            \qquad (5\times1)$$
+            <p>
+              The negative <em>sat</em> entry says its score should rise. Every other
+              entry is positive, so those competing scores should fall.
+            </p>
+
+            <h3>2. Transpose gathers every route back to the hidden layer</h3>
+            <p>The five output rows of the worksheet's weight grid are:</p>
+            $$W_2=
+            \begin{bmatrix}
+            0.8 & -0.2\\
+            0.2 & 0.5\\
+            -0.4 & 0.1\\
+            0.6 & -0.3\\
+            -0.1 & 0.4
+            \end{bmatrix}
+            \qquad (5\times2)$$
+            <p>
+              Transposing lays each hidden neuron's five outgoing weights across one row.
+              Each row-dot-column calculation is exactly the path sum we did for \(h_1\):
+            </p>
+            $$W_2^\top\delta=
+            \underbrace{
+            \begin{bmatrix}
+            0.8 & 0.2 & -0.4 & 0.6 & -0.1\\
+            -0.2 & 0.5 & 0.1 & -0.3 & 0.4
+            \end{bmatrix}}_{2\times5}
+            \underbrace{
+            \begin{bmatrix}
+            -0.759\\0.196\\0.167\\0.215\\0.182
+            \end{bmatrix}}_{5\times1}
+            =
+            \underbrace{
+            \begin{bmatrix}
+            -0.524\\0.275
+            \end{bmatrix}}_{2\times1}$$
+            <p>
+              That first \(-0.524\) is the worksheet's scalar sum. The same multiplication
+              calculated \(h_2\)'s incoming blame at the same time.
+            </p>
+
+            <h3>3. Element-wise multiplication applies one activation gate per neuron</h3>
+            <p>
+              The raw hidden values were \([0.180,-0.010]^\top\). ReLU was open for
+              \(h_1\) and closed for \(h_2\), so its two local slopes are \([1,0]^\top\):
+            </p>
+            $$\delta^{(1)}=(W_2^\top\delta)\odot f'(r)
+            =
+            \begin{bmatrix}-0.524\\0.275\end{bmatrix}
+            \odot
+            \begin{bmatrix}1\\0\end{bmatrix}
+            =
+            \begin{bmatrix}-0.524\\0\end{bmatrix}$$
+            <p>
+              The \(\odot\) symbol does not mix positions. It pairs the first blame with
+              the first gate and the second blame with the second gate. The closed gate
+              blocks \(h_2\)'s blame from reaching its incoming weights.
+            </p>
+
+            <h3>4. Outer products build one gradient for every edge</h3>
+            <p>
+              At the output layer, stand the five blames vertically and lay the two hidden
+              signals horizontally. Every blame multiplies every signal:
+            </p>
+            $$\nabla W_2=\delta h^\top=
+            \begin{bmatrix}
+            -0.137 & 0\\
+            0.035 & 0\\
+            0.030 & 0\\
+            0.039 & 0\\
+            0.033 & 0
+            \end{bmatrix}
+            \qquad (5\times2)$$
+            <p>
+              The top-left \(-0.137\) is the exact output-weight gradient we derived.
+              The second column is zero because \(h_2=0\), so no signal flowed through
+              those five edges during this example.
+            </p>
+            <p>At the input layer, do the same with two hidden deltas and two inputs:</p>
+            $$\nabla W_1=\delta^{(1)}x^\top=
+            \begin{bmatrix}
+            -0.262 & -0.105\\
+            0 & 0
+            \end{bmatrix}
+            \qquad (2\times2)$$
+            <p>
+              The top-left \(-0.262\) is the earlier gradient from our scalar path. Each
+              gradient grid has exactly the same shape as the weight grid it will update.
+            </p>
+
+            <details class="math-proof-accordion backprop-index-proof">
+              <summary>The index-level proof of the transpose and outer product</summary>
+              <div>
+                <p>
+                  Let one linear layer be \(z=Wx\), with \(W\) shaped \(M\times N\),
+                  \(x\) shaped \(N\times1\), and incoming blame
+                  \(\delta=\partial L/\partial z\) shaped \(M\times1\).
+                </p>
+                <h4>Why \(\nabla W=\delta x^\top\)</h4>
+                <p>A specific weight \(W_{ij}\) reaches only output \(z_i\):</p>
+                $$\frac{\partial L}{\partial W_{ij}}
+                =\frac{\partial L}{\partial z_i}
+                \frac{\partial z_i}{\partial W_{ij}}
+                =\delta_i x_j$$
+                <p>
+                  An outer product places \(\delta_i x_j\) at every row \(i\), column
+                  \(j\), producing the full \(M\times N\) gradient grid.
+                </p>
+                <h4>Why the earlier blame is \(W^\top\delta\)</h4>
+                <p>
+                  One input \(x_j\) fans out to all \(M\) outputs, so every path must
+                  contribute:
+                </p>
+                $$\frac{\partial L}{\partial x_j}
+                =\sum_{i=1}^{M}
+                \frac{\partial L}{\partial z_i}
+                \frac{\partial z_i}{\partial x_j}
+                =\sum_{i=1}^{M}\delta_iW_{ij}$$
+                <p>
+                  Column \(j\) of \(W\) contains those connecting weights. Transpose puts
+                  that column into row \(j\), so ordinary matrix multiplication performs
+                  every path sum for every input at once: \(\partial L/\partial x=W^\top\delta\).
+                </p>
+              </div>
+            </details>
+
+            <div class="backprop-golden-rule">
+              <h3>The two scalable rules</h3>
+              <p><strong>Build weight gradients - the weight-update rule:</strong> incoming blame column times incoming signal row.</p>
+              $$\nabla W=\delta x^\top$$
+              <p><strong>Pass blame backward - the blame-passing rule:</strong> transposed weights gather the path sums, then the activation slopes gate them.</p>
+              $$\delta_{earlier}=(W^\top\delta)\odot f'(r)$$
+              <p>Every layer in every deep network you will ever meet is doing these two lines, over and over, from the loss back to the first weight.</p>
+            </div>
+
+            <h3>Why deep networks need help keeping the signal alive</h3>
+            <p>
+              Every layer multiplies by weights and activation slopes. Across many layers,
+              repeatedly multiplying by small slopes can shrink the backward signal until
+              early layers barely learn. This is the
+              <a href="https://en.wikipedia.org/wiki/Vanishing_gradient_problem" target="_blank" rel="noreferrer">vanishing gradient problem</a>.
+              Chapter 5 will show how skip connections and normalization help information
+              and gradients travel through much deeper networks.
+            </p>
+          </div>
         </details>
+
 
         <div class="backprop-live-bridge">
           <p class="eyebrow">Now widen the same computation</p>
           <h3>The live panel uses more numbers, not a different algorithm.</h3>
-          <p>The worksheet used \(D=2, H=2, V=5\) for hand arithmetic. This panel returns to the chapter's two 2D embedding rows joined into \(D=4\), with \(H=3\) hidden neurons and three visible candidate words. The graph, transpose, element-wise gate, outer products, and \(T=1\) output blame are the same.</p>
+          <p>The worksheet used \(D=2, H=2, V=5\) for hand arithmetic. This panel returns to the chapter's two 2D embedding rows joined into \(D=4\), with \(H=3\) hidden neurons and three visible candidate words. The graph, transpose, element-wise gate, outer products, and \(T=1\) output blame are the same. It also lets you switch the activation \(f\), where the worksheet stayed on ReLU because its slope is a tidy 1 or 0; the trace below still calls the pre-activation \(r\) and the word scores \(z\), exactly as above.</p>
           <p><strong>Deliberate before-state:</strong> the untrained gradients are populated on load because they are the evidence you compare against after pressing <em>Take a gradient step</em>.</p>
         </div>
 
@@ -2264,226 +3021,40 @@
       </div>
     </section>
 
-    <section id="warmup-lab" class="band" aria-labelledby="warmup-title">
+    <section id="train-lab" class="band" aria-labelledby="train-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">7. The final build, in two acts</p>
-          <h2 id="warmup-title">Act 1: watch a network learn - and watch it overfit.</h2>
+          <p class="eyebrow">7. The final build</p>
+          <h2 id="train-title">Train a real next-word model on an entire book.</h2>
           <p>
-            You have now assembled every beat of the loop and even watched single gradient
-            steps move the loss in the backprop lab. This last stretch runs the <em>whole</em> loop to
-            completion, twice. First, here in Act 1, on a task whose answer is a picture you can
-            read at a glance - a boundary between two colours of dots - so you can literally see
-            learning happen and meet the one genuinely new idea: <strong>generalization</strong>.
-            Then, in Act 2 just below, on the real next-word task that is the whole point of the chapter.
-          </p>
-          <p class="example-note final-build-purpose review-block review-add">
-            <em>What is genuinely new in Act 1?</em> Not forward pass, loss, backprop, or the update - you have already done each one. The new idea is <strong>generalization</strong>: whether a model learned a pattern that works on examples it never trained on. The shaded map lets you see the difference between learning the ring and merely tracing the training dots.
+            This is the payoff: everything above becomes one small neural language model
+            that predicts the next token. It does not train on a hand-written demonstration
+            or stop when an arbitrary timer expires. Choose one of the public-domain books
+            used in the earlier chapters, and each pass processes <strong>every token in that
+            selected text</strong>.
           </p>
           <p>
-            This is a real two-layer network with random starting weights, and each epoch runs the
-            same four beats: a forward pass, cross-entropy loss, a backward pass, then a weight update.
-            The dots are split into a <strong>training</strong> set it learns from and a held-out
-            <strong>test</strong> set it never sees. Training accuracy shows how well it fits what it
-            studied; test accuracy is the honest check - did it learn the <em>pattern</em>, or just
-            memorize the flashcards? A wide gap between them is the classic sign of
-            <a href="https://en.wikipedia.org/wiki/Overfitting" target="_blank" rel="noreferrer">overfitting</a>.
+            Every training example runs the complete pipeline in compute order:
+            <strong>embedding lookup \(\rightarrow\) forward pass \(\rightarrow\) Softmax
+            \(\rightarrow\) cross-entropy \(\rightarrow\) backpropagation \(\rightarrow\)
+            gradient descent</strong>. One <strong>pass</strong>, also called an epoch, means
+            visiting every context-to-next-token example once. The browser shuffles those
+            examples and updates after one example at a time, which is stochastic gradient
+            descent. Larger systems usually group examples into mini-batches so accelerators
+            can work in parallel.
           </p>
           <p class="example-note">
-            <em>See it for yourself:</em> pick the <strong>Noisy ring</strong>, push <strong>Hidden</strong>
-            up to its maximum, and train for many epochs. The boundary turns wiggly as it chases individual
-            noisy dots - training accuracy keeps climbing while test accuracy stalls or even slips. That gap
-            is overfitting, and it is the very same trap the real model falls into on a tiny corpus in Act 2.
+            <em>An honest limit:</em> the model reads the whole book, but full Softmax over
+            thousands of rare spellings would make this small browser exercise needlessly
+            slow. It keeps the 511 most frequent tokens plus one visible
+            <code>&lt;rare&gt;</code> token. Every original token is still processed; rarer
+            spellings share that one vocabulary row. The live coverage readout below shows
+            exactly how much of the book remains individually named.
           </p>
-        </div>
-
-        <div class="build-network-explainer">
-          <div class="build-network-copy">
-            <p class="eyebrow">What you are training</p>
-            <h3>A tiny multilayer perceptron - the very same shape as the forward-pass network above.</h3>
-            <p>
-              There is no mystery box here. Every dot on the map is just <strong>two numbers</strong>:
-              its <code>x</code> and <code>y</code> position. Those two inputs feed a <strong>hidden
-              layer</strong> of a handful of neurons (the <em>Hidden</em> slider sets how many) with a
-              <code>tanh</code> bend, and the hidden layer produces <strong>two output scores</strong>
-              that <a href="#softmax">softmax</a> turns into "how sure am I this dot is group A versus
-              group B." That is the whole network.
-            </p>
-            <p>
-              It is the exact same architecture as the next-word network you built above - only the
-              input is two coordinates instead of two word vectors, and there are two output classes
-              instead of a whole vocabulary. With <code>N</code> hidden neurons it carries
-              <code>5N + 2</code> weights and biases, which is precisely the <strong>parameters</strong>
-              count in the readout (6 hidden neurons &rarr; 32 parameters).
-            </p>
-          </div>
-          <figure class="build-network-figure">
-            <svg class="mlp-svg" viewBox="0 0 540 250" role="img" aria-labelledby="mlp-t mlp-d">
-              <title id="mlp-t">The 2D classifier network</title>
-              <desc id="mlp-d">Two inputs, x and y, feed a hidden layer of tanh neurons, which feed two softmax outputs labelled group A and group B.</desc>
-              <line class="network-edge" x1="102" y1="88" x2="248" y2="44"></line>
-              <line class="network-edge" x1="102" y1="88" x2="248" y2="100"></line>
-              <line class="network-edge" x1="102" y1="88" x2="248" y2="156"></line>
-              <line class="network-edge" x1="102" y1="88" x2="248" y2="212"></line>
-              <line class="network-edge" x1="102" y1="170" x2="248" y2="44"></line>
-              <line class="network-edge" x1="102" y1="170" x2="248" y2="100"></line>
-              <line class="network-edge" x1="102" y1="170" x2="248" y2="156"></line>
-              <line class="network-edge" x1="102" y1="170" x2="248" y2="212"></line>
-              <line class="network-edge" x1="282" y1="44" x2="420" y2="89"></line>
-              <line class="network-edge" x1="282" y1="100" x2="420" y2="89"></line>
-              <line class="network-edge" x1="282" y1="156" x2="420" y2="89"></line>
-              <line class="network-edge" x1="282" y1="212" x2="420" y2="89"></line>
-              <line class="network-edge" x1="282" y1="44" x2="420" y2="171"></line>
-              <line class="network-edge" x1="282" y1="100" x2="420" y2="171"></line>
-              <line class="network-edge" x1="282" y1="156" x2="420" y2="171"></line>
-              <line class="network-edge" x1="282" y1="212" x2="420" y2="171"></line>
-              <circle class="network-node is-input" cx="78" cy="88" r="24"></circle>
-              <text class="network-label" x="78" y="93">x</text>
-              <circle class="network-node is-input" cx="78" cy="170" r="24"></circle>
-              <text class="network-label" x="78" y="175">y</text>
-              <circle class="network-node is-hidden" cx="265" cy="44" r="17"></circle>
-              <circle class="network-node is-hidden" cx="265" cy="100" r="17"></circle>
-              <circle class="network-node is-hidden" cx="265" cy="156" r="17"></circle>
-              <circle class="network-node is-hidden" cx="265" cy="212" r="17"></circle>
-              <rect class="network-node is-output" x="420" y="66" width="104" height="46" rx="11"></rect>
-              <text class="network-label" x="472" y="93">group A</text>
-              <rect class="network-node is-output" x="420" y="148" width="104" height="46" rx="11"></rect>
-              <text class="network-label" x="472" y="175">group B</text>
-              <text class="mlp-axis" x="78" y="232">2 inputs: x, y</text>
-              <text class="mlp-axis" x="265" y="244">hidden layer &middot; tanh</text>
-              <text class="mlp-axis" x="472" y="232">softmax &rarr; 2 classes</text>
-            </svg>
-            <figcaption>Two inputs &rarr; one hidden layer (tanh) &rarr; two softmax outputs. The <em>Hidden</em> slider adds or removes the middle neurons.</figcaption>
-          </figure>
-        </div>
-
-        <section class="trainer nn-trainer" aria-label="Tiny neural network training controls">
-          <div class="trainer-head">
-            <div>
-              <h3>Training controls</h3>
-              <p>Change the task, capacity, and learning rate, then train for a few epochs.</p>
-            </div>
-            <button id="resetNetworkButton" class="ghost-button" type="button">Reset network</button>
-          </div>
-          <p class="microcopy trainer-reset-contract review-add"><strong>Reset contract:</strong> <em>Reset network</em> clears learned weights, metrics, history, and the decision map while preserving your selected data, hidden width, learning rate, and epoch count. <em>New data split</em> also replaces the dots.</p>
-
-          <div class="control-grid nn-controls">
-            <label class="select-row" for="datasetSelect">
-              <span>Data</span>
-              <select id="datasetSelect" class="control-input">
-                <option value="xor">XOR corners</option>
-                <option value="blobs">Two blobs</option>
-                <option value="ring">Noisy ring</option>
-              </select>
-            </label>
-            <label class="range-row math-range" for="hiddenUnitsSlider">
-              <span>Hidden</span>
-              <input id="hiddenUnitsSlider" type="range" min="2" max="10" step="1" value="6">
-              <output id="hiddenUnitsLabel" for="hiddenUnitsSlider">6</output>
-            </label>
-            <label class="range-row math-range" for="networkRateSlider">
-              <span>Rate</span>
-              <input id="networkRateSlider" type="range" min="1" max="30" value="8">
-              <output id="networkRateLabel" for="networkRateSlider">0.08</output>
-            </label>
-            <label class="range-row math-range" for="epochBatchSlider">
-              <span>Epochs</span>
-              <input id="epochBatchSlider" type="range" min="5" max="120" step="5" value="40">
-              <output id="epochBatchLabel" for="epochBatchSlider">40</output>
-            </label>
-          </div>
-
-          <div class="stepper-row nn-button-row">
-            <button id="trainOneEpochButton" class="ghost-button" type="button">Train 1 epoch</button>
-            <button id="trainBatchButton" class="primary-button" type="button">Train selected epochs</button>
-            <button id="newDataButton" class="ghost-button" type="button">New data split</button>
-          </div>
-
-          <div id="trainingProgress" class="training-progress" aria-live="polite">
-            <div class="training-progress-copy">
-              <strong>Ready to train</strong>
-              <span id="trainingProgressText">One click runs the selected epochs and updates the map as it learns.</span>
-            </div>
-            <div class="training-progress-track" aria-hidden="true">
-              <span id="trainingProgressBar"></span>
-            </div>
-          </div>
-
-          <div class="training-output-grid">
-            <div class="panel decision-panel">
-              <div class="section-title-row">
-                <h3>Decision map</h3>
-                <span id="networkStatus" class="pill">untrained</span>
-              </div>
-              <canvas id="decisionCanvas" class="decision-canvas" width="720" height="480" aria-label="Decision boundary and data points"></canvas>
-              <div class="decision-legend" aria-hidden="true">
-                <span class="legend-item"><span class="swatch swatch-a"></span>group A</span>
-                <span class="legend-item"><span class="swatch swatch-b"></span>group B</span>
-                <span class="legend-item"><span class="dot-key dot-train"></span>solid = training dots</span>
-                <span class="legend-item"><span class="dot-key dot-test"></span>haloed = held-out test dots</span>
-              </div>
-              <p class="microcopy decision-help">
-                The <strong>shaded background is the model's guess</strong> for every point on the
-                map - coral where it bets group A, teal where it bets group B. The dots are the
-                actual data; a dot sitting on the <em>wrong</em> shade is a mistake. So
-                <strong>train accuracy</strong> is the share of solid dots on the right shade, and
-                <strong>test accuracy</strong> is the share of haloed dots (which it never trained on)
-                on the right shade. When the boundary hugs the solid dots but misses the haloed ones,
-                that gap is overfitting.
-              </p>
-            </div>
-            <div class="panel">
-              <div class="section-title-row">
-                <h3>Training signal</h3>
-                <span id="networkEpochLabel" class="pill">0 epochs</span>
-              </div>
-              <div id="networkMetrics" class="metric-card-grid" aria-live="polite"></div>
-              <div id="lossHistory" class="loss-history" aria-live="polite"></div>
-              <div id="generalizationPanel" class="generalization-panel" aria-live="polite"></div>
-            </div>
-          </div>
-
-        </section>
-
-        <p class="insight-note build-bridge review-remove" inert>
-          That was the entire loop running to completion, and <strong>generalization</strong> - the gap
-          between fitting and truly learning - is the one new idea that earned Act 1 its place. The dots
-          were easy to picture; now we run the exact same four beats on the real task of the chapter,
-          where the input is words and the output is a probability over the whole vocabulary. Watch for
-          the same overfitting: on a corpus this small, the model will happily <em>memorise</em> it.
-        </p>
-        <p class="insight-note build-bridge review-add">
-          That was the whole loop running to completion, and <strong>generalization</strong> - the gap between fitting and truly learning - is the one new idea that earned Act 1 its place. On the noisy ring, overfitting means bending the boundary around individual training dots instead of learning the ring. In Act 2, the picture disappears but the failure is the same: a model can memorize individual context-to-next-word examples instead of learning a pattern that would travel to new text. Same loop, same pressure, different data.
-        </p>
-
-        <div class="section-heading" id="train-lab">
-          <p class="eyebrow">Act 2: now the real thing</p>
-          <h2 id="train-title">The same loop on real words: a tiny next-word model.</h2>
-          <p>
-            This is the payoff, and it runs the exact same four beats you just watched on the dots -
-            only now the dots are words. Not a fake diagram, not a pretend model: everything above
-            becomes one small network that predicts the next word, trained right here on a tiny corpus.
-            When you click "Train", every example runs the full pipeline in <em>compute order</em>: <strong>Embeddings \(\rightarrow\) Forward Pass \(\rightarrow\) Softmax \(\rightarrow\) Cross-Entropy Loss \(\rightarrow\) Backprop \(\rightarrow\) Gradient Descent</strong>. Backprop lands <em>before</em> gradient descent here for a concrete reason: a step has to compute the gradients (backprop) before it can take the downhill move (gradient descent). That is the reverse of the order we taught them in, on purpose - the downhill step is the simpler idea, and backprop exists only to feed it.
-          </p>
-          <p class="review-add">
-            One <strong>epoch</strong> is one pass through every context-to-next-word example. At the start of each epoch, this browser shuffles those examples, then updates the weights after <em>one example at a time</em>: that is <strong>stochastic gradient descent</strong>, or SGD. Production training usually groups many examples into a <strong>mini-batch</strong> so GPUs can process them in parallel. We stay with one-at-a-time updates because every move remains easier to inspect.
-          </p>
-          <p>
-            It is a miniature of the
-            <a href="https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf" target="_blank" rel="noreferrer">neural language model Bengio and colleagues introduced in 2003</a>:
-            each context word is looked up in an embedding table, the rows are joined and pushed through a hidden layer with a tanh
-            activation, and softmax produces a probability for every
-            word in the vocabulary. Cross-entropy scores each guess
-            and backprop nudges every weight, including the embedding
-            rows themselves.
-          </p>
-          <p>
-            Press <em>Train next-word model</em> and watch three things move together: the loss falls,
-            <strong>perplexity</strong> drops from "torn between many words" toward "a
-            confident handful," and the prediction bars for a context like
-            <code>the cat</code> sharpen onto the words that really follow it. Then
-            generate a sentence and see the same math from Chapter 1, sampling one word
-            at a time, but now driven by learned vectors instead of raw counts.
+          <p class="example-note">
+            <em>Training is not evaluation.</em> Falling training loss proves that the model
+            is fitting this book, not that it will generalize to unseen writing. Chapter 1's
+            <a href="chapter-1.html#evaluate">held-out evaluation</a> is still the honest test.
           </p>
         </div>
 
@@ -2499,15 +3070,12 @@
               <a href="#softmax">Softmax</a> makes those scores a probability distribution:
               "given these two words, here is how likely each possible next word is."
             </p>
-            <p class="review-remove" inert>
+            <p>
               Training nudges every number along that path - the embeddings, both weight
-              layers, and the biases - using the exact backprop you just traced. With a
-              vocabulary of <code>V</code> words, a <code>12</code>-dimensional embedding, and
-              <code>24</code> hidden units, that is a few thousand weights; the live
-              <strong>parameters</strong> readout below counts them exactly.
-            </p>
-            <p class="review-add">
-              Training nudges every number along that path - the embeddings, both weight layers, and the biases - using the exact backprop you just traced. This browser model uses <code>53</code> vocabulary entries, <code>12</code> numbers per embedding, a two-word context, and <code>24</code> hidden units. Together those tables and biases contain exactly <code>2,561</code> trainable parameters, the same total shown by the live readout below.
+              layers, and the biases - using the exact backprop you just traced. This
+              browser model uses 12 numbers per embedding, a two-token context, 24 hidden
+              units, and a 512-token output vocabulary. The live readout below counts every
+              parameter and shows how the selected book becomes training examples.
             </p>
           </div>
           <figure class="build-network-figure">
@@ -2545,73 +3113,62 @@
           </figure>
         </div>
 
-        <div class="corpus-card panel" aria-label="Training corpus">
+        <div class="corpus-card panel" aria-label="Real-book training corpus">
           <div class="section-title-row">
-            <h3>The training corpus</h3>
-            <span id="nwCorpusCount" class="pill">sentences</span>
+            <h3>Choose the book this model will actually read</h3>
+            <span id="nwCorpusCount" class="pill">loading corpus</span>
           </div>
-          <p class="microcopy review-remove" inert>
-            A bigger, more varied corpus this time - dozens of short sentences about animals
-            and people in a little nature world, with a deliberately controlled vocabulary so
-            a two-word context is still genuinely predictive. Every sentence gets a hidden
-            <code>start</code> marker so the first word has a context too. Here is a sample:
-          </p>
-          <p class="microcopy review-add">
-            The complete corpus contains <strong>72 short sentences</strong> about animals and people in a little nature world. A deliberately controlled vocabulary keeps a two-word context genuinely predictive. Each sentence receives two hidden <code>start</code> markers and one end target, producing one training example for every word and ending. Here is a sample:
-          </p>
+          <label class="select-row" for="nwCorpusSelect">
+            <span>Public-domain corpus</span>
+            <select id="nwCorpusSelect" class="control-input"></select>
+          </label>
+          <p class="microcopy">The preview is short; training uses the complete selected text. <a id="nwCorpusSource" href="https://www.gutenberg.org/" target="_blank" rel="noreferrer">Open the source</a>.</p>
           <div id="nwCorpusPreview" class="corpus-lines" aria-live="polite"></div>
-          <p class="microcopy">...and more, in the same style. The whole list trains within the budget you pick below.</p>
-        </div>
-
-        <div class="training-transparency review-block review-add" aria-labelledby="training-transparency-title">
-          <p class="eyebrow">The browser-scale contract</p>
-          <h3 id="training-transparency-title">Every training number, before you press Train.</h3>
           <div class="training-transparency-grid">
-            <article><strong id="nwTrainingSentenceCount">72</strong><span>sentences</span><em>the full tiny corpus</em></article>
-            <article><strong id="nwTrainingExampleCount">484</strong><span>examples per epoch</span><em>one context → target pair each</em></article>
-            <article><strong id="nwTrainingVocabCount">53</strong><span>vocabulary entries</span><em>including start and end</em></article>
-            <article><strong>12</strong><span>embedding width</span><em>numbers per vocabulary row</em></article>
-            <article><strong>24</strong><span>hidden units</span><em>the context summary</em></article>
-            <article><strong id="nwTrainingParamCount">2,561</strong><span>parameters</span><em>every learned number</em></article>
-            <article><strong>0.02</strong><span>learning rate</span><em>fixed for this teaching run</em></article>
+            <article><strong id="nwTrainingTokenCount">-</strong><span>book tokens</span><em>all processed each pass</em></article>
+            <article><strong id="nwTrainingExampleCount">-</strong><span>training examples</span><em>two-token context → target</em></article>
+            <article><strong id="nwTrainingRawVocabCount">-</strong><span>raw token types</span><em>before the browser cap</em></article>
+            <article><strong id="nwTrainingVocabCount">512</strong><span>model vocabulary</span><em>511 frequent + &lt;rare&gt;</em></article>
+            <article><strong id="nwTrainingCoverage">-</strong><span>named-token coverage</span><em>the rest map to &lt;rare&gt;</em></article>
+            <article><strong id="nwTrainingParamCount">-</strong><span>parameters</span><em>every learned number</em></article>
           </div>
-          <p class="microcopy">These are deliberate browser-speed choices, not production recommendations. Larger language models use far wider vectors, many layers, vastly more data, and mini-batches spread across accelerators.</p>
+          <p class="microcopy"><strong>Fixed architecture:</strong> two-token context, 12 numbers per embedding, 24 tanh hidden units, full Softmax over all 512 model tokens, and learning rate 0.015. These are browser-speed choices, not production recommendations.</p>
         </div>
 
         <section class="trainer nn-trainer" aria-label="Next-word model training controls">
           <div class="trainer-head">
             <div>
               <h3>Training controls</h3>
-              <p class="review-remove" inert>Pick a time budget and train. The model keeps training until it converges or the budget runs out, showing live progress. The learning rate is fixed at 0.02. Each pass through the corpus is measured; if later passes make the loss worse, the model finishes with the lowest-loss weights it found.</p>
-              <p class="review-add">Pick a time budget and train. Each epoch shuffles and visits all <span id="nwTrainingExampleCountInline">484</span> examples using one-at-a-time SGD updates at a fixed learning rate of <code>0.02</code>. The run stops when improvement settles or time runs out, and it keeps the lowest-cross-entropy weights it found.</p>
+              <p>Choose complete passes, then train. Every pass shuffles and visits all <span id="nwTrainingExampleCountInline">training examples</span>. Progress reports the exact position in the selected book-derived dataset.</p>
             </div>
             <button id="nwResetButton" class="ghost-button" type="button">Reset model</button>
           </div>
 
           <div class="control-grid nw-controls">
-            <label class="select-row" for="nwBudgetSelect">
-              <span>Time budget</span>
-              <select id="nwBudgetSelect" class="control-input">
-                <option value="15000">15 seconds</option>
-                <option value="30000" selected>30 seconds</option>
-                <option value="60000">60 seconds</option>
+            <label class="select-row" for="nwPassesSelect">
+              <span>Complete passes</span>
+              <select id="nwPassesSelect" class="control-input">
+                <option value="1">1 pass</option>
+                <option value="2" selected>2 passes</option>
+                <option value="3">3 passes</option>
               </select>
             </label>
             <label class="range-row math-range" for="nwTempSlider">
-              <span>Gen. temp</span>
+              <span>Generation temperature</span>
               <input id="nwTempSlider" type="range" min="40" max="200" step="5" value="80">
               <output id="nwTempLabel" for="nwTempSlider">0.80</output>
             </label>
           </div>
+          <p class="microcopy">That temperature is the same dial you turned in <a href="#softmax">Softmax and cross-entropy</a>: it divides the logits before Softmax, so a low value makes the model play it safe and a high value makes it take chances. It only affects the sentences we generate below, never the training itself.</p>
 
           <div class="stepper-row nn-button-row">
-            <button id="nwTrainButton" class="primary-button" type="button">Train next-word model</button>
-            <button id="nwTrainStepButton" class="ghost-button" type="button">Train 8 more seconds</button>
-            <button id="nwGenerateButton" class="ghost-button" type="button">Generate a sentence</button>
+            <button id="nwTrainButton" class="primary-button" type="button">Train complete passes</button>
+            <button id="nwTrainStepButton" class="ghost-button" type="button">Train 1 more pass</button>
+            <button id="nwGenerateButton" class="ghost-button" type="button">Generate a continuation</button>
           </div>
-          <p class="microcopy trainer-reset-contract review-add"><strong>Reset contract:</strong> <em>Reset model</em> restores the original random weights and clears epochs, metrics, loss history, predictions, watched contexts, and generated text. It preserves your time budget, generation temperature, and selected prediction context.</p>
+          <p class="microcopy trainer-reset-contract"><strong>Reset contract:</strong> <em>Reset model</em> restores the original random weights and clears passes, metrics, loss history, predictions, and generated text. Changing the book also creates a fresh model for that corpus.</p>
 
-          <details class="optimizer-bridge review-add">
+          <details class="optimizer-bridge">
             <summary>Production note: why larger models use optimizers such as AdamW</summary>
             <div>
               <p>This lab uses the simplest optimizer: subtract the current gradient times one fixed learning rate.</p>
@@ -2628,20 +3185,11 @@
           <div id="nwProgress" class="training-progress" aria-live="polite">
             <div class="training-progress-copy">
               <strong>Ready to train</strong>
-              <span id="nwProgressText">Pick a time budget and press Train - it trains until it converges or the budget runs out, showing live progress.</span>
+              <span id="nwProgressText">Choose complete passes and press Train. Every selected token will be visited.</span>
             </div>
             <div class="training-progress-track" aria-hidden="true">
               <span id="nwProgressBar"></span>
             </div>
-          </div>
-
-          <div class="panel nw-watch-card">
-            <div class="section-title-row">
-              <h3>Watch these predictions sharpen</h3>
-              <span class="pill">top next word</span>
-            </div>
-            <p class="microcopy">Four fixed contexts. As training runs, watch each one lock onto a sensible next word and grow confident - that is the model learning the corpus's patterns, live.</p>
-            <div id="nwWatchPanel" class="watch-panel" aria-live="polite"></div>
           </div>
 
           <div class="training-output-grid">
@@ -2660,7 +3208,7 @@
                   <select id="nwContextSelectB" class="control-input"></select>
                 </label>
               </div>
-              <p class="microcopy">Top six words the model expects next, by probability.</p>
+              <p class="microcopy">The selected context updates during training so you can watch the model's probabilities sharpen.</p>
               <div id="nwPredictPanel" class="probability-panel" aria-live="polite"></div>
             </div>
             <div class="panel">
@@ -2675,81 +3223,16 @@
 
           <div class="panel nw-generate-card">
             <div class="section-title-row">
-              <h3>Generated sentence</h3>
+              <h3>Generated continuation</h3>
               <span class="pill">sampled</span>
             </div>
             <div id="nwGeneratePanel" class="generate-panel" aria-live="polite"></div>
           </div>
 
-          <div class="review-block review-remove" inert>
-            <strong>Earlier code-cell baseline</strong>
-            <p><code>startLoss</code> was recorded only after the first epoch, so the random model's true epoch-0 loss was missing and the returned object did not show the curve between its endpoints.</p>
-          </div>
-          <article class="code-cell chapter4-code-cell review-block review-add">
-            <div class="cell-head">
-              <h3>Train and sample from code</h3>
-              <button class="run-button" type="button">Run</button>
-            </div>
-            <div class="code-quiz" data-quiz-type="predict" data-explain="Perplexity is surprise: roughly how many words the model is choosing between. A model that has learned the patterns is rarely surprised, so its perplexity is low.">
-              <p class="quiz-prompt">Predict first: this trains a tiny next-word model and reports its <strong>perplexity</strong>. A model that has learned to predict the next word well will have a perplexity that is&hellip;</p>
-              <div class="quiz-options" role="group" aria-label="Predict the perplexity of a trained model">
-                <button class="quiz-option" type="button" data-correct="true">Low: it is rarely surprised</button>
-                <button class="quiz-option" type="button">High: it is usually surprised</button>
-                <button class="quiz-option" type="button">Unrelated to how well it learned</button>
-              </div>
-              <p class="quiz-feedback" aria-live="polite" hidden></p>
-              <button class="quiz-skip" type="button">Just show me the code</button>
-            </div>
-            <textarea class="code-input" spellcheck="false">// One epoch = one pass over every (context -> next word) example.
-// Each example runs the same four beats: look up the two context
-// word vectors, a forward pass to next-word scores, the cross-entropy
-// loss, a backward pass, then update every weight (embeddings too).
-const epochs = 60;
-
-const startLoss = nextWordLoss();
-const startPerplexity = nextWordPerplexity();
-const lossPerEpoch = [startLoss];
-for (let epoch = 1; epoch <= epochs; epoch++) {
-  nwTrainOneEpoch();
-  lossPerEpoch.push(nextWordLoss());
-}
-
-// Lower loss means lower perplexity (less surprise). Then sample text.
-const endLoss = lossPerEpoch[lossPerEpoch.length - 1];
-return {
-  epochs: epochs,
-  startLoss: startLoss,
-  endLoss: endLoss,
-  improvement: startLoss - endLoss,
-  startPerplexity: startPerplexity,
-  perplexity: nextWordPerplexity(),
-  lossCurve: lossPerEpoch,
-  sample: generateSentence(0.8)
-};</textarea>
-            <div class="code-output is-empty" aria-live="polite">
-              <div class="output-message">
-                <strong>Ready to run</strong>
-                <span>This is the real per-epoch loop. Edit <code>epochs</code>, press Run, and read back the loss, perplexity, and a sampled sentence.</span>
-              </div>
-            </div>
-          </article>
         </section>
 
-        <p class="insight-note chapter-bridge-note review-remove" inert>
-          Take a moment to appreciate what just happened. With nothing but
-          probability, vectors, a dot product, softmax, and a gradient nudge, a pile
-          of numbers taught itself to finish sentences. (Push the epochs slider high and
-          watch its training perplexity dive toward 1 as it simply <em>memorises</em> these
-          twelve sentences - the very overfitting you forced on the ring back in Act 1.)
-          That is the whole engine of a
-          modern LLM, only tiny. It still has one real limit, though: it reads a fixed
-          two-word window and learns every context on its own, much like the n-grams
-          back in Chapter 1. We already pinned down the raw text-to-token step in
-          Chapter 3. Next we meet the Transformer, the architecture that finally lets a
-          model look across a whole sentence at once.
-        </p>
-        <p class="insight-note chapter-bridge-note review-add">
-          Take a moment to appreciate what just happened. With probability, vectors, dot products, Softmax, cross-entropy, backpropagation, and SGD, a pile of numbers taught itself to finish sentences. Give the tiny model a longer <strong>time budget</strong> and its training perplexity can slide toward 1 as it memorizes the <strong>72-sentence corpus</strong> - the same overfitting pressure you made visible on the noisy ring. Its real ceiling is the fixed two-word window: every prediction must squeeze the past into exactly two neighboring words. Chapter 5 introduces <strong>attention</strong>, which gathers useful context dynamically from farther back while keeping the machinery you built here: embeddings, logits, Softmax, cross-entropy, backpropagation, and optimization. The training loop stays; the way context enters the guess changes.
+        <p class="insight-note chapter-bridge-note">
+          Take a moment to appreciate what just happened. With probability, vectors, dot products, Softmax, cross-entropy, backpropagation, and SGD, a pile of numbers learned directly from a real book. This model is still deliberately tiny: rare spellings share one token and every prediction must squeeze the past into exactly two neighboring tokens. Chapter 5 introduces <strong>attention</strong>, which gathers useful context dynamically from farther back while keeping the machinery you built here. The training loop stays; the way context enters the guess changes.
         </p>
       </div>
     </section>
@@ -2759,7 +3242,7 @@ return {
     <section id="references" class="band" aria-labelledby="references-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">9. Going deeper</p>
+          <p class="eyebrow">8. Going deeper</p>
           <h2 id="references-title">Further reading.</h2>
           <p>
             If the live examples now feel comfortable, I would go deeper in this order:
@@ -2770,7 +3253,7 @@ return {
         </div>
 
         <ol class="reference-list">
-          <li class="review-add">
+          <li>
             <a href="https://nostarch.com/math-deep-learning" target="_blank" rel="noreferrer">Ronald T. Kneusel, Math for Deep Learning</a>
             <span>A practical foundation for this chapter: Chapters 5–6 cover linear algebra and matrix operations, Chapters 7–8 cover differential and matrix calculus, Chapter 10 develops backpropagation, and Chapter 11 covers gradient descent and adaptive optimizers.</span>
           </li>
@@ -2799,6 +3282,10 @@ return {
             <span>A visual intuition for backpropagation as local gradients moving through a graph.</span>
           </li>
           <li>
+            <a href="https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/" target="_blank" rel="noreferrer">Matt Mazur, A Step by Step Backpropagation Example</a>
+            <span>The same by-hand arithmetic we did in the worksheet, worked on a different small network. A good way to check that the method, not the numbers, is what you learned.</span>
+          </li>
+          <li>
             <a href="https://cs231n.github.io/neural-networks-case-study/" target="_blank" rel="noreferrer">CS231n Neural Network Case Study</a>
             <span>A readable from-scratch classifier with softmax loss and backpropagation.</span>
           </li>
@@ -2824,7 +3311,8 @@ return {
     </section>
   </main>
 
-  <script src="chapter4.js?v=20260811r"></script>
+  <script src="corpora.js?v=20260812a"></script>
+  <script src="chapter4.js?v=20260812i"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>
@@ -2840,8 +3328,6 @@ return {
       }
     });
   </script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script defer src="code-highlight.js"></script>
   <script defer src="code-quiz.js"></script>
   <script src="site.js" defer></script>
 </body>

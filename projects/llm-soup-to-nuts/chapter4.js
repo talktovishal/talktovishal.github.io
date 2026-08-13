@@ -123,6 +123,11 @@ const dom = {
   backpropMetrics: document.getElementById("backpropMetrics"),
   backpropLossSpark: document.getElementById("backpropLossSpark"),
   backpropTracePanel: document.getElementById("backpropTracePanel"),
+  backpropNudgeLab: document.getElementById("backpropNudgeLab"),
+  backpropNudgeButton: document.getElementById("backpropNudgeButton"),
+  backpropNudgeResetButton: document.getElementById("backpropNudgeResetButton"),
+  backpropNudgeStatus: document.getElementById("backpropNudgeStatus"),
+  backpropNudgeComparison: document.getElementById("backpropNudgeComparison"),
   byHandLab: document.getElementById("byHandLab"),
   byHandProgress: document.getElementById("byHandProgress"),
   byHandSvg: document.getElementById("byHandSvg"),
@@ -140,26 +145,8 @@ const dom = {
   byHandPrevButton: document.getElementById("byHandPrevButton"),
   byHandNextButton: document.getElementById("byHandNextButton"),
   byHandResetButton: document.getElementById("byHandResetButton"),
-  datasetSelect: document.getElementById("datasetSelect"),
-  hiddenUnitsSlider: document.getElementById("hiddenUnitsSlider"),
-  hiddenUnitsLabel: document.getElementById("hiddenUnitsLabel"),
-  networkRateSlider: document.getElementById("networkRateSlider"),
-  networkRateLabel: document.getElementById("networkRateLabel"),
-  epochBatchSlider: document.getElementById("epochBatchSlider"),
-  epochBatchLabel: document.getElementById("epochBatchLabel"),
-  trainOneEpochButton: document.getElementById("trainOneEpochButton"),
-  trainBatchButton: document.getElementById("trainBatchButton"),
-  resetNetworkButton: document.getElementById("resetNetworkButton"),
-  newDataButton: document.getElementById("newDataButton"),
-  trainingProgress: document.getElementById("trainingProgress"),
-  trainingProgressText: document.getElementById("trainingProgressText"),
-  trainingProgressBar: document.getElementById("trainingProgressBar"),
-  decisionCanvas: document.getElementById("decisionCanvas"),
-  networkStatus: document.getElementById("networkStatus"),
-  networkEpochLabel: document.getElementById("networkEpochLabel"),
-  networkMetrics: document.getElementById("networkMetrics"),
-  lossHistory: document.getElementById("lossHistory"),
-  generalizationPanel: document.getElementById("generalizationPanel"),
+  nwCorpusSelect: document.getElementById("nwCorpusSelect"),
+  nwCorpusSource: document.getElementById("nwCorpusSource"),
   nwContextSelectA: document.getElementById("nwContextSelectA"),
   nwContextSelectB: document.getElementById("nwContextSelectB"),
   nwContextLabel: document.getElementById("nwContextLabel"),
@@ -167,7 +154,7 @@ const dom = {
   nwMetrics: document.getElementById("nwMetrics"),
   nwLossHistory: document.getElementById("nwLossHistory"),
   nwStatus: document.getElementById("nwStatus"),
-  nwBudgetSelect: document.getElementById("nwBudgetSelect"),
+  nwPassesSelect: document.getElementById("nwPassesSelect"),
   nwTempSlider: document.getElementById("nwTempSlider"),
   nwTempLabel: document.getElementById("nwTempLabel"),
   nwTrainButton: document.getElementById("nwTrainButton"),
@@ -178,13 +165,14 @@ const dom = {
   nwProgress: document.getElementById("nwProgress"),
   nwProgressText: document.getElementById("nwProgressText"),
   nwProgressBar: document.getElementById("nwProgressBar"),
-  nwWatchPanel: document.getElementById("nwWatchPanel"),
   nwCorpusPreview: document.getElementById("nwCorpusPreview"),
   nwCorpusCount: document.getElementById("nwCorpusCount"),
-  nwTrainingSentenceCount: document.getElementById("nwTrainingSentenceCount"),
+  nwTrainingTokenCount: document.getElementById("nwTrainingTokenCount"),
   nwTrainingExampleCount: document.getElementById("nwTrainingExampleCount"),
   nwTrainingExampleCountInline: document.getElementById("nwTrainingExampleCountInline"),
+  nwTrainingRawVocabCount: document.getElementById("nwTrainingRawVocabCount"),
   nwTrainingVocabCount: document.getElementById("nwTrainingVocabCount"),
+  nwTrainingCoverage: document.getElementById("nwTrainingCoverage"),
   nwTrainingParamCount: document.getElementById("nwTrainingParamCount")
 };
 
@@ -238,16 +226,8 @@ const state = {
   probabilityPreset: "cat",
   autoLineTimer: null,
   autoLineRun: null,
-  network: null,
-  data: null,
-  dataSeed: 41,
-  networkSeed: 17,
-  networkHistory: [],
-  networkTrainingRun: 0,
-  isNetworkTraining: false,
   hasExploredProbability: true,
   hasExploredGradient: false,
-  hasTrainedNetwork: false,
   gradientWalkthroughStep: 0,
   gradientWalkthroughTimer: null,
   softmaxStep: 0,
@@ -257,8 +237,10 @@ const state = {
   forwardStep: 0,
   forwardPlayTimer: null,
   backprop: null,
+  hasNudgedBackprop: false,
   byHand: { index: 0, hints: {}, solved: {}, revealed: {}, answers: {}, feedback: {} }
 };
+const numberFormat = new Intl.NumberFormat("en-US");
 
 function formatNumber(value, digits = 3) {
   if (!Number.isFinite(value)) return "n/a";
@@ -2311,8 +2293,8 @@ function buildBackpropBreakdown(pass, focus) {
   const deriv = activationDerivative(name, z1[focus]);
   const gateStack = createElement("div", "formula-stack");
   gateStack.append(
-    createElement("code", "", `${name}'(z) at z = ${formatNumber(z1[focus], 2)}  =  ${formatNumber(deriv, 3)}`),
-    createElement("code", "", `dL/dz = dL/dh x ${name}'(z) = ${signedFixed(dh[focus], 3)} x ${formatNumber(deriv, 3)} = ${signedFixed(dz1[focus], 3)}`)
+    createElement("code", "", `${name}'(r) at r = ${formatNumber(z1[focus], 2)}  =  ${formatNumber(deriv, 3)}`),
+    createElement("code", "", `dL/dr = dL/dh x ${name}'(r) = ${signedFixed(dh[focus], 3)} x ${formatNumber(deriv, 3)} = ${signedFixed(dz1[focus], 3)}`)
   );
   nodes.push(gateStack);
   nodes.push(backpropGateNote(name, deriv));
@@ -2323,7 +2305,7 @@ function buildBackpropBreakdown(pass, focus) {
   const gradStack = createElement("div", "formula-stack");
   gradStack.append(
     createElement("code", "", `grad W2[h${focus + 1} -> ${trueWord}] = h x blame = ${signedProduct(hidden[focus], dz2[trueIndex])} = ${signedFixed(gradW2ft, 3)}`),
-    createElement("code", "", `grad W1[${inputLabels[0]} -> h${focus + 1}] = input x dL/dz = ${signedProduct(input[0], dz1[focus])} = ${signedFixed(gradW1ft, 3)}`)
+    createElement("code", "", `grad W1[${inputLabels[0]} -> h${focus + 1}] = input x dL/dr = ${signedProduct(input[0], dz1[focus])} = ${signedFixed(gradW1ft, 3)}`)
   );
   nodes.push(gradStack);
 
@@ -2440,6 +2422,72 @@ function computeByHandValues() {
 }
 
 const byHandValues = computeByHandValues();
+
+function computeBackpropNudge(weight) {
+  const logits = byHandValues.logits.slice();
+  logits[byHandValues.targetIndex] = byHandNetwork.words[byHandValues.targetIndex].bias
+    + weight * byHandValues.hidden[0]
+    + byHandNetwork.words[byHandValues.targetIndex].weights[1] * byHandValues.hidden[1];
+  const probabilities = softmax(logits);
+  return {
+    weight,
+    logit: logits[byHandValues.targetIndex],
+    probability: probabilities[byHandValues.targetIndex],
+    loss: -Math.log(Math.max(probabilities[byHandValues.targetIndex], 1e-9))
+  };
+}
+
+function backpropNudgeCard(label, values, note, className = "") {
+  const card = createElement("article", `backprop-nudge-card ${className}`.trim());
+  const heading = createElement("div", "backprop-nudge-card-heading");
+  heading.append(createElement("strong", "", label), createElement("span", "", note));
+  const metrics = createElement("dl", "backprop-nudge-metrics");
+  [
+    ["weight", formatNumber(values.weight, 3)],
+    ["sat logit", formatNumber(values.logit, 4)],
+    ["sat probability", formatNumber(values.probability, 4)],
+    ["loss", formatNumber(values.loss, 4)]
+  ].forEach(([metricLabel, value]) => {
+    const item = createElement("div");
+    item.append(createElement("dt", "", metricLabel), createElement("dd", "", value));
+    metrics.append(item);
+  });
+  card.append(heading, metrics);
+  return card;
+}
+
+function renderBackpropNudge() {
+  if (!dom.backpropNudgeLab) return;
+  const before = computeBackpropNudge(0.8);
+  const beforeCard = backpropNudgeCard("Before", before, "the frozen forward pass");
+  if (!state.hasNudgedBackprop) {
+    const empty = createElement("article", "backprop-nudge-card is-empty");
+    empty.append(
+      createElement("strong", "", "After"),
+      createElement("p", "", "Press Nudge +0.01 to reveal the changed score, probability, and loss.")
+    );
+    dom.backpropNudgeComparison.replaceChildren(beforeCard, empty);
+    dom.backpropNudgeStatus.textContent = "Press Nudge to run the same forward path with one changed weight.";
+    dom.backpropNudgeButton.disabled = false;
+    return;
+  }
+  const after = computeBackpropNudge(0.81);
+  const afterCard = backpropNudgeCard("After +0.01", after, "only this weight changed", "is-after");
+  const lossChange = after.loss - before.loss;
+  dom.backpropNudgeComparison.replaceChildren(beforeCard, afterCard);
+  dom.backpropNudgeStatus.textContent = `The sat probability rose by ${formatNumber(after.probability - before.probability, 6)} and loss fell by ${formatNumber(Math.abs(lossChange), 6)}. The weight helped in the direction we hoped.`;
+  dom.backpropNudgeButton.disabled = true;
+}
+
+function runBackpropNudge() {
+  state.hasNudgedBackprop = true;
+  renderBackpropNudge();
+}
+
+function resetBackpropNudge() {
+  state.hasNudgedBackprop = false;
+  renderBackpropNudge();
+}
 
 const byHandSteps = [
   {
@@ -2993,109 +3041,6 @@ function randomNormal(random) {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-function makePoint(type, random) {
-  let x;
-  let y;
-  let label;
-  if (type === "blobs") {
-    label = random() < 0.5 ? 0 : 1;
-    const center = label === 0 ? [-0.45, -0.35] : [0.45, 0.35];
-    x = clamp(center[0] + randomNormal(random) * 0.25, -1, 1);
-    y = clamp(center[1] + randomNormal(random) * 0.25, -1, 1);
-  } else if (type === "ring") {
-    x = random() * 2 - 1;
-    y = random() * 2 - 1;
-    const radius = Math.sqrt(x * x + y * y);
-    label = radius < 0.52 ? 0 : 1;
-    if (random() < 0.12) label = 1 - label;
-  } else {
-    x = random() * 2 - 1;
-    y = random() * 2 - 1;
-    label = x * y >= 0 ? 0 : 1;
-    if (random() < 0.04) label = 1 - label;
-  }
-  return { x, y, label };
-}
-
-function makeDataset(type, seed) {
-  const random = mulberry32(seed);
-  const train = [];
-  const test = [];
-  for (let i = 0; i < 90; i += 1) train.push(makePoint(type, random));
-  for (let i = 0; i < 90; i += 1) test.push(makePoint(type, random));
-  return { type, train, test };
-}
-
-function makeNetwork(hiddenUnits, seed) {
-  const random = mulberry32(seed);
-  const scale1 = 0.9;
-  const scale2 = 0.7;
-  const w1 = Array.from({ length: 2 }, () => (
-    Array.from({ length: hiddenUnits }, () => randomNormal(random) * scale1)
-  ));
-  const b1 = Array.from({ length: hiddenUnits }, () => 0);
-  const w2 = Array.from({ length: hiddenUnits }, () => (
-    Array.from({ length: 2 }, () => randomNormal(random) * scale2)
-  ));
-  const b2 = [0, 0];
-  return { hiddenUnits, w1, b1, w2, b2, epochs: 0 };
-}
-
-function forwardNet(net, point) {
-  const input = [point.x, point.y];
-  const z1 = net.b1.map((bias, j) => bias + input[0] * net.w1[0][j] + input[1] * net.w1[1][j]);
-  const a1 = z1.map((value) => Math.tanh(value));
-  const z2 = net.b2.map((bias, k) => bias + a1.reduce((sum, value, j) => sum + value * net.w2[j][k], 0));
-  const probs = softmax(z2);
-  return { input, z1, a1, z2, probs };
-}
-
-function predictNet(net, point) {
-  const { probs } = forwardNet(net, point);
-  return probs[1] > probs[0] ? 1 : 0;
-}
-
-function evaluateNet(net, points) {
-  let loss = 0;
-  let correct = 0;
-  points.forEach((point) => {
-    const { probs } = forwardNet(net, point);
-    loss += -Math.log(Math.max(probs[point.label], 1e-9));
-    if ((probs[1] > probs[0] ? 1 : 0) === point.label) correct += 1;
-  });
-  return {
-    loss: loss / points.length,
-    accuracy: correct / points.length
-  };
-}
-
-function trainOneExample(net, point, learningRate) {
-  const pass = forwardNet(net, point);
-  const target = [point.label === 0 ? 1 : 0, point.label === 1 ? 1 : 0];
-  const dz2 = pass.probs.map((probability, index) => probability - target[index]);
-  const da1 = Array.from({ length: net.hiddenUnits }, (_, j) => (
-    dz2.reduce((sum, value, k) => sum + value * net.w2[j][k], 0)
-  ));
-  const dz1 = da1.map((value, j) => value * (1 - pass.a1[j] ** 2));
-
-  for (let j = 0; j < net.hiddenUnits; j += 1) {
-    for (let k = 0; k < 2; k += 1) {
-      net.w2[j][k] -= learningRate * pass.a1[j] * dz2[k];
-    }
-  }
-  for (let k = 0; k < 2; k += 1) {
-    net.b2[k] -= learningRate * dz2[k];
-  }
-  for (let i = 0; i < 2; i += 1) {
-    for (let j = 0; j < net.hiddenUnits; j += 1) {
-      net.w1[i][j] -= learningRate * pass.input[i] * dz1[j];
-    }
-  }
-  for (let j = 0; j < net.hiddenUnits; j += 1) {
-    net.b1[j] -= learningRate * dz1[j];
-  }
-}
-
 function shuffleInPlace(items, random) {
   for (let index = items.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(random() * (index + 1));
@@ -3103,419 +3048,116 @@ function shuffleInPlace(items, random) {
   }
 }
 
-function networkLearningRate() {
-  return Number(dom.networkRateSlider.value) / 100;
-}
-
 function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function setTrainingProgress(done, total, phase = "ready") {
-  const safeTotal = Math.max(1, total);
-  const ratio = clamp(done / safeTotal, 0, 1);
-  dom.trainingProgressBar.style.width = `${ratio * 100}%`;
-  dom.trainingProgress.classList.toggle("is-running", phase === "running");
-  dom.trainingProgress.classList.toggle("is-complete", phase === "complete");
-  if (phase === "running") {
-    dom.trainingProgress.querySelector("strong").textContent = "Training in progress";
-    dom.trainingProgressText.textContent = `Epoch ${done} of ${total}. Cross-entropy, accuracy, and the decision map update as the network learns.`;
-  } else if (phase === "complete") {
-    dom.trainingProgress.querySelector("strong").textContent = "Training complete";
-    dom.trainingProgressText.textContent = `Finished ${total} epoch${total === 1 ? "" : "s"}. Click once again when you want another run.`;
-  } else {
-    dom.trainingProgress.querySelector("strong").textContent = "Ready to train";
-    dom.trainingProgressText.textContent = "One click runs the selected epochs and updates the map as it learns.";
-  }
-}
-
-function setNetworkTrainingControls(isRunning) {
-  state.isNetworkTraining = isRunning;
-  dom.trainBatchButton.disabled = isRunning;
-  dom.trainOneEpochButton.disabled = isRunning;
-  dom.resetNetworkButton.disabled = isRunning;
-  dom.newDataButton.disabled = isRunning;
-  dom.datasetSelect.disabled = isRunning;
-  dom.hiddenUnitsSlider.disabled = isRunning;
-  dom.networkRateSlider.disabled = isRunning;
-  dom.epochBatchSlider.disabled = isRunning;
-  dom.trainBatchButton.textContent = isRunning ? "Training..." : "Train selected epochs";
-  dom.trainOneEpochButton.textContent = isRunning ? "Running..." : "Train 1 epoch";
-}
-
-function trainEpochs(count) {
-  const lr = networkLearningRate();
-  for (let epoch = 0; epoch < count; epoch += 1) {
-    const random = mulberry32(state.dataSeed + state.network.epochs * 31 + 1009);
-    const batch = state.data.train.slice();
-    shuffleInPlace(batch, random);
-    batch.forEach((point) => trainOneExample(state.network, point, lr));
-    state.network.epochs += 1;
-    const trainEval = evaluateNet(state.network, state.data.train);
-    state.networkHistory.push(trainEval.loss);
-    if (state.networkHistory.length > 100) state.networkHistory.shift();
-  }
-}
-
-function trainTinyNetwork(epochs = 40) {
-  const steps = clamp(Math.round(Number(epochs) || 1), 1, 300);
-  trainEpochs(steps);
-  renderNetworkLab();
-  return networkSummary();
-}
-
-async function trainTinyNetworkAnimated(epochs = 40) {
-  if (state.isNetworkTraining) return networkSummary();
-  const total = clamp(Math.round(Number(epochs) || 1), 1, 300);
-  const runId = state.networkTrainingRun + 1;
-  state.networkTrainingRun = runId;
-  setNetworkTrainingControls(true);
-  setTrainingProgress(0, total, "running");
-  try {
-    for (let done = 0; done < total; done += 1) {
-      if (state.networkTrainingRun !== runId) break;
-      trainEpochs(1);
-      renderNetworkLab();
-      setTrainingProgress(done + 1, total, "running");
-      await wait(total <= 5 ? 180 : 45);
-    }
-    if (state.networkTrainingRun === runId) {
-      setTrainingProgress(total, total, "complete");
-    }
-  } finally {
-    if (state.networkTrainingRun === runId) {
-      setNetworkTrainingControls(false);
-    }
-  }
-  return networkSummary();
-}
-
-function beginOneEpochTraining(event) {
-  event?.preventDefault();
-  if (state.isNetworkTraining) return;
-  state.hasTrainedNetwork = true;
-  trainTinyNetworkAnimated(1);
-}
-
-function beginBatchTraining(event) {
-  event?.preventDefault();
-  if (state.isNetworkTraining) return;
-  state.hasTrainedNetwork = true;
-  trainTinyNetworkAnimated(Number(dom.epochBatchSlider.value));
-}
-
-function networkSummary() {
-  const trainEval = evaluateNet(state.network, state.data.train);
-  const testEval = evaluateNet(state.network, state.data.test);
-  return {
-    dataset: dom.datasetSelect.value,
-    hiddenUnits: state.network.hiddenUnits,
-    epochs: state.network.epochs,
-    learningRate: networkLearningRate(),
-    trainLoss: Number(trainEval.loss.toFixed(4)),
-    trainAccuracy: Number(trainEval.accuracy.toFixed(3)),
-    testAccuracy: Number(testEval.accuracy.toFixed(3)),
-    generalizationGap: Number(Math.abs(trainEval.accuracy - testEval.accuracy).toFixed(3))
-  };
-}
-
-function resetNetwork({ newData = false } = {}) {
-  state.networkTrainingRun += 1;
-  state.hasTrainedNetwork = false;
-  setNetworkTrainingControls(false);
-  if (newData) state.dataSeed += 17;
-  state.networkSeed += 13;
-  const datasetType = dom.datasetSelect.value;
-  state.data = makeDataset(datasetType, state.dataSeed);
-  state.network = makeNetwork(Number(dom.hiddenUnitsSlider.value), state.networkSeed);
-  state.networkHistory = [evaluateNet(state.network, state.data.train).loss];
-  setTrainingProgress(0, Number(dom.epochBatchSlider.value), "ready");
-  renderNetworkLab();
-}
-
-function renderNetworkControls() {
-  dom.hiddenUnitsLabel.textContent = dom.hiddenUnitsSlider.value;
-  dom.networkRateLabel.textContent = formatNumber(networkLearningRate(), 2);
-  dom.epochBatchLabel.textContent = dom.epochBatchSlider.value;
-}
-
-function renderNetworkLab() {
-  renderNetworkControls();
-  if (!state.hasTrainedNetwork) {
-    dom.networkStatus.textContent = "untrained";
-    dom.networkEpochLabel.textContent = "0 epochs";
-    dom.networkMetrics.replaceChildren(createElement("div", "empty-state", "Press \u201cTrain selected epochs\u201d to train the network and reveal its metrics."));
-    dom.lossHistory.replaceChildren(createElement("div", "empty-state", "Cross-entropy history appears once training starts."));
-    dom.generalizationPanel.replaceChildren(createElement("p", "", "Train the network to compare train and test accuracy."));
-    drawDecisionMapPlaceholder();
-    return;
-  }
-  const summary = networkSummary();
-  dom.networkStatus.textContent = state.network.epochs === 0 ? "untrained" : "trained";
-  dom.networkEpochLabel.textContent = `${state.network.epochs} epoch${state.network.epochs === 1 ? "" : "s"}`;
-  renderMetricCards(dom.networkMetrics, [
-    {
-      label: "train cross-entropy",
-      value: formatNumber(summary.trainLoss, 3),
-      note: "nats per example"
-    },
-    {
-      label: "train accuracy",
-      value: formatPercent(summary.trainAccuracy),
-      note: "solid dots it got right"
-    },
-    {
-      label: "test accuracy",
-      value: formatPercent(summary.testAccuracy),
-      note: "haloed dots it never saw"
-    },
-    {
-      label: "gap",
-      value: formatPercent(summary.generalizationGap),
-      note: "train minus test = overfitting"
-    },
-    {
-      label: "parameters",
-      value: String(state.network.hiddenUnits * 5 + 2),
-      note: "weights and biases"
-    },
-    {
-      label: "learning rate",
-      value: formatNumber(summary.learningRate, 2),
-      note: "update size"
-    }
-  ]);
-  renderLossHistory();
-  renderGeneralization(summary);
-  drawDecisionMap();
-}
-
-function renderLossHistory() {
-  const recent = state.networkHistory.slice(-8);
-  const maxLoss = Math.max(...recent, 0.1);
-  dom.lossHistory.replaceChildren();
-  recent.forEach((loss, index) => {
-    const row = createElement("div", "history-row");
-    const label = index === recent.length - 1 ? "latest" : `-${recent.length - index - 1}`;
-    const track = createElement("div", "history-track");
-    const fill = createElement("span");
-    fill.style.width = `${clamp((loss / maxLoss) * 100, 2, 100)}%`;
-    track.append(fill);
-    row.append(createElement("strong", "", label), track, createElement("em", "", formatNumber(loss, 3)));
-    dom.lossHistory.append(row);
-  });
-}
-
-function renderGeneralization(summary) {
-  const p = createElement("p");
-  if (summary.trainAccuracy > 0.9 && summary.testAccuracy < 0.72) {
-    p.textContent = "The model fits the training points much better than the test points. That gap is the overfitting warning sign.";
-  } else if (summary.testAccuracy > 0.82 && summary.generalizationGap < 0.16) {
-    p.textContent = "The test accuracy is close to the training accuracy. That is the generalization pattern we want: the model learned a reusable boundary.";
-  } else if (state.network.epochs === 0) {
-    p.textContent = "The network is still random. Train a few epochs and watch the boundary move toward the pattern in the points.";
-  } else {
-    p.textContent = "Training is in progress. More epochs or a different hidden size may help, but a noisy dataset can keep the test score imperfect.";
-  }
-  dom.generalizationPanel.replaceChildren(p);
-}
-
-function drawDecisionMapPlaceholder() {
-  const canvas = dom.decisionCanvas;
-  const context = canvas.getContext("2d");
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "#f4efe6";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "#6a6a6a";
-  context.font = "16px system-ui, sans-serif";
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText("Press \u201cTrain selected epochs\u201d to draw the decision boundary.", canvas.width / 2, canvas.height / 2);
-}
-
-function drawDecisionMap() {
-  const canvas = dom.decisionCanvas;
-  const context = canvas.getContext("2d");
-  const width = canvas.width;
-  const height = canvas.height;
-  context.clearRect(0, 0, width, height);
-  const toCanvasX = (x) => ((x + 1.05) / 2.1) * width;
-  const toCanvasY = (y) => height - ((y + 1.05) / 2.1) * height;
-  const fromCanvasX = (x) => (x / width) * 2.1 - 1.05;
-  const fromCanvasY = (y) => ((height - y) / height) * 2.1 - 1.05;
-  const step = 8;
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) {
-      const point = { x: fromCanvasX(x + step / 2), y: fromCanvasY(y + step / 2), label: 0 };
-      const p1 = forwardNet(state.network, point).probs[1];
-      // soft coral where it predicts group A, blending to soft teal where it predicts group B
-      const red = Math.round(248 * (1 - p1) + 205 * p1);
-      const green = Math.round(224 * (1 - p1) + 232 * p1);
-      const blue = Math.round(209 * (1 - p1) + 229 * p1);
-      context.fillStyle = `rgb(${red}, ${green}, ${blue})`;
-      context.fillRect(x, y, step + 1, step + 1);
-    }
-  }
-  context.strokeStyle = "rgba(17, 17, 17, 0.25)";
-  context.lineWidth = 1;
-  context.beginPath();
-  context.moveTo(0, toCanvasY(0));
-  context.lineTo(width, toCanvasY(0));
-  context.moveTo(toCanvasX(0), 0);
-  context.lineTo(toCanvasX(0), height);
-  context.stroke();
-  drawPoints(context, state.data.test, toCanvasX, toCanvasY, true);
-  drawPoints(context, state.data.train, toCanvasX, toCanvasY, false);
-}
-
-function drawPoints(context, points, toX, toY, isTest) {
-  points.forEach((point) => {
-    const x = toX(point.x);
-    const y = toY(point.y);
-    const color = point.label === 0 ? "#c65f1e" : "#15756c";
-    if (isTest) {
-      // held-out dots get a white halo so they pop on any shade
-      context.beginPath();
-      context.arc(x, y, 6.8, 0, Math.PI * 2);
-      context.strokeStyle = "#ffffff";
-      context.lineWidth = 3;
-      context.stroke();
-      context.beginPath();
-      context.arc(x, y, 4.6, 0, Math.PI * 2);
-      context.fillStyle = color;
-      context.fill();
-      context.strokeStyle = "rgba(17, 17, 17, 0.55)";
-      context.lineWidth = 1;
-      context.stroke();
-    } else {
-      context.beginPath();
-      context.arc(x, y, 5.2, 0, Math.PI * 2);
-      context.fillStyle = color;
-      context.fill();
-      context.strokeStyle = "rgba(17, 17, 17, 0.45)";
-      context.lineWidth = 1;
-      context.stroke();
-    }
+function yieldToBrowser() {
+  if (typeof MessageChannel === "undefined") return wait(0);
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => {
+      channel.port1.close();
+      channel.port2.close();
+      resolve();
+    };
+    channel.port2.postMessage(null);
   });
 }
 
 // ---------- Tiny neural next-word model (a miniature fixed-window language model) ----------
-const NW_SENTENCES = [
-  "the cat sat on the mat",
-  "the cat ran in the sun",
-  "the cat slept under the tree",
-  "the cat saw a bird",
-  "the cat chased a mouse",
-  "the cat jumped over the fence",
-  "the cat hid in the bush",
-  "the cat rested by the log",
-  "the cat played in the garden",
-  "the cat sat and slept",
-  "the dog sat on the mat",
-  "the dog ran in the park",
-  "the dog slept near the log",
-  "the dog watched a bird",
-  "the dog swam in the lake",
-  "the dog chased a duck",
-  "the dog jumped over the fence",
-  "the dog rested by the river",
-  "the dog played in the field",
-  "the dog ran and played",
-  "the bird sat on the tree",
-  "the bird flew over the hill",
-  "the bird sang in the garden",
-  "the bird hid in the nest",
-  "the bird saw a cat",
-  "the bird rested on the fence",
-  "a bird flew near the pond",
-  "the bird flew and sang",
-  "the fox ran by the river",
-  "the fox hid in the bush",
-  "the fox watched a rabbit",
-  "the fox saw a duck",
-  "the fox ran and hid",
-  "the owl slept in the tree",
-  "the owl flew over the field",
-  "the owl saw a mouse",
-  "the rabbit ran in the field",
-  "the rabbit hid under the log",
-  "the rabbit ate in the garden",
-  "the mouse ran under the fence",
-  "the mouse hid by the bush",
-  "the mouse ate by the log",
-  "the fish swam in the river",
-  "the fish rested under the log",
-  "the frog jumped in the pond",
-  "the frog sat on the log",
-  "the duck swam in the lake",
-  "the duck slept by the pond",
-  "a duck flew over the river",
-  "the girl ran in the park",
-  "the girl played in the garden",
-  "the girl saw a duck",
-  "the girl sang by the river",
-  "the girl rested by the pond",
-  "the boy ran in the field",
-  "the boy jumped over the log",
-  "the boy found a frog",
-  "the boy watched a bird",
-  "the boy played in the park",
-  "the boy swam in the lake",
-  "a cat slept on the mat",
-  "a dog ran in the rain",
-  "a bird sang in the tree",
-  "a fox hid in the bush",
-  "a rabbit ran in the field",
-  "a girl played in the garden",
-  "a boy swam in the lake",
-  "the cat saw a dog",
-  "the dog saw a cat",
-  "the owl saw a fox",
-  "the fox saw a rabbit",
-  "the duck saw a frog"
+const NW_FALLBACK_CORPUS = {
+  id: "fallback",
+  title: "Built-in fallback passage",
+  author: "LLM Soup to Nuts",
+  sourceUrl: "https://talktovishal.github.io/projects/llm-soup-to-nuts/",
+  recommendedContext: "the model",
+  text: "The model learns from a real passage. The model predicts the next token from context. Training changes every weight."
+};
+const NW_CORPUS_IDS = [
+  "alice-gutenberg-sample",
+  "alice-both-books",
+  "lookingglass-gutenberg",
+  "pride-gutenberg-sample",
+  "sherlock-gutenberg-sample"
 ];
-const NW_WATCH = [
-  ["the", "cat"],
-  ["the", "dog"],
-  ["saw", "a"],
-  ["in", "the"]
-];
-const NW_START = "<s>";
-const NW_END = ".";
+const NW_SOURCE_CORPORA = Array.isArray(window.LESSON_CORPORA)
+  ? window.LESSON_CORPORA.filter((corpus) => NW_CORPUS_IDS.includes(corpus.id))
+  : [];
+const NW_CORPORA = NW_SOURCE_CORPORA.length ? NW_SOURCE_CORPORA : [NW_FALLBACK_CORPUS];
+const NW_DEFAULT_CORPUS_ID = "alice-gutenberg-sample";
+const NW_RARE = "<rare>";
+const NW_VOCAB_SIZE = 512;
+const NW_CORPUS_LABELS = {
+  "alice-gutenberg-sample": "Alice in Wonderland",
+  "alice-both-books": "Both Alice books",
+  "lookingglass-gutenberg": "Through the Looking-Glass",
+  "pride-gutenberg-sample": "Pride and Prejudice excerpt",
+  "sherlock-gutenberg-sample": "Sherlock Holmes excerpt"
+};
+const NW_CONTEXT_OVERRIDES = {
+  "alice-gutenberg-sample": "said alice",
+  "alice-both-books": "said alice",
+  "lookingglass-gutenberg": "said alice",
+  "sherlock-gutenberg-sample": "sherlock holmes"
+};
 const NW_DIM = 12;
 const NW_HIDDEN = 24;
 const NW_CONTEXT = 2;
-const NW_RATE = 0.02;
-const NW_DEFAULT_BUDGET_MS = 30000;
+const NW_RATE = 0.015;
+const NW_EVALUATION_SAMPLES = 1024;
 
-let nwData = buildNextWordData();
+let nwCorpus = NW_CORPORA.find((corpus) => corpus.id === NW_DEFAULT_CORPUS_ID) || NW_CORPORA[0];
+let nwData = buildNextWordData(nwCorpus);
 let nwModel = null;
 let nwHistory = [];
 const nwState = { isTraining: false, run: 0, seed: 91, hasTrained: false };
 
 function nwLabel(token) {
-  if (token === NW_START) return "start";
-  if (token === NW_END) return "(end)";
+  if (token === NW_RARE) return "<rare>";
   return token;
 }
 
-function buildNextWordData() {
-  const vocabSet = new Set([NW_START, NW_END]);
-  const sentences = NW_SENTENCES.map((line) => line.trim().split(/\s+/));
-  sentences.forEach((words) => words.forEach((word) => vocabSet.add(word)));
-  const vocab = Array.from(vocabSet);
+function tokenizeNextWordCorpus(text) {
+  return String(text).toLowerCase().match(/[\p{L}\p{N}]+(?:[\u0027\u2019][\p{L}\p{N}]+)?|[^\s]/gu) || [];
+}
+
+function buildNextWordData(corpus) {
+  const rawTokens = tokenizeNextWordCorpus(corpus.text || "");
+  const counts = new Map();
+  rawTokens.forEach((token) => counts.set(token, (counts.get(token) || 0) + 1));
+  const namedTokens = Array.from(counts.entries())
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, NW_VOCAB_SIZE - 1)
+    .map(([token]) => token);
+  const vocab = [NW_RARE, ...namedTokens];
   const index = new Map(vocab.map((word, i) => [word, i]));
-  const examples = [];
-  sentences.forEach((words) => {
-    const sequence = [NW_START, NW_START, ...words, NW_END];
-    for (let i = NW_CONTEXT; i < sequence.length; i += 1) {
-      examples.push({
-        context: [index.get(sequence[i - 2]), index.get(sequence[i - 1])],
-        target: index.get(sequence[i])
-      });
-    }
+  const tokenIds = rawTokens.map((token) => index.get(token) ?? 0);
+  const examples = Array.from({ length: Math.max(0, tokenIds.length - NW_CONTEXT) }, (_, offset) => {
+    const position = offset + NW_CONTEXT;
+    return {
+      context: [tokenIds[position - 2], tokenIds[position - 1]],
+      target: tokenIds[position]
+    };
   });
-  return { vocab, index, examples };
+  const namedCount = tokenIds.reduce((total, id) => total + (id === 0 ? 0 : 1), 0);
+  const preferred = tokenizeNextWordCorpus(NW_CONTEXT_OVERRIDES[corpus.id] || corpus.recommendedContext || "said the")
+    .slice(-NW_CONTEXT)
+    .map((token) => index.get(token));
+  const defaultContext = preferred.length === NW_CONTEXT && preferred.every((id) => id !== undefined && id !== 0)
+    ? preferred.map((id) => vocab[id])
+    : [vocab[1] || NW_RARE, vocab[2] || NW_RARE];
+  return {
+    corpus,
+    rawTokens,
+    rawVocabCount: counts.size,
+    tokenIds,
+    vocab,
+    index,
+    examples,
+    coverage: rawTokens.length ? namedCount / rawTokens.length : 0,
+    defaultContext
+  };
 }
 
 function nextWordParamCount() {
@@ -3539,7 +3181,7 @@ function makeNextWordModel(seed) {
     Array.from({ length: V }, () => randomNormal(random) / Math.sqrt(NW_HIDDEN))
   ));
   const b2 = Array.from({ length: V }, () => 0);
-  return { V, emb, w1, b1, w2, b2, epochs: 0 };
+  return { V, emb, w1, b1, w2, b2, passes: 0 };
 }
 
 function cloneNextWordModel(model) {
@@ -3550,7 +3192,7 @@ function cloneNextWordModel(model) {
     b1: model.b1.slice(),
     w2: model.w2.map((row) => row.slice()),
     b2: model.b2.slice(),
-    epochs: model.epochs
+    passes: model.passes
   };
 }
 
@@ -3566,6 +3208,7 @@ function nwForward(model, context) {
 
 function nwTrainExample(model, example, learningRate) {
   const pass = nwForward(model, example.context);
+  const loss = -Math.log(Math.max(pass.probs[example.target], 1e-9));
   const inputDim = NW_DIM * NW_CONTEXT;
   const dz2 = pass.probs.slice();
   dz2[example.target] -= 1;
@@ -3592,36 +3235,62 @@ function nwTrainExample(model, example, learningRate) {
       model.emb[id][col] -= learningRate * dx[c * NW_DIM + col];
     }
   }
+  return loss;
+}
+
+function nwEvaluationExamples() {
+  if (nwData.examples.length <= NW_EVALUATION_SAMPLES) return nwData.examples;
+  const lastIndex = nwData.examples.length - 1;
+  return Array.from({ length: NW_EVALUATION_SAMPLES }, (_, index) => (
+    nwData.examples[Math.round((index / (NW_EVALUATION_SAMPLES - 1)) * lastIndex)]
+  ));
 }
 
 function nwEvaluate(model) {
   let loss = 0;
-  nwData.examples.forEach((example) => {
+  const examples = nwEvaluationExamples();
+  examples.forEach((example) => {
     const { probs } = nwForward(model, example.context);
     loss += -Math.log(Math.max(probs[example.target], 1e-9));
   });
-  const average = loss / nwData.examples.length;
-  return { loss: average, perplexity: Math.exp(average) };
+  const average = examples.length ? loss / examples.length : 0;
+  return { loss: average, perplexity: Math.exp(average), samples: examples.length };
 }
 
 function nwTrainEpochs(count) {
-  for (let epoch = 0; epoch < count; epoch += 1) {
-    const random = mulberry32(1234 + nwModel.epochs * 17);
+  for (let pass = 0; pass < count; pass += 1) {
+    const random = mulberry32(1234 + nwModel.passes * 17);
     const batch = nwData.examples.slice();
     shuffleInPlace(batch, random);
     batch.forEach((example) => nwTrainExample(nwModel, example, NW_RATE));
-    nwModel.epochs += 1;
+    nwModel.passes += 1;
     nwHistory.push(nwEvaluate(nwModel).loss);
     if (nwHistory.length > 200) nwHistory.shift();
   }
 }
 
-function generateSentence(temperature = 0.8, maxLength = 12) {
-  let context = [nwData.index.get(NW_START), nwData.index.get(NW_START)];
-  const words = [];
+function joinGeneratedTokens(tokens) {
+  return tokens.join(" ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/([\[(])\s+/g, "$1")
+    .replace(/\s+([\])])/g, "$1");
+}
+
+function selectedGenerationContext() {
+  const selected = [dom.nwContextSelectA?.value, dom.nwContextSelectB?.value];
+  if (selected.every((token) => nwData.index.has(token))) {
+    return selected.map((token) => nwData.index.get(token));
+  }
+  return nwData.defaultContext.map((token) => nwData.index.get(token));
+}
+
+function generateSentence(temperature = 0.8, maxLength = 24) {
+  let context = selectedGenerationContext();
+  const words = context.map((id) => nwData.vocab[id]);
   for (let step = 0; step < maxLength; step += 1) {
     const { z2 } = nwForward(nwModel, context);
     const scaled = z2.map((value) => value / Math.max(temperature, 0.05));
+    scaled[nwData.index.get(NW_RARE)] = Number.NEGATIVE_INFINITY;
     const probs = softmax(scaled);
     let roll = Math.random();
     let pick = probs.length - 1;
@@ -3630,17 +3299,19 @@ function generateSentence(temperature = 0.8, maxLength = 12) {
       if (roll <= 0) { pick = i; break; }
     }
     const word = nwData.vocab[pick];
-    if (word === NW_END) break;
-    if (word !== NW_START) words.push(word);
+    words.push(word);
     context = [context[1], pick];
+    if (/[.!?]/.test(word) && step >= 4) break;
   }
-  return words.length ? words.join(" ") : "(no words yet — train a little first)";
+  return words.length ? joinGeneratedTokens(words) : "(no tokens yet - train a little first)";
 }
 
 function nextWordSummary() {
   const evaluation = nwEvaluate(nwModel);
   return {
-    epochs: nwModel.epochs,
+    passes: nwModel.passes,
+    corpus: nwCorpus.title,
+    tokens: nwData.rawTokens.length,
     vocab: nwModel.V,
     parameters: nextWordParamCount(),
     trainLoss: Number(evaluation.loss.toFixed(4)),
@@ -3649,8 +3320,8 @@ function nextWordSummary() {
   };
 }
 
-function trainNextWordModel(epochs = 120) {
-  const steps = clamp(Math.round(Number(epochs) || 1), 1, 600);
+function trainNextWordModel(passes = 1) {
+  const steps = clamp(Math.round(Number(passes) || 1), 1, 5);
   nwState.hasTrained = true;
   nwTrainEpochs(steps);
   renderNextWordLab();
@@ -3663,8 +3334,9 @@ function setNwTrainingControls(isRunning) {
   dom.nwTrainStepButton.disabled = isRunning;
   dom.nwResetButton.disabled = isRunning;
   dom.nwGenerateButton.disabled = isRunning;
-  if (dom.nwBudgetSelect) dom.nwBudgetSelect.disabled = isRunning;
-  dom.nwTrainButton.textContent = isRunning ? "Training..." : "Train next-word model";
+  dom.nwPassesSelect.disabled = isRunning;
+  dom.nwCorpusSelect.disabled = isRunning;
+  dom.nwTrainButton.textContent = isRunning ? "Training complete passes..." : "Train complete passes";
 }
 
 function setNwProgress(fraction, phase, headline, detail) {
@@ -3675,82 +3347,79 @@ function setNwProgress(fraction, phase, headline, detail) {
   dom.nwProgressText.textContent = detail;
 }
 
-async function trainNextWordTimed(budgetMs) {
+async function trainNextWordPasses(requestedPasses) {
   if (nwState.isTraining) return nextWordSummary();
-  const budget = clamp(Math.round(Number(budgetMs) || NW_DEFAULT_BUDGET_MS), 3000, 120000);
-  const budgetS = Math.round(budget / 1000);
+  const passCount = clamp(Math.round(Number(requestedPasses) || 1), 1, 5);
   const runId = nwState.run + 1;
   nwState.run = runId;
   nwState.hasTrained = true;
   setNwTrainingControls(true);
-  const start = performance.now();
-  let elapsed = 0;
-  let converged = false;
-  let diverged = false;
-  let checksWithoutImprovement = 0;
+  const startedAt = performance.now();
+  const examplesPerPass = nwData.examples.length;
+  const totalExamples = examplesPerPass * passCount;
+  let processedExamples = 0;
   const startingLoss = nwEvaluate(nwModel).loss;
   let bestLoss = startingLoss;
   let bestModel = cloneNextWordModel(nwModel);
-  let bestEpoch = nwModel.epochs;
+  let bestPass = nwModel.passes;
   try {
-    setNwProgress(0, "running", "Training in progress", `0s of ${budgetS}s - warming up...`);
-    await wait(16);
-    while (elapsed < budget) {
-      if (nwState.run !== runId) break;
-      const sliceStart = performance.now();
-      do {
-        nwTrainEpochs(1);
-        elapsed = performance.now() - start;
-        const epochLoss = nwHistory[nwHistory.length - 1];
-        if (!Number.isFinite(epochLoss) || epochLoss > bestLoss + 0.5) {
-          diverged = true;
-          break;
+    setNwProgress(0, "running", "Training in progress", `Preparing pass 1 of ${passCount}. Every one of ${numberFormat.format(examplesPerPass)} examples will be visited.`);
+    await yieldToBrowser();
+    for (let passOffset = 0; passOffset < passCount; passOffset += 1) {
+      const passNumber = passOffset + 1;
+      const random = mulberry32(1234 + nwModel.passes * 17);
+      const batch = nwData.examples.slice();
+      shuffleInPlace(batch, random);
+      let rollingLoss = 0;
+      let sliceStartedAt = performance.now();
+      for (let exampleIndex = 0; exampleIndex < batch.length; exampleIndex += 1) {
+        if (nwState.run !== runId) return nextWordSummary();
+        rollingLoss += nwTrainExample(nwModel, batch[exampleIndex], NW_RATE);
+        processedExamples += 1;
+        if (performance.now() - sliceStartedAt >= 40 || exampleIndex === batch.length - 1) {
+          const passProcessed = exampleIndex + 1;
+          const rollingAverage = rollingLoss / passProcessed;
+          setNwProgress(
+            processedExamples / totalExamples,
+            "running",
+            `Training pass ${passNumber} of ${passCount}`,
+            `${numberFormat.format(passProcessed)} / ${numberFormat.format(examplesPerPass)} examples in this pass · rolling cross-entropy ${rollingAverage.toFixed(3)} nats`
+          );
+          renderNwPrediction();
+          await yieldToBrowser();
+          sliceStartedAt = performance.now();
         }
-        if (epochLoss < bestLoss - 5e-4) {
-          bestLoss = epochLoss;
-          bestModel = cloneNextWordModel(nwModel);
-          bestEpoch = nwModel.epochs;
-          checksWithoutImprovement = 0;
-        } else {
-          checksWithoutImprovement += 1;
-        }
-        if (checksWithoutImprovement >= 12 && elapsed > 2500) {
-          converged = true;
-          break;
-        }
-      } while (performance.now() - sliceStart < 45 && elapsed < budget);
-      const loss = nwHistory[nwHistory.length - 1];
-      const ppl = Math.exp(loss);
+      }
+      nwModel.passes += 1;
+      const evaluation = nwEvaluate(nwModel);
+      nwHistory.push(evaluation.loss);
+      if (nwHistory.length > 200) nwHistory.shift();
+      if (evaluation.loss < bestLoss) {
+        bestLoss = evaluation.loss;
+        bestModel = cloneNextWordModel(nwModel);
+        bestPass = nwModel.passes;
+      }
       renderNextWordLab();
-      setNwProgress(
-        elapsed / budget,
-        "running",
-        "Training in progress",
-        `${(elapsed / 1000).toFixed(0)}s of ${budgetS}s - epoch ${nwModel.epochs}, cross-entropy ${loss.toFixed(3)} nats, perplexity ${ppl.toFixed(1)}`
-      );
-      if (diverged || converged) break;
-      await wait(16);
     }
     if (nwState.run === runId) {
-      const attemptedEpoch = nwModel.epochs;
+      const attemptedPass = nwModel.passes;
       nwModel = cloneNextWordModel(bestModel);
       const finalLoss = nwEvaluate(nwModel).loss;
       const finalPpl = Math.exp(finalLoss);
-      const laterEpochs = Math.max(0, attemptedEpoch - bestEpoch);
+      const laterPasses = Math.max(0, attemptedPass - bestPass);
       const lossSummary = finalLoss < startingLoss - 1e-6
-        ? `Cross-entropy fell from ${startingLoss.toFixed(3)} to ${finalLoss.toFixed(3)} nats.`
-        : `Cross-entropy stayed at ${finalLoss.toFixed(3)} nats.`;
-      const keptSummary = laterEpochs > 0
-        ? `Epoch ${bestEpoch} was best; ${laterEpochs} later pass${laterEpochs === 1 ? "" : "es"} did not beat it, so the model kept epoch ${bestEpoch}.`
-        : "The final epoch was also the lowest-loss result.";
-      nwHistory.push(finalLoss);
-      if (nwHistory.length > 200) nwHistory.shift();
+        ? `Sampled training cross-entropy fell from ${startingLoss.toFixed(3)} to ${finalLoss.toFixed(3)} nats.`
+        : `Sampled training cross-entropy stayed at ${finalLoss.toFixed(3)} nats.`;
+      const keptSummary = laterPasses > 0
+        ? `Pass ${bestPass} scored best, so the model kept those weights.`
+        : "The final pass also scored best.";
+      const elapsedSeconds = (performance.now() - startedAt) / 1000;
       renderNextWordLab();
       setNwProgress(
         1,
         "complete",
-        diverged ? "Training stopped safely" : "Training complete",
-        `${lossSummary} ${keptSummary} Perplexity is ${finalPpl.toFixed(1)}.`
+        "Complete book passes finished",
+        `${numberFormat.format(totalExamples)} examples visited in ${elapsedSeconds.toFixed(1)}s. ${lossSummary} ${keptSummary} Sampled training perplexity is ${finalPpl.toFixed(1)}.`
       );
     }
   } finally {
@@ -3762,13 +3431,13 @@ async function trainNextWordTimed(budgetMs) {
 function beginNextWordTraining(event) {
   event?.preventDefault();
   if (nwState.isTraining) return;
-  trainNextWordTimed(Number(dom.nwBudgetSelect ? dom.nwBudgetSelect.value : NW_DEFAULT_BUDGET_MS));
+  trainNextWordPasses(Number(dom.nwPassesSelect.value));
 }
 
 function beginNextWordStep(event) {
   event?.preventDefault();
   if (nwState.isTraining) return;
-  trainNextWordTimed(8000);
+  trainNextWordPasses(1);
 }
 
 function resetNextWord() {
@@ -3777,15 +3446,34 @@ function resetNextWord() {
   setNwTrainingControls(false);
   nwModel = makeNextWordModel(nwState.seed);
   nwHistory = [nwEvaluate(nwModel).loss];
-  setNwProgress(0, "ready", "Ready to train", "Pick a time budget and press Train - it trains until it converges or the budget runs out, showing live progress.");
+  setNwProgress(0, "ready", "Ready to train", `Choose complete passes and press Train. Each pass will visit all ${numberFormat.format(nwData.examples.length)} examples.`);
   dom.nwGeneratePanel.replaceChildren(
-    createElement("p", "", "Train the model, then click generate to sample a sentence one word at a time.")
+    createElement("p", "", "Train the model, then generate a continuation from the selected two-token context.")
   );
   renderNextWordLab();
 }
 
+function populateNwCorpusSelect() {
+  dom.nwCorpusSelect.replaceChildren();
+  NW_CORPORA.forEach((corpus) => {
+    const option = document.createElement("option");
+    option.value = corpus.id;
+    option.textContent = NW_CORPUS_LABELS[corpus.id] || corpus.title;
+    dom.nwCorpusSelect.append(option);
+  });
+  dom.nwCorpusSelect.value = nwCorpus.id;
+}
+
+function changeNextWordCorpus() {
+  nwCorpus = NW_CORPORA.find((corpus) => corpus.id === dom.nwCorpusSelect.value) || NW_CORPORA[0];
+  nwData = buildNextWordData(nwCorpus);
+  populateContextSelects();
+  renderCorpusPreview();
+  resetNextWord();
+}
+
 function populateContextSelects() {
-  const friendly = nwData.vocab.filter((word) => word !== NW_END);
+  const friendly = nwData.vocab.filter((word) => word !== NW_RARE);
   [dom.nwContextSelectA, dom.nwContextSelectB].forEach((select, position) => {
     select.replaceChildren();
     friendly.forEach((word) => {
@@ -3794,7 +3482,7 @@ function populateContextSelects() {
       option.textContent = nwLabel(word);
       select.append(option);
     });
-    select.value = position === 0 ? "the" : "cat";
+    select.value = nwData.defaultContext[position];
   });
 }
 
@@ -3818,47 +3506,21 @@ function renderNwPrediction() {
   });
 }
 
-function renderNwWatch() {
-  if (!dom.nwWatchPanel) return;
-  if (!nwState.hasTrained) {
-    dom.nwWatchPanel.replaceChildren(createElement("div", "empty-state", "These four contexts sharpen as the model learns. Press Train and watch each one lock onto a sensible next word."));
-    return;
-  }
-  dom.nwWatchPanel.replaceChildren();
-  NW_WATCH.forEach(([a, b]) => {
-    const ia = nwData.index.get(a);
-    const ib = nwData.index.get(b);
-    if (ia === undefined || ib === undefined) return;
-    const { probs } = nwForward(nwModel, [ia, ib]);
-    let best = 0;
-    for (let i = 1; i < probs.length; i += 1) if (probs[i] > probs[best]) best = i;
-    const row = createElement("div", "watch-row");
-    const track = createElement("div", "watch-track");
-    const fill = createElement("span");
-    fill.style.width = `${clamp(probs[best] * 100, 2, 100)}%`;
-    track.append(fill);
-    row.append(
-      createElement("span", "watch-context", `${nwLabel(a)} ${nwLabel(b)} \u2192`),
-      createElement("strong", "watch-word", nwLabel(nwData.vocab[best])),
-      track,
-      createElement("em", "watch-pct", formatPercent(probs[best]))
-    );
-    dom.nwWatchPanel.append(row);
-  });
-}
-
 function renderCorpusPreview() {
   if (!dom.nwCorpusPreview) return;
   dom.nwCorpusPreview.replaceChildren();
-  NW_SENTENCES.slice(0, 14).forEach((line) => {
-    dom.nwCorpusPreview.append(createElement("code", "", line));
-  });
-  if (dom.nwCorpusCount) dom.nwCorpusCount.textContent = `${NW_SENTENCES.length} sentences`;
-  const numberFormat = new Intl.NumberFormat("en-US");
-  if (dom.nwTrainingSentenceCount) dom.nwTrainingSentenceCount.textContent = numberFormat.format(NW_SENTENCES.length);
+  for (let start = 0; start < Math.min(nwData.rawTokens.length, 96); start += 32) {
+    dom.nwCorpusPreview.append(createElement("code", "", joinGeneratedTokens(nwData.rawTokens.slice(start, start + 32))));
+  }
+  dom.nwCorpusCount.textContent = `${numberFormat.format(nwData.rawTokens.length)} tokens`;
+  dom.nwCorpusSource.href = nwCorpus.sourceUrl || "https://www.gutenberg.org/";
+  dom.nwCorpusSource.textContent = `Open ${nwCorpus.author || "the public-domain source"}`;
+  dom.nwTrainingTokenCount.textContent = numberFormat.format(nwData.rawTokens.length);
   if (dom.nwTrainingExampleCount) dom.nwTrainingExampleCount.textContent = numberFormat.format(nwData.examples.length);
   if (dom.nwTrainingExampleCountInline) dom.nwTrainingExampleCountInline.textContent = numberFormat.format(nwData.examples.length);
+  dom.nwTrainingRawVocabCount.textContent = numberFormat.format(nwData.rawVocabCount);
   if (dom.nwTrainingVocabCount) dom.nwTrainingVocabCount.textContent = numberFormat.format(nwData.vocab.length);
+  dom.nwTrainingCoverage.textContent = formatPercent(nwData.coverage);
   if (dom.nwTrainingParamCount) dom.nwTrainingParamCount.textContent = numberFormat.format(nextWordParamCount());
 }
 
@@ -3866,9 +3528,11 @@ function renderNwLossHistory() {
   const recent = nwHistory.slice(-8);
   const maxLoss = Math.max(...recent, 0.1);
   dom.nwLossHistory.replaceChildren();
+  const firstPass = Math.max(0, nwModel.passes - (recent.length - 1));
   recent.forEach((loss, index) => {
     const row = createElement("div", "history-row");
-    const label = index === recent.length - 1 ? "latest" : `-${recent.length - index - 1}`;
+    const pass = firstPass + index;
+    const label = pass === 0 ? "random" : `pass ${pass}`;
     const track = createElement("div", "history-track");
     const fill = createElement("span");
     fill.style.width = `${clamp((loss / maxLoss) * 100, 2, 100)}%`;
@@ -3883,25 +3547,23 @@ function renderNextWordLab() {
   dom.nwTempLabel.textContent = formatNumber(Number(dom.nwTempSlider.value) / 100, 2);
   if (!nwState.hasTrained) {
     dom.nwStatus.textContent = "untrained";
-    dom.nwMetrics.replaceChildren(createElement("div", "empty-state", "Press Train next-word model to train the model and reveal its metrics."));
-    dom.nwLossHistory.replaceChildren(createElement("div", "empty-state", "Cross-entropy history appears once training starts."));
+    dom.nwMetrics.replaceChildren(createElement("div", "empty-state", "Press Train complete passes to train on every example in the selected book."));
+    dom.nwLossHistory.replaceChildren(createElement("div", "empty-state", "Pass-by-pass sampled training loss appears once training starts."));
     renderNwPrediction();
-    renderNwWatch();
     return;
   }
   const evaluation = nwEvaluate(nwModel);
-  dom.nwStatus.textContent = nwModel.epochs === 0 ? "untrained" : `${nwModel.epochs} epochs`;
+  dom.nwStatus.textContent = nwModel.passes === 0 ? "starting" : `${nwModel.passes} pass${nwModel.passes === 1 ? "" : "es"}`;
   renderMetricCards(dom.nwMetrics, [
-    { label: "train cross-entropy", value: formatNumber(evaluation.loss, 3), note: "nats per prediction" },
-    { label: "perplexity", value: formatNumber(evaluation.perplexity, 2), note: "effective word choices" },
-    { label: "epochs", value: String(nwModel.epochs), note: "epoch of the current weights" },
-    { label: "vocabulary", value: String(nwModel.V), note: "words it can predict" },
-    { label: "parameters", value: String(nextWordParamCount()), note: "weights it tunes" },
-    { label: "context", value: `${NW_CONTEXT} words`, note: "fixed window" }
+    { label: "sampled train loss", value: formatNumber(evaluation.loss, 3), note: `${numberFormat.format(evaluation.samples)} evenly spaced examples` },
+    { label: "sampled perplexity", value: formatNumber(evaluation.perplexity, 2), note: "effective token choices" },
+    { label: "complete passes", value: String(nwModel.passes), note: "every book token per pass" },
+    { label: "book tokens", value: numberFormat.format(nwData.rawTokens.length), note: "all used for training" },
+    { label: "model vocabulary", value: String(nwModel.V), note: "including <rare>" },
+    { label: "context", value: `${NW_CONTEXT} tokens`, note: "fixed window" }
   ]);
   renderNwPrediction();
   renderNwLossHistory();
-  renderNwWatch();
 }
 
 function handleGenerate() {
@@ -3910,164 +3572,8 @@ function handleGenerate() {
   const sentence = generateSentence(temperature);
   dom.nwGeneratePanel.replaceChildren(
     createElement("p", "generated-line", sentence),
-    createElement("span", "generated-note", `sampled at temperature ${formatNumber(temperature, 2)} · click again for another`)
+    createElement("span", "generated-note", `sampled at temperature ${formatNumber(temperature, 2)} · <rare> is excluded because it cannot decode to one specific spelling · click again for another`)
   );
-}
-
-// --- Transparent code-cell helpers: one visible step per call ------------
-// These let a code cell show the real per-epoch loop instead of hiding it
-// behind one opaque call. trainOneEpoch / nwTrainOneEpoch run a single pass
-// (the four beats over every example); the read-back helpers report loss,
-// accuracy, and perplexity so the cell can collect and return them.
-function trainOneEpoch() {
-  state.hasTrainedNetwork = true;
-  trainEpochs(1);
-}
-
-function networkLoss() {
-  return Number(evaluateNet(state.network, state.data.train).loss.toFixed(4));
-}
-
-function networkAccuracy() {
-  return Number(evaluateNet(state.network, state.data.train).accuracy.toFixed(3));
-}
-
-function nwTrainOneEpoch() {
-  nwState.hasTrained = true;
-  nwTrainEpochs(1);
-}
-
-function nextWordLoss() {
-  return Number(nwEvaluate(nwModel).loss.toFixed(4));
-}
-
-function nextWordPerplexity() {
-  return Number(nwEvaluate(nwModel).perplexity.toFixed(2));
-}
-
-function runCodeCell(cell) {
-  const input = cell.querySelector(".code-input");
-  const output = cell.querySelector(".code-output");
-  output.className = "code-output is-running";
-  output.textContent = "Running...";
-  try {
-    const api = {
-      trainOneEpoch, networkLoss, networkAccuracy,
-      nwTrainOneEpoch, nextWordLoss, nextWordPerplexity, generateSentence,
-      trainTinyNetwork, networkSummary, trainNextWordModel, nextWordSummary
-    };
-    const runner = new Function("api", `"use strict"; const { trainOneEpoch, networkLoss, networkAccuracy, nwTrainOneEpoch, nextWordLoss, nextWordPerplexity, generateSentence, trainTinyNetwork, networkSummary, trainNextWordModel, nextWordSummary } = api; return (() => { ${input.value} })();`);
-    const result = runner(api);
-    renderNetworkLab();
-    renderNextWordLab();
-    output.className = "code-output is-success";
-    renderCodeResult(output, result);
-  } catch (error) {
-    output.className = "code-output is-error";
-    output.textContent = `${error.name}: ${error.message}`;
-  }
-}
-
-function humanizeKey(key) {
-  return key
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .toLowerCase();
-}
-
-function formatResultValue(key, value) {
-  if (typeof value !== "number") return String(value);
-  if (/accuracy|gap/i.test(key)) return formatPercent(value);
-  if (Number.isInteger(value)) return String(value);
-  return formatNumber(value, Math.abs(value) < 1 ? 3 : 2);
-}
-
-function renderOutputLossCurve(values) {
-  const losses = values.filter(Number.isFinite);
-  if (losses.length < 2) return null;
-  const width = 360;
-  const height = 126;
-  const padX = 28;
-  const padY = 24;
-  const minLoss = Math.min(...losses);
-  const maxLoss = Math.max(...losses);
-  const range = Math.max(maxLoss - minLoss, 1e-9);
-  const toX = (index) => padX + (index / (losses.length - 1)) * (width - padX * 2);
-  const toY = (loss) => padY + ((maxLoss - loss) / range) * (height - padY * 2);
-
-  const panel = createElement("div", "output-loss-curve");
-  panel.append(createElement("strong", "", "Cross-entropy from epoch 0"));
-  const svg = createSvgElement("svg", {
-    class: "output-loss-spark",
-    viewBox: `0 0 ${width} ${height}`,
-    role: "img",
-    "aria-label": `Cross-entropy falls from ${formatNumber(losses[0], 3)} at epoch 0 to ${formatNumber(losses[losses.length - 1], 3)} after ${losses.length - 1} epochs`
-  });
-  svg.append(
-    createSvgElement("line", { class: "output-loss-axis", x1: padX, y1: height - padY, x2: width - padX, y2: height - padY }),
-    createSvgElement("polyline", {
-      class: "output-loss-line",
-      points: losses.map((loss, index) => `${toX(index)},${toY(loss)}`).join(" ")
-    }),
-    createSvgElement("circle", { class: "output-loss-start", cx: toX(0), cy: toY(losses[0]), r: 4 }),
-    createSvgElement("circle", { class: "output-loss-end", cx: toX(losses.length - 1), cy: toY(losses[losses.length - 1]), r: 4 })
-  );
-  const startLabel = createSvgElement("text", { class: "output-loss-label", x: padX, y: 14, "text-anchor": "start" });
-  startLabel.textContent = `epoch 0: ${formatNumber(losses[0], 3)}`;
-  const endLabel = createSvgElement("text", { class: "output-loss-label", x: width - padX, y: height - 6, "text-anchor": "end" });
-  endLabel.textContent = `epoch ${losses.length - 1}: ${formatNumber(losses[losses.length - 1], 3)}`;
-  svg.append(startLabel, endLabel);
-  panel.append(svg);
-  return panel;
-}
-
-function renderCodeResult(output, result) {
-  const data = result && typeof result === "object" ? result : { value: result };
-  const status = createElement("div", "output-status");
-  status.append(
-    createElement("strong", "", "Ran successfully"),
-    createElement("span", "", "browser training loop")
-  );
-  const visual = createElement("div", "output-visual");
-
-  const numericEntries = Object.entries(data).filter(
-    ([key, value]) => key !== "sample" && typeof value === "number"
-  );
-  if (numericEntries.length) {
-    const metrics = createElement("div", "output-metrics");
-    numericEntries.slice(0, 6).forEach(([key, value]) => {
-      const item = createElement("div", "output-metric");
-      item.append(
-        createElement("strong", "", formatResultValue(key, value)),
-        createElement("span", "", humanizeKey(key))
-      );
-      metrics.append(item);
-    });
-    visual.append(metrics);
-  }
-
-  if (Array.isArray(data.lossCurve)) {
-    const curve = renderOutputLossCurve(data.lossCurve);
-    if (curve) visual.append(curve);
-  }
-
-  if (typeof data.sample === "string") {
-    const sentence = createElement("div", "generate-panel");
-    sentence.append(
-      createElement("p", "generated-line", data.sample),
-      createElement("span", "generated-note", "sampled from the model you just trained")
-    );
-    visual.append(sentence);
-  }
-
-  const raw = createElement("details", "output-raw");
-  raw.append(createElement("summary", "", "Raw result object"));
-  const pre = createElement("pre");
-  pre.textContent = JSON.stringify(result, null, 2);
-  raw.append(pre);
-  visual.append(raw);
-
-  output.replaceChildren(status, visual);
 }
 
 function wireEvents() {
@@ -4137,6 +3643,10 @@ function wireEvents() {
   dom.backpropRateSlider.addEventListener("input", renderBackprop);
   dom.backpropStepButton.addEventListener("click", backpropStep);
   dom.backpropResetButton.addEventListener("click", restartBackpropRun);
+  if (dom.backpropNudgeLab) {
+    dom.backpropNudgeButton.addEventListener("click", runBackpropNudge);
+    dom.backpropNudgeResetButton.addEventListener("click", resetBackpropNudge);
+  }
   if (dom.byHandLab) {
     dom.byHandCheckButton.addEventListener("click", checkByHandAnswer);
     dom.byHandHintButton.addEventListener("click", showByHandHint);
@@ -4151,14 +3661,7 @@ function wireEvents() {
       }
     });
   }
-  dom.datasetSelect.addEventListener("change", () => resetNetwork({ newData: true }));
-  dom.hiddenUnitsSlider.addEventListener("input", () => resetNetwork());
-  dom.networkRateSlider.addEventListener("input", renderNetworkControls);
-  dom.epochBatchSlider.addEventListener("input", renderNetworkControls);
-  dom.trainOneEpochButton.addEventListener("click", beginOneEpochTraining);
-  dom.trainBatchButton.addEventListener("click", beginBatchTraining);
-  dom.resetNetworkButton.addEventListener("click", () => resetNetwork());
-  dom.newDataButton.addEventListener("click", () => resetNetwork({ newData: true }));
+  dom.nwCorpusSelect.addEventListener("change", changeNextWordCorpus);
   [dom.nwContextSelectA, dom.nwContextSelectB].forEach((select) => {
     select.addEventListener("change", renderNwPrediction);
   });
@@ -4167,9 +3670,6 @@ function wireEvents() {
   dom.nwTrainStepButton.addEventListener("click", beginNextWordStep);
   dom.nwResetButton.addEventListener("click", resetNextWord);
   dom.nwGenerateButton.addEventListener("click", handleGenerate);
-  document.querySelectorAll(".chapter4-code-cell .run-button").forEach((button) => {
-    button.addEventListener("click", () => runCodeCell(button.closest(".chapter4-code-cell")));
-  });
 }
 
 function setupSectionSpy() {
@@ -4198,10 +3698,11 @@ function init() {
   renderSoftmax();
   renderForwardPass();
   initBackpropLab();
+  renderBackpropNudge();
   renderByHandLab();
-  resetNetwork();
-  renderCorpusPreview();
+  populateNwCorpusSelect();
   populateContextSelects();
+  renderCorpusPreview();
   resetNextWord();
   setupSectionSpy();
 }
