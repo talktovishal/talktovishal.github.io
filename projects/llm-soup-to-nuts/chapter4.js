@@ -498,17 +498,27 @@ function renderVectorSvg(vectorA, vectorB) {
   const b = toPoint(vectorB);
 
   const defs = createSvgElement("defs");
-  const marker = createSvgElement("marker", {
-    id: "arrowHead",
-    markerWidth: "10",
-    markerHeight: "10",
+  const markerA = createSvgElement("marker", {
+    id: "vectorArrowHeadA",
+    markerWidth: "9",
+    markerHeight: "9",
     refX: "8",
-    refY: "3",
+    refY: "4",
     orient: "auto",
-    markerUnits: "strokeWidth"
+    markerUnits: "userSpaceOnUse"
   });
-  marker.append(createSvgElement("path", { d: "M0,0 L0,6 L9,3 z", fill: "#c65f1e" }));
-  defs.append(marker);
+  markerA.append(createSvgElement("path", { d: "M0,0 L0,8 L8,4 z", fill: "#c65f1e" }));
+  const markerB = createSvgElement("marker", {
+    id: "vectorArrowHeadB",
+    markerWidth: "9",
+    markerHeight: "9",
+    refX: "8",
+    refY: "4",
+    orient: "auto",
+    markerUnits: "userSpaceOnUse"
+  });
+  markerB.append(createSvgElement("path", { d: "M0,0 L0,8 L8,4 z", fill: "#27664a" }));
+  defs.append(markerA, markerB);
   svg.append(defs);
 
   svg.append(createSvgElement("line", { class: "svg-axis", x1: 36, y1: center.y, x2: width - 36, y2: center.y }));
@@ -524,18 +534,17 @@ function renderVectorSvg(vectorA, vectorB) {
     y1: center.y,
     x2: a.x,
     y2: a.y,
-    "marker-end": "url(#arrowHead)"
+    "marker-end": "url(#vectorArrowHeadA)"
   });
   const lineB = createSvgElement("line", {
     class: "vector-arrow-b",
     x1: center.x,
     y1: center.y,
     x2: b.x,
-    y2: b.y
+    y2: b.y,
+    "marker-end": "url(#vectorArrowHeadB)"
   });
   svg.append(lineA, lineB);
-  svg.append(createSvgElement("circle", { class: "vector-point-a", cx: a.x, cy: a.y, r: 8 }));
-  svg.append(createSvgElement("circle", { class: "vector-point-b", cx: b.x, cy: b.y, r: 8 }));
   const labelA = createSvgElement("text", { class: "svg-grid-label", x: a.x + 10, y: a.y - 10 });
   labelA.textContent = "A";
   const labelB = createSvgElement("text", { class: "svg-grid-label", x: b.x + 10, y: b.y - 10 });
@@ -649,6 +658,53 @@ function gradientComparisonCard(label, w, b, loss, note, className = "") {
   return card;
 }
 
+function gradientContributionTable(rows, sumError, sumErrorTimesX) {
+  function gradientCell(label, value, className = "") {
+    const cell = createElement("td", className, value);
+    cell.dataset.label = label;
+    return cell;
+  }
+
+  const wrap = createElement("div", "deriv-table-wrap");
+  const table = createElement("table", "deriv-table gradient-contribution-table");
+  const caption = createElement("caption", "", "Where the two gradient subtotals come from");
+  const head = createElement("thead");
+  const headRow = createElement("tr");
+  ["point", "x", "true y", "prediction ŷ", "error e = ŷ - y", "e × x"].forEach((label) => {
+    headRow.append(createElement("th", "", label));
+  });
+  head.append(headRow);
+
+  const body = createElement("tbody");
+  rows.forEach((row, index) => {
+    const tableRow = createElement("tr");
+    tableRow.append(
+      gradientCell("point", String(index + 1), "row-label"),
+      gradientCell("x", formatNumber(row.x, 2)),
+      gradientCell("true y", formatNumber(row.y, 2)),
+      gradientCell("prediction ŷ", formatNumber(row.prediction, 3)),
+      gradientCell("error e = ŷ - y", formatNumber(row.error, 3), forwardSignClass(row.error)),
+      gradientCell("e × x", formatNumber(row.error * row.x, 4), forwardSignClass(row.error * row.x))
+    );
+    body.append(tableRow);
+  });
+
+  const foot = createElement("tfoot");
+  const totalRow = createElement("tr");
+  const totalLabel = createElement("td", "row-label", "Totals");
+  totalLabel.dataset.label = "";
+  totalLabel.colSpan = 4;
+  totalRow.append(
+    totalLabel,
+    gradientCell("Σ(error)", formatNumber(sumError, 4), forwardSignClass(sumError)),
+    gradientCell("Σ(error × x)", formatNumber(sumErrorTimesX, 4), forwardSignClass(sumErrorTimesX))
+  );
+  foot.append(totalRow);
+  table.append(caption, head, body, foot);
+  wrap.append(table);
+  return wrap;
+}
+
 function renderGradientWalkthrough({ w, b, lr, info }) {
   if (!dom.gradientStepPanel) return;
   const step = clamp(state.gradientWalkthroughStep, 0, gradientWalkthroughMeta.length - 1);
@@ -687,8 +743,10 @@ function renderGradientWalkthrough({ w, b, lr, info }) {
     nodes.push(createElement("p", "forward-takeaway", `What we learned: the current slope and intercept produce MSE ${formatNumber(info.loss, 4)}. Loss measures the mistake; it does not yet say how either knob should move.`));
   } else if (step === 1) {
     nodes.push(forwardExplanation("Give each knob its own slope", "The slope gradient weights each error by x because changing slope affects distant x-values more. The intercept gradient uses each error directly because changing intercept lifts or lowers the whole line equally."));
-    nodes.push(forwardResultRow("Slope gradient", `(2 ÷ ${n}) × ${formatNumber(sumErrorTimesX, 4)}`, info.dw, "∂L/∂slope: the uphill direction for the line's tilt."));
-    nodes.push(forwardResultRow("Intercept gradient", `(2 ÷ ${n}) × ${formatNumber(sumError, 4)}`, info.db, "∂L/∂intercept: the uphill direction for the line's height."));
+    nodes.push(gradientContributionTable(rows, sumError, sumErrorTimesX));
+    nodes.push(createElement("p", "step-lead", `Add the last column to get Σ(error × x) = ${formatNumber(sumErrorTimesX, 4)} for the slope. Add the error column to get Σ(error) = ${formatNumber(sumError, 4)} for the intercept.`));
+    nodes.push(forwardResultRow("Slope gradient", `(2 ÷ ${n}) × Σ(error × x) = (2 ÷ ${n}) × ${formatNumber(sumErrorTimesX, 4)}`, info.dw, "∂L/∂slope: the uphill direction for the line's tilt."));
+    nodes.push(forwardResultRow("Intercept gradient", `(2 ÷ ${n}) × Σ(error) = (2 ÷ ${n}) × ${formatNumber(sumError, 4)}`, info.db, "∂L/∂intercept: the uphill direction for the line's height."));
     nodes.push(createElement("p", "forward-takeaway", `What we learned: the gradient vector is [${formatNumber(info.dw, 3)}, ${formatNumber(info.db, 3)}]. Each entry belongs to one trainable knob.`));
   } else if (step === 2) {
     nodes.push(forwardExplanation("Subtract, because the gradient points uphill", `The learning rate η = ${formatNumber(lr, 2)} scales both moves. A negative gradient makes subtraction increase that knob; a positive gradient makes subtraction decrease it.`));
@@ -1746,21 +1804,6 @@ function renderMatrixMultiplyPanel({ wordA, wordB, input, inputLabels, z1 }) {
   );
   nodes.push(equation);
 
-  nodes.push(forwardExplanation("Compute the first output cell: row h1 · column e", "Select the h1 weight row and the only input column. Multiply matching positions, add the four products, and place the result in the h1 output cell."));
-  const firstProducts = input.map((value, index) => value * weightRows[0][index]);
-  nodes.push(forwardContributionLedger(input.map((value, index) => ({
-    source: `${inputLabels[index]} with h1 weight`,
-    input: value,
-    weight: weightRows[0][index],
-    product: firstProducts[index]
-  }))));
-  const firstResult = createElement("div", "forward-result-stack");
-  firstResult.append(
-    forwardResultRow("Add the four products", firstProducts.map((value) => sumTerm(value)).join(" + "), weightedTotals[0], "Place this value in output cell h1."),
-    forwardResultRow("Repeat with row h2", "row h2 · column e", weightedTotals[1], "This fills output cell h2."),
-    forwardResultRow("Repeat with row h3", "row h3 · column e", weightedTotals[2], "This fills output cell h3.")
-  );
-  nodes.push(firstResult);
 
   const biasStep = createElement("section", "matrix-bias-step");
   biasStep.append(
@@ -1769,7 +1812,7 @@ function renderMatrixMultiplyPanel({ wordA, wordB, input, inputLabels, z1 }) {
     createElement("code", "", `[${weightedTotals.map((value) => formatNumber(value, 3)).join(", ")}] + [${forwardB1.map((value) => formatNumber(value, 2)).join(", ")}] = [${z1.map((value) => formatNumber(value, 3)).join(", ")}]`),
     createElement("p", "", "Only after this bias addition does the activation function bend the three raw hidden values.")
   );
-  nodes.push(biasStep, createElement("p", "forward-takeaway", `What we learned: W₁e is not new arithmetic. It repeats the dot product from Step 2 once for each hidden-neuron row, producing [${weightedTotals.map((value) => formatNumber(value, 3)).join(", ")}].`));
+  nodes.push(biasStep);
 
   panel.replaceChildren(...nodes);
 }
@@ -1835,8 +1878,7 @@ function renderScoringRolesPanel({ wordA, wordB, embA, embB, hidden, logits, can
       "is-output-role"
     )
   );
-  const rule = createElement("p", "scoring-role-rule", "Keep the roles separate: E supplies context-token rows; h is the context-dependent result of computation; W₂ and b₂ score candidate next words. In this toy, the input and output parameter sets are not shared.");
-  dom.scoringRolesPanel.replaceChildren(flow, rule);
+  dom.scoringRolesPanel.replaceChildren(flow);
 }
 
 function renderNetworkSvg(contextWords, hidden, candidates, logits, opts = {}) {
@@ -2494,7 +2536,7 @@ const byHandSteps = [
     id: "h1-raw",
     phase: "forward pass",
     prompt: "Step 1: find the raw value entering hidden neuron h1.",
-    instruction: "Use the two incoming edges: x1 x 0.40 plus x2 x -0.10. With x1 = 0.50 and x2 = 0.20, what enters h1 before ReLU?",
+    instruction: "Use the two incoming edges: x1 x 0.40 plus x2 x -0.10, then add the hidden bias, which is 0 here. With x1 = 0.50 and x2 = 0.20, what enters h1 before ReLU?",
     answer: byHandValues.hiddenRaw[0],
     tolerance: 0.005,
     solution: "0.50 x 0.40 + 0.20 x -0.10 = 0.180",
@@ -2518,7 +2560,7 @@ const byHandSteps = [
     id: "h2-raw",
     phase: "forward pass",
     prompt: "Step 3: find the raw value entering hidden neuron h2.",
-    instruction: "Now use the second hidden neuron: x1 x -0.30 plus x2 x 0.70. What enters h2 before ReLU?",
+    instruction: "Now use the second hidden neuron: x1 x -0.30 plus x2 x 0.70, again with a hidden bias of 0. What enters h2 before ReLU?",
     answer: byHandValues.hiddenRaw[1],
     tolerance: 0.005,
     solution: "0.50 x -0.30 + 0.20 x 0.70 = -0.010",
@@ -2593,32 +2635,9 @@ const byHandSteps = [
     instruction: "Softmax plus cross-entropy gives <strong>&delta;<sub>i</sub> = (q<sub>i</sub> - y<sub>i</sub>) / T</strong> on each original logit. This worksheet uses <strong>T = 1</strong>, so the factor is 1. For the true word \"sat\", the target is 1. What blame flows backward from its score?",
     derivationTitle: "Why is output blame probability minus target?",
     derivation: [
-      { type: "p", html: "First name the pieces. <strong>z<sub>word</sub></strong> is a raw score, also called a logit. <strong>q<sub>word</sub></strong> is the probability after softmax. <strong>y<sub>word</sub></strong> is the target label: 1 for the correct word and 0 for every other word. <strong>&delta;<sub>word</sub></strong> is the blame sent backward into that word's raw score." },
-      { type: "code", html: "q<sub>i</sub> = softmax(z)<sub>i</sub> = e<sup>z<sub>i</sub></sup> / &Sigma;<sub>k</sub> e<sup>z<sub>k</sub></sup>" },
-      { type: "code", html: "L = -&Sigma;<sub>j</sub> y<sub>j</sub> log(q<sub>j</sub>)" },
-      { type: "p", html: "We want the slope of the loss with respect to one raw score <strong>z<sub>i</sub></strong>. Because softmax shares one denominator, changing <strong>z<sub>i</sub></strong> changes every probability <strong>q<sub>j</sub></strong>, not just <strong>q<sub>i</sub></strong>." },
-      { type: "code", html: "&delta;<sub>i</sub> = &part;L / &part;z<sub>i</sub> = &Sigma;<sub>j</sub> (&part;L / &part;q<sub>j</sub>)(&part;q<sub>j</sub> / &part;z<sub>i</sub>)" },
-      { type: "p", html: "Now get the cross-entropy derivative with respect to one probability. Focus on one term, <strong>-y<sub>j</sub> log(q<sub>j</sub>)</strong>. The target <strong>y<sub>j</sub></strong> is just a constant multiplier here." },
-      { type: "code", html: "&part; / &part;q<sub>j</sub> [-y<sub>j</sub> log(q<sub>j</sub>)] = -y<sub>j</sub> &times; &part;log(q<sub>j</sub>) / &part;q<sub>j</sub>" },
-      { type: "p", html: "Why is the log slope <strong>1 / q<sub>j</sub></strong>? Let <strong>u = log(q<sub>j</sub>)</strong>. Natural log means the inverse of exponentiation, so <strong>e<sup>u</sup> = q<sub>j</sub></strong>." },
-      { type: "code", html: "e<sup>u</sup> = q<sub>j</sub>" },
-      { type: "code", html: "&part; / &part;q<sub>j</sub> [e<sup>u</sup>] = &part; / &part;q<sub>j</sub> [q<sub>j</sub>]" },
-      { type: "code", html: "e<sup>u</sup> (&part;u / &part;q<sub>j</sub>) = 1" },
-      { type: "code", html: "&part;u / &part;q<sub>j</sub> = 1 / e<sup>u</sup> = 1 / q<sub>j</sub>" },
-      { type: "p", html: "Substitute that log slope back into the cross-entropy term." },
-      { type: "code", html: "&part;L / &part;q<sub>j</sub> = -y<sub>j</sub> / q<sub>j</sub>" },
-      { type: "p", html: "The softmax part has two cases: the probability for the same word rises when its own score rises, while the other probabilities fall because the denominator got bigger." },
-      { type: "code", html: "&part;q<sub>j</sub> / &part;z<sub>i</sub> = q<sub>j</sub>(1 - q<sub>i</sub>) if i = j" },
-      { type: "code", html: "&part;q<sub>j</sub> / &part;z<sub>i</sub> = -q<sub>j</sub>q<sub>i</sub> if i &ne; j" },
-      { type: "p", html: "A compact way to write both cases is:" },
-      { type: "code", html: "&part;q<sub>j</sub> / &part;z<sub>i</sub> = q<sub>j</sub>(1<sub>i=j</sub> - q<sub>i</sub>)" },
-      { type: "p", html: "Now substitute both derivative pieces into the chain-rule sum." },
-      { type: "code", html: "&part;L / &part;z<sub>i</sub> = &Sigma;<sub>j</sub> (-y<sub>j</sub> / q<sub>j</sub>) q<sub>j</sub>(1<sub>i=j</sub> - q<sub>i</sub>)" },
-      { type: "code", html: "= &Sigma;<sub>j</sub> -y<sub>j</sub>(1<sub>i=j</sub> - q<sub>i</sub>)" },
-      { type: "code", html: "= -y<sub>i</sub> + q<sub>i</sub>&Sigma;<sub>j</sub>y<sub>j</sub>" },
-      { type: "p", html: "For one correct next word, the target vector has exactly one 1, so <strong>&Sigma;<sub>j</sub>y<sub>j</sub> = 1</strong>." },
-      { type: "code", html: "&part;L / &part;z<sub>i</sub> = q<sub>i</sub> - y<sub>i</sub>" },
-      { type: "p", html: "That is the blame on the scaled score. If temperature first made <strong>s<sub>i</sub> = z<sub>i</sub> / T</strong>, one final chain-rule factor gives <strong>&part;L / &part;z<sub>i</sub> = (q<sub>i</sub> - y<sub>i</sub>) / T</strong>. Here <strong>T = 1</strong>, so output blame is predicted probability minus target." }
+      { type: "p", html: "The complete proof now lives in <strong>Backward 1</strong> above. For this step, identify the model probability, the one-hot target, and the temperature, then apply the rule you just derived." },
+      { type: "code", html: "&delta;<sub>sat</sub> = (q<sub>sat</sub> - y<sub>sat</sub>) / T" },
+      { type: "p", html: "Here <strong>y<sub>sat</sub> = 1</strong> because sat is the true word, and <strong>T = 1</strong>. Substitute the displayed probability yourself before checking the answer." }
     ],
     answer: byHandValues.outputBlame[0],
     tolerance: 0.005,
@@ -2634,16 +2653,9 @@ const byHandSteps = [
     instruction: "This asks: if we nudge the weight from <strong>h1</strong> into the <strong>sat</strong> score, how much does the loss change? That sensitivity is written <strong>&part;L / &part;W<sub>sat,h1</sub></strong>. Use sat blame -0.759 and h1 = 0.180.",
     derivationTitle: "Why does this gradient equal blame times signal?",
     derivation: [
-      { type: "p", html: "First name the pieces. <strong>W<sub>sat,h1</sub></strong> is the weight from hidden activation h1 into the raw sat score. <strong>h<sub>1</sub></strong> is the activation that flowed through that weight. <strong>&delta;<sub>sat</sub></strong> is shorthand for <strong>&part;L / &part;z<sub>sat</sub></strong>, the blame already sitting at the sat score." },
-      { type: "p", html: "The weight affects the loss only by first changing the raw sat score <strong>z<sub>sat</sub></strong>." },
-      { type: "code", html: "z<sub>sat</sub> = W<sub>sat,h1</sub>h<sub>1</sub> + W<sub>sat,h2</sub>h<sub>2</sub> + b<sub>sat</sub>" },
-      { type: "p", html: "We want the slope of the loss with respect to this one weight. Follow the path backward: <strong>L &rarr; z<sub>sat</sub> &rarr; W<sub>sat,h1</sub></strong>." },
-      { type: "code", html: "&part;L / &part;W<sub>sat,h1</sub> = (&part;L / &part;z<sub>sat</sub>) &times; (&part;z<sub>sat</sub> / &part;W<sub>sat,h1</sub>)" },
-      { type: "p", html: "The first slope is the sat blame:" },
-      { type: "code", html: "&part;L / &part;z<sub>sat</sub> = &delta;<sub>sat</sub>" },
-      { type: "p", html: "For the second slope, treat every other term in <strong>z<sub>sat</sub></strong> as constant. The only term containing <strong>W<sub>sat,h1</sub></strong> is <strong>W<sub>sat,h1</sub>h<sub>1</sub></strong>." },
-      { type: "code", html: "&part;z<sub>sat</sub> / &part;W<sub>sat,h1</sub> = h<sub>1</sub>" },
-      { type: "code", html: "&part;L / &part;W<sub>sat,h1</sub> = &delta;<sub>sat</sub> &times; h<sub>1</sub>" }
+      { type: "p", html: "<strong>Backward 2</strong> above derives this rule from the sat logit's forward equation. One path means multiply the blame arriving at the score by the signal that passed through the weight." },
+      { type: "code", html: "&part;L / &part;W<sub>sat,h1</sub> = &delta;<sub>sat</sub> &times; h<sub>1</sub>" },
+      { type: "p", html: "Use the blame you found in Step 9 and the hidden activation shown in the network. Do the multiplication before revealing the solution." }
     ],
     answer: byHandValues.outputGradSatH1,
     tolerance: 0.005,
@@ -2659,16 +2671,9 @@ const byHandSteps = [
     instruction: "Hidden neuron <strong>h1</strong> helped all five word scores, so its blame is the sum of every output blame times the matching outgoing weight. What is <strong>&part;L / &part;h<sub>1</sub></strong>, the blame on h1 before the ReLU gate?",
     derivationTitle: "Why do we sum blame from every word?",
     derivation: [
-      { type: "p", html: "First name the pieces. <strong>h<sub>1</sub></strong> is the hidden activation. <strong>z<sub>word</sub></strong> is a raw score for one output word. <strong>&delta;<sub>word</sub></strong> means <strong>&part;L / &part;z<sub>word</sub></strong>, the blame at that word score. <strong>W<sub>word,h1</sub></strong> is the weight from h1 into that word score." },
-      { type: "p", html: "Hidden neuron h1 fans out into every word score. Changing h1 changes sat, ran, slept, purred, and meowed at the same time." },
-      { type: "p", html: "When one variable affects the loss through multiple paths, the chain rule adds the path contributions from all paths." },
-      { type: "code", html: "&part;L / &part;h<sub>1</sub> = &Sigma;<sub>word</sub> (&part;L / &part;z<sub>word</sub>) &times; (&part;z<sub>word</sub> / &part;h<sub>1</sub>)" },
-      { type: "p", html: "The first piece on each path is that word's output blame:" },
-      { type: "code", html: "&part;L / &part;z<sub>word</sub> = &delta;<sub>word</sub>" },
-      { type: "p", html: "For the second piece, write one output score. The term containing h1 is the outgoing weight times h1." },
-      { type: "code", html: "z<sub>word</sub> = W<sub>word,h1</sub>h<sub>1</sub> + W<sub>word,h2</sub>h<sub>2</sub> + b<sub>word</sub>" },
-      { type: "code", html: "&part;z<sub>word</sub> / &part;h<sub>1</sub> = W<sub>word,h1</sub>" },
-      { type: "code", html: "&part;L / &part;h<sub>1</sub> = &Sigma;<sub>word</sub> &delta;<sub>word</sub> &times; W<sub>word,h1</sub>" }
+      { type: "p", html: "<strong>Backward 2</strong> also shows why all five routes must add: h1 changed every word score, so every score sends one contribution back through its own outgoing weight." },
+      { type: "code", html: "&part;L / &part;h<sub>1</sub> = &Sigma;<sub>word</sub> &delta;<sub>word</sub> &times; W<sub>word,h1</sub>" },
+      { type: "p", html: "Pair each displayed output blame with the matching h1 weight. Multiply the five pairs, then add the five signed results." }
     ],
     answer: byHandValues.hiddenBlame[0],
     tolerance: 0.008,
@@ -2684,17 +2689,9 @@ const byHandSteps = [
     instruction: "Now move one edge farther backward. We want the gradient for the weight from <strong>x1</strong> into <strong>h1</strong>, written <strong>&part;L / &part;W<sub>h1,x1</sub></strong>. Because h1's ReLU gate was open, its slope is 1.",
     derivationTitle: "Why does the ReLU gate appear here?",
     derivation: [
-      { type: "p", html: "First name the pieces. <strong>r<sub>1</sub></strong> is the raw value going into hidden neuron h1. <strong>h<sub>1</sub></strong> is the value after ReLU. <strong>W<sub>h1,x1</sub></strong> is the input weight from x1 into h1. <strong>x<sub>1</sub></strong> is the input signal." },
-      { type: "p", html: "The input weight does not touch h1 directly. It first changes the raw hidden value <strong>r<sub>1</sub></strong>; then ReLU turns <strong>r<sub>1</sub></strong> into <strong>h<sub>1</sub></strong>." },
-      { type: "code", html: "r<sub>1</sub> = W<sub>h1,x1</sub>x<sub>1</sub> + W<sub>h1,x2</sub>x<sub>2</sub> + b<sub>h1</sub>" },
-      { type: "code", html: "h<sub>1</sub> = ReLU(r<sub>1</sub>)" },
-      { type: "p", html: "The chain rule follows the path backward: <strong>L &rarr; h<sub>1</sub> &rarr; r<sub>1</sub> &rarr; W<sub>h1,x1</sub></strong>." },
-      { type: "code", html: "&part;L / &part;W<sub>h1,x1</sub> = (&part;L / &part;h<sub>1</sub>) &times; (&part;h<sub>1</sub> / &part;r<sub>1</sub>) &times; (&part;r<sub>1</sub> / &part;W<sub>h1,x1</sub>)" },
-      { type: "p", html: "The middle slope is the ReLU gate. ReLU's derivative is 1 when the raw value is positive and 0 when the raw value is negative or zero." },
-      { type: "code", html: "&part;h<sub>1</sub> / &part;r<sub>1</sub> = ReLU'(r<sub>1</sub>)" },
-      { type: "p", html: "The last slope is <strong>x<sub>1</sub></strong>, because the term containing this weight is <strong>W<sub>h1,x1</sub>x<sub>1</sub></strong>." },
-      { type: "code", html: "&part;r<sub>1</sub> / &part;W<sub>h1,x1</sub> = x<sub>1</sub>" },
-      { type: "code", html: "&part;L / &part;W<sub>h1,x1</sub> = (&part;L / &part;h<sub>1</sub>) &times; ReLU'(r<sub>1</sub>) &times; x<sub>1</sub>" }
+      { type: "p", html: "<strong>Backward 3</strong> derives the ReLU gate, and <strong>Backward 4</strong> derives the earlier weight rule. Follow the one path from h1's blame, through the gate, to the x1-to-h1 weight." },
+      { type: "code", html: "&part;L / &part;W<sub>h1,x1</sub> = (&part;L / &part;h<sub>1</sub>) &times; ReLU'(r<sub>1</sub>) &times; x<sub>1</sub>" },
+      { type: "p", html: "The raw hidden value was positive, so the gate contributes 1. Substitute the hidden blame from Step 11 and the displayed x1 signal." }
     ],
     answer: byHandValues.inputGradX1H1,
     tolerance: 0.006,
@@ -2710,17 +2707,9 @@ const byHandSteps = [
     instruction: "Gradient descent now uses that gradient to move the weight downhill. The old weight is 0.400, the learning rate is 0.10, and the gradient is -0.262. What is the new <strong>x1 &rarr; h1</strong> weight?",
     derivationTitle: "Why do we subtract the gradient?",
     derivation: [
-      { type: "p", html: "First name the pieces. <strong>W</strong> is the weight we are updating. <strong>g</strong> is its gradient, meaning <strong>g = &part;L / &part;W</strong>. <strong>&eta;</strong> is the learning rate, the size of the step." },
-      { type: "p", html: "The gradient points uphill: it tells us which direction makes the loss increase fastest." },
-      { type: "p", html: "For a tiny change <strong>&Delta;W</strong>, calculus gives this local approximation:" },
-      { type: "code", html: "L(W + &Delta;W) &approx; L(W) + g&Delta;W" },
-      { type: "p", html: "To move downhill, choose a change that makes <strong>g&Delta;W</strong> negative. Gradient descent chooses the opposite direction of the gradient." },
-      { type: "code", html: "&Delta;W = -&eta;g" },
-      { type: "p", html: "Substitute that into the local approximation:" },
-      { type: "code", html: "L(W + &Delta;W) &approx; L(W) - &eta;g<sup>2</sup>" },
-      { type: "p", html: "Since <strong>g<sup>2</sup></strong> is never negative, this small step is aimed downhill." },
-      { type: "code", html: "W<sub>new</sub> = W<sub>old</sub> + &Delta;W = W<sub>old</sub> - &eta;g" },
-      { type: "code", html: "W<sub>new</sub> = W<sub>old</sub> - &eta;(&part;L / &part;W)" }
+      { type: "p", html: "The update bar beneath the walkthrough keeps backpropagation and gradient descent separate: backprop calculated the gradient; now gradient descent applies it." },
+      { type: "code", html: "W<sub>new</sub> = W<sub>old</sub> - &eta;g" },
+      { type: "p", html: "Use the old weight, learning rate, and gradient in the prompt. Remember that subtracting a negative gradient increases the weight." }
     ],
     answer: byHandValues.updatedX1H1,
     tolerance: 0.006,

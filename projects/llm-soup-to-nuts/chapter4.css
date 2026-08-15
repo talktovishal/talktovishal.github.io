@@ -551,7 +551,7 @@ body {
 
 .vector-arrow-a,
 .vector-arrow-b {
-  stroke-width: 5;
+  stroke-width: 3;
   stroke-linecap: round;
 }
 
@@ -694,6 +694,85 @@ body {
   text-align: left;
   color: var(--muted);
   font-weight: 850;
+}
+
+.gradient-contribution-table caption {
+  padding: 2px 0 7px;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 900;
+  text-align: left;
+}
+
+.gradient-contribution-table :is(td.is-positive, td.is-negative) {
+  font-weight: 850;
+}
+
+.gradient-contribution-table td.is-positive {
+  color: #27664a;
+}
+
+.gradient-contribution-table td.is-negative {
+  color: #9f3f2d;
+}
+
+@media (max-width: 700px) {
+  .gradient-contribution-table {
+    min-width: 0;
+    font-size: 0.78rem;
+  }
+
+  .gradient-contribution-table thead {
+    display: none;
+  }
+
+  .gradient-contribution-table :is(tbody, tfoot) {
+    display: grid;
+    gap: 8px;
+  }
+
+  .gradient-contribution-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 10px;
+    padding: 7px 8px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #fffefa;
+  }
+
+  .gradient-contribution-table td {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    padding: 2px 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  .gradient-contribution-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-family: inherit;
+    font-weight: 800;
+    text-align: left;
+  }
+
+  .gradient-contribution-table td.row-label {
+    grid-column: 1 / -1;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee5d8;
+  }
+
+  .gradient-contribution-table tbody td:nth-child(n + 4),
+  .gradient-contribution-table tfoot td {
+    grid-column: 1 / -1;
+  }
+
+  .gradient-contribution-table tfoot td.row-label {
+    border-bottom: 0;
+  }
 }
 
 #gradientExplanation .formula-stack code {
@@ -923,6 +1002,37 @@ body {
   border-radius: 5px;
   background: #ffffff;
   overflow-wrap: anywhere;
+}
+
+.gradient-vector-key {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid #a9c9c2;
+}
+
+.gradient-vector-key h5,
+.gradient-vector-key ul,
+.gradient-vector-key p {
+  margin: 0;
+}
+
+.gradient-vector-key h5 {
+  color: var(--ink);
+  font-size: 0.9rem;
+  letter-spacing: 0;
+}
+
+.gradient-vector-key ul {
+  display: grid;
+  gap: 5px;
+  padding-left: 20px;
+}
+
+.gradient-vector-key li {
+  color: #3f4e4b;
+  line-height: 1.5;
 }
 
 .gradient-walkthrough {
@@ -3026,8 +3136,10 @@ body {
 }
 
 .backprop-scalar-story {
-  border-left: 4px solid var(--gold);
-  background: #fffaf0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .backprop-scalar-story h3 {
@@ -3103,10 +3215,12 @@ body {
 .backprop-pass-map {
   display: grid;
   gap: 14px;
-  overflow: hidden;
-  border: 2px solid #8cac49;
-  border-radius: 8px;
-  background: #ffffff;
+  overflow: visible;
+  border: 0;
+  border-top: 2px solid #8cac49;
+  border-bottom: 2px solid #8cac49;
+  border-radius: 0;
+  background: transparent;
 }
 
 .backprop-pass-map-intro {
@@ -3404,51 +3518,6 @@ body {
   }
 }
 
-.backprop-story-step {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 11px;
-  padding: 13px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.backprop-story-step > div {
-  min-width: 0;
-}
-
-.backprop-story-number {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--ink);
-  color: #ffffff;
-  font-weight: 900;
-}
-
-.backprop-story-step h4 {
-  margin: 2px 0 5px;
-  color: var(--ink);
-  font-size: 0.98rem;
-}
-
-.backprop-story-step .formula-stack.backprop-equation-grid {
-  gap: 0 16px;
-  margin: 7px 0 9px;
-  padding: 5px 10px;
-  overflow: visible;
-  border: 1px solid #e6e0d5;
-  border-radius: 7px;
-  background: #fbfaf6;
-}
-
-.backprop-equation-grid.is-one {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .backprop-equation-grid.is-two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -3457,37 +3526,10 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.backprop-story-step .backprop-equation-grid > span {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  min-height: 37px;
-  padding: 5px 2px;
-  border-bottom: 1px dashed #e2ddd3;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.backprop-story-step .backprop-equation-grid > span.is-wide {
-  grid-column: 1 / -1;
-}
-
-.backprop-story-step .backprop-equation-grid .katex {
-  max-width: 100%;
-}
-
 @media (max-width: 980px) {
   .backprop-equation-grid.is-three {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-.backprop-bias-note {
-  margin-top: 10px !important;
-  padding: 9px 10px;
-  border-left: 4px solid var(--gold);
-  border-radius: 6px;
-  background: #fff8d8;
 }
 
 .backprop-example-vote {
@@ -3507,11 +3549,6 @@ body {
 .backprop-example-vote h4 {
   color: var(--ink);
   font-size: 0.98rem;
-}
-
-.backprop-story-step .katex-display,
-.backprop-output-proof .katex-display {
-  margin: 10px 0;
 }
 
 .backprop-shape-primer,
@@ -3797,23 +3834,9 @@ body {
     padding: 10px;
   }
 
-  .backprop-story-step {
-    grid-template-columns: 1fr;
-    padding: 10px;
-  }
-
-  .backprop-story-step .katex {
-    font-size: 0.9em;
-  }
-
   .backprop-equation-grid.is-two,
   .backprop-equation-grid.is-three {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .backprop-story-step .backprop-equation-grid > span {
-    min-height: 0;
-    overflow-x: auto;
   }
 
   .backprop-focus-svg-desktop {
@@ -5082,21 +5105,6 @@ body {
   height: auto;
 }
 
-.backprop-pass-stage > span {
-  display: block;
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 500;
-  line-height: 1.45;
-}
-
-.backprop-pass-row.is-figures .backprop-path-figure {
-  border-top: 0;
-  border-radius: 8px;
-  border: 1px solid #dfe6cd;
-}
-
 .backprop-path-figure figcaption {
   padding-bottom: 4px;
   border-bottom: 1px solid #dfe6cd;
@@ -5110,78 +5118,362 @@ body {
   color: #2f7d52;
 }
 
-.backprop-pass-table-note {
-  margin: 14px 14px 0;
-  color: var(--muted);
-  font-size: 0.85rem;
-  line-height: 1.5;
-}
-
-.backprop-pass-table {
-  margin-top: 12px;
-  border-top: 1px solid #c9d7a8;
-  border-bottom: 1px solid #c9d7a8;
-}
-
-.backprop-pass-table-head,
-.backprop-pass-row {
+.backprop-sequential-lesson {
+  min-width: 0;
+  margin: 0 14px;
   display: grid;
-  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.4fr) minmax(0, 1.4fr);
-  gap: 14px;
-  padding: 11px 13px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  background: transparent;
 }
 
-.backprop-pass-table-head {
-  background: #f2f7e7;
-  color: #4f6f1d;
-  font-size: 0.82rem;
-  font-weight: 950;
-}
-
-.backprop-pass-row {
-  border-top: 1px solid var(--line);
-}
-
-.backprop-pass-row:first-of-type {
-  border-top: 0;
-}
-
-.backprop-pass-stage {
-  align-self: start;
-  color: var(--ink);
-  font-size: 0.84rem;
-  font-weight: 900;
-  line-height: 1.35;
-}
-
-.backprop-pass-cell {
+.backprop-sequential-pass {
   display: grid;
-  align-content: start;
-  gap: 5px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
   min-width: 0;
 }
 
-.backprop-pass-cell p {
+.backprop-sequential-pass.is-backward {
+  padding-top: 22px;
+  border-top: 2px solid #e6c48c;
+}
+
+.backprop-sequential-heading {
+  display: grid;
+  gap: 5px;
+}
+
+.backprop-sequential-heading :is(h5, p) {
   margin: 0;
+}
+
+.backprop-sequential-heading h5,
+.backprop-turnaround h5 {
+  color: var(--ink);
+  font-size: 1.08rem;
+  line-height: 1.3;
+}
+
+.backprop-sequential-heading > p:last-child,
+.backprop-turnaround > p {
   color: var(--muted);
-  font-size: 0.79rem;
-  line-height: 1.4;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.backprop-sequential-figure {
+  width: min(540px, 100%);
+  margin: 0 auto;
+  border: 1px solid #c9dfd1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.backprop-sequential-steps {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.backprop-sequential-step {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding: 15px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.backprop-sequential-step p {
+  margin: 0;
+  color: #3f4a42;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.backprop-sequential-step-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.backprop-sequential-step-head span {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #e5f4ea;
+  color: #1f613f;
+  font-size: 0.74rem;
+  font-weight: 950;
+}
+
+.backprop-sequential-step-head h6 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.backprop-sequential-step-head a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.backprop-sequential-step.is-backward {
+  border: 0;
+}
+
+.backprop-sequential-step + .backprop-sequential-step {
+  border-top: 1px solid #c9dfd1;
+}
+
+.backprop-sequential-pass.is-backward .backprop-sequential-step + .backprop-sequential-step {
+  border-top-color: #e1c39a;
+}
+
+.backprop-sequential-step.is-backward .backprop-sequential-step-head span {
+  background: #fff0dc;
+  color: #7a4300;
+}
+
+.backprop-sequential-figure.is-backward {
+  border-color: #e1c39a;
+}
+
+.backprop-sequential-step .backprop-map-equation {
+  padding: 9px 10px;
+  overflow-x: auto;
+  border: 1px solid #d9e7dd;
+  border-radius: 6px;
+  background: #fbfdfb;
+  font-size: 0.9rem;
+}
+
+.backprop-derivation-chain {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: backprop-derivation;
+}
+
+.backprop-derivation-chain > li {
+  position: relative;
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 14px 0 14px 40px;
+  border-top: 1px dashed #dcc29c;
+  counter-increment: backprop-derivation;
+}
+
+.backprop-derivation-chain > li:first-child {
+  padding-top: 2px;
+  border-top: 0;
+}
+
+.backprop-derivation-chain > li::before {
+  content: counter(backprop-derivation);
+  position: absolute;
+  top: 14px;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff0dc;
+  color: #7a4300;
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.backprop-derivation-chain > li:first-child::before {
+  top: 2px;
+}
+
+.backprop-derivation-chain p {
+  margin: 0;
+}
+
+.backprop-equation-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid #d9e7dd;
+  border-radius: 6px;
+  background: #fbfdfb;
+}
+
+.backprop-equation-flow.is-three {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.backprop-sequential-step .backprop-equation-flow > .backprop-map-equation {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 3px 2px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+}
+
+.backprop-equation-flow-arrow {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  color: #9c5a00;
+  font-size: 1.05rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.backprop-derivation-bridge {
+  display: grid;
+  gap: 9px;
+  margin: 4px 0;
+  padding: 12px 14px;
+  border: 0;
+  border-top: 1px solid #c9dfd1;
+  border-bottom: 1px solid #c9dfd1;
+  border-radius: 0;
+  background: #f7fbf8;
+  color: #3f4a42;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.backprop-derivation-bridge p {
+  color: #3f4a42;
+}
+
+.backprop-derivation-bridge .backprop-map-equation,
+.backprop-derivation-bridge .backprop-map-number-ledger,
+.backprop-derivation-bridge .backprop-equation-flow {
+  border-color: #d9e7dd;
+  background: #ffffff;
+  color: #243512;
+}
+
+.backprop-turnaround {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 2px solid #d5a13d;
+  border-radius: 8px;
+  background: #fff9e8;
+}
+
+.backprop-turnaround :is(h5, p) {
+  margin: 0;
+}
+
+.backprop-turnaround-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.backprop-turnaround-values > span {
+  min-width: 0;
+  padding: 8px;
+  overflow-x: auto;
+  border: 1px solid #ead8a7;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #5f4816;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.backprop-map-number-ledger {
+  display: grid;
+  gap: 0 10px;
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid #c9dfd1;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.backprop-map-number-ledger.is-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.backprop-map-number-ledger > span {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 38px;
+  padding: 5px 2px;
+  overflow-x: auto;
+  border-bottom: 1px dashed #d8e8dc;
+  color: #274b3a;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.backprop-map-number-ledger > span:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+@media (max-width: 1100px) {
+  .backprop-map-number-ledger.is-three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
-
-  .backprop-pass-table-head {
-    display: none;
+  .backprop-sequential-lesson {
+    margin-right: 10px;
+    margin-left: 10px;
   }
 
-  .backprop-pass-row {
+  .backprop-sequential-step-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .backprop-turnaround-values {
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
   }
 
-  .backprop-pass-cell.is-backward {
-    padding-top: 10px;
-    border-top: 1px dashed var(--line);
+  .backprop-equation-flow,
+  .backprop-equation-flow.is-three {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .backprop-equation-flow-arrow {
+    width: 100%;
+    height: 16px;
+    transform: rotate(90deg);
+  }
+
+  .backprop-map-number-ledger.is-two,
+  .backprop-map-number-ledger.is-three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .backprop-map-number-ledger > span,
+  .backprop-map-number-ledger.is-three > span:nth-last-child(3) {
+    min-height: 0;
+    border-bottom: 1px dashed #d8e8dc;
+  }
+
+  .backprop-map-number-ledger > span:last-child {
+    border-bottom: 0;
   }
 }
 
@@ -5196,7 +5488,7 @@ body {
   }
 }
 
-/* The paired network diagrams reuse the focus-diagram classes but sit in a much smaller viewBox. */
+/* The sequential network diagrams reuse the focus-diagram classes in a smaller viewBox. */
 .backprop-path-svg .backprop-focus-active-route line {
   stroke-width: 2.6;
 }
