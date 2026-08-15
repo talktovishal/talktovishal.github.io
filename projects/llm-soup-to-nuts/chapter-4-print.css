@@ -204,6 +204,62 @@
   background: var(--print-green-soft);
 }
 
+.print-quiz-ref {
+  margin: 8px 0 0;
+  color: var(--print-muted);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.print-answer-line {
+  margin: 10px 0 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--print-line);
+  color: var(--print-muted);
+  font-size: 0.84rem;
+}
+
+.print-answer-key {
+  padding: 42px 42px 48px;
+  border-top: 2px solid var(--print-green);
+}
+
+.print-answer-key .eyebrow {
+  color: var(--print-green);
+}
+
+.print-answer-intro {
+  max-width: 640px;
+  color: var(--print-muted);
+}
+
+.print-answer-block {
+  margin-top: 22px;
+}
+
+.print-answer-block h3 {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--print-line);
+}
+
+.print-answer-list {
+  columns: 2;
+  column-gap: 32px;
+  padding-left: 20px;
+}
+
+.print-answer-list li {
+  break-inside: avoid;
+  margin: 0 0 9px;
+  font-size: 0.9rem;
+}
+
+.print-answer-list .by-hand-feedback {
+  display: inline;
+  padding: 0;
+  background: none;
+}
+
 .print-correct-answer {
   border-color: var(--print-green) !important;
   background: var(--print-green-soft) !important;
@@ -235,11 +291,26 @@
 }
 
 .print-edition details > summary {
+  display: block;
+  padding: 6px 0;
+  color: var(--print-muted);
+  font-size: 0.86rem;
+  font-style: italic;
+  list-style: none;
+}
+
+.print-edition details > summary::marker,
+.print-edition details > summary::-webkit-details-marker {
   display: none;
 }
 
-.print-edition details > *:not(summary) {
-  display: block !important;
+.print-edition details:not([open]) > summary::after {
+  content: " (opens in the live chapter)";
+  font-style: normal;
+}
+
+.print-edition details:not([open]) > *:not(summary) {
+  display: none !important;
 }
 
 .print-edition .code-quiz {
@@ -412,6 +483,15 @@
 
   .print-transcript {
     break-before: page;
+  }
+
+  .print-answer-key {
+    break-before: page;
+    padding: 0;
+  }
+
+  .print-answer-list li {
+    font-size: 8.8pt;
   }
 
   .print-state,

@@ -91,6 +91,8 @@ async function waitForPrintReady(cdp, timeoutMs = 120000) {
         outputChildren: document.getElementById("printContent")?.children.length || 0,
         states: document.querySelectorAll(".print-state").length,
         worksheet: document.querySelectorAll(".print-worksheet-step").length,
+        answers: document.querySelectorAll(".print-answer-block .print-answer-list > li").length,
+        openDetails: [...document.querySelectorAll("#printContent details")].filter((d) => d.open).length,
         failure: document.querySelector(".print-failure")?.innerText || ""
       }))()`,
       returnByValue: true
@@ -99,8 +101,8 @@ async function waitForPrintReady(cdp, timeoutMs = 120000) {
     const status = result.value;
     if (status.failure) throw new Error(status.failure);
     if (status.ready) {
-      if (status.states !== 13 || status.worksheet !== 13) {
-        throw new Error(`Print companion at ${status.href} was marked ready with ${status.outputChildren} output children, ${status.states} transition states, and ${status.worksheet} worksheet steps; expected 3, 13, and 13.`);
+      if (status.worksheet !== 13 || status.answers < 13 || status.states !== 0 || status.openDetails !== 0) {
+        throw new Error(`Print companion at ${status.href} was marked ready with ${status.worksheet} worksheet prompts, ${status.answers} answer-key entries, ${status.states} expanded state cards, and ${status.openDetails} open disclosures; expected 13, at least 13, 0, and 0.`);
       }
       return status;
     }
@@ -153,7 +155,7 @@ async function main() {
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, Buffer.from(data, "base64"));
     const size = fs.statSync(outputPath).size;
-    console.log(`Printed ${status.states} transition states and ${status.worksheet} worksheet solutions to ${outputPath} (${(size / 1048576).toFixed(2)} MB).`);
+    console.log(`Printed the compact edition with ${status.worksheet} worksheet prompts and ${status.answers} answer-key entries to ${outputPath} (${(size / 1048576).toFixed(2)} MB).`);
   } finally {
     try {
       if (cdp) await cdp.send("Browser.close");

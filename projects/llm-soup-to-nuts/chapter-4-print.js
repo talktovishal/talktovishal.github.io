@@ -59,28 +59,11 @@
     return note;
   }
 
-  async function captureStepper(win, doc, config) {
-    const transcript = element("section", "print-transcript");
-    const head = element("header", "print-transcript-head");
-    head.append(element("p", "eyebrow", config.eyebrow), element("h3", "", config.heading));
-    head.append(liveNote("This PDF lays out every state; the live chapter lets you move backward, forward, and replay:"));
-    transcript.append(head);
-
-    const list = element("div", "print-state-list");
-    for (let index = 0; index < config.count; index += 1) {
-      win[config.setter](index);
-      await nextPaint(win);
-      const state = element("article", "print-state");
-      state.append(
-        element("p", "eyebrow", `Step ${index + 1} of ${config.count}`),
-        element("h4", "", doc.getElementById(config.titleId).textContent.trim()),
-        element("p", "print-state-copy", doc.getElementById(config.copyId).textContent.trim()),
-        imported(doc.getElementById(config.panelId))
-      );
-      list.append(state);
-    }
-    transcript.append(list);
-    return transcript;
+  function stepperNote(section, count) {
+    if (!section) return;
+    const note = liveNote(`This shows the opening state only. Step through all ${count} states, backward and forward, in the live chapter:`);
+    const panel = section.querySelector(".forward-panel, .softmax-step-panel, .gradient-step-panel");
+    (panel || section).insertAdjacentElement("beforebegin", note);
   }
 
   async function captureWorksheet(win, doc) {
@@ -90,54 +73,95 @@
     const transcript = element("section", "print-transcript");
     const head = element("header", "print-transcript-head");
     head.append(
-      element("p", "eyebrow", "Solved worksheet transcript"),
-      element("h3", "", "Do one complete training step by hand - all 13 solutions")
+      element("p", "eyebrow", "Work it by hand"),
+      element("h3", "", "Do one complete training step yourself - all 13 prompts")
     );
-    head.append(liveNote("The live worksheet lets you attempt each number, ask for progressive hints, and receive immediate feedback:"));
+    head.append(liveNote("Solutions are in the answer key at the end of this PDF. The live worksheet checks each number and offers progressive hints:"));
     transcript.append(head);
 
     const intro = element("div", "print-worksheet-intro");
     intro.append(imported(doc.getElementById("byHandSvg")), imported(doc.getElementById("byHandMiniFacts")));
     transcript.append(intro);
 
+    const answers = [];
     const steps = element("div", "print-worksheet-steps");
     for (let index = 0; index < 13; index += 1) {
-      win.revealByHandSolution();
-      await nextPaint(win);
       const card = element("article", "print-worksheet-step");
       card.append(
         element("p", "eyebrow", doc.getElementById("byHandProgress").textContent.trim()),
         element("h4", "", doc.getElementById("byHandPrompt").textContent.trim()),
         imported(doc.getElementById("byHandInstruction")),
         imported(doc.getElementById("byHandEquation")),
-        imported(doc.getElementById("byHandFeedback"))
+        element("p", "print-answer-line", "Your answer:")
       );
       steps.append(card);
+
+      win.revealByHandSolution();
+      await nextPaint(win);
+      const solution = imported(doc.getElementById("byHandFeedback"));
+      solution.innerHTML = solution.innerHTML.replace(/^\s*Solution revealed\.\s*/i, "");
+      answers.push({ label: `Step ${index + 1}.`, solution });
+
       if (index < 12) {
         win.moveByHandStep(1);
         await nextPaint(win);
       }
     }
     transcript.append(steps);
-    return transcript;
+    return { transcript, answers };
   }
 
-  function revealQuizAnswers(root) {
-    root.querySelectorAll(".code-quiz").forEach((quiz) => {
+  function collectQuizAnswers(root) {
+    const answers = [];
+    root.querySelectorAll(".code-quiz").forEach((quiz, index) => {
+      const number = index + 1;
       const correct = quiz.querySelector('.quiz-option[data-correct="true"]');
-      if (correct) correct.classList.add("print-correct-answer");
-      const answer = element("p", "print-quiz-answer");
-      const label = correct ? `Answer: ${correct.textContent.trim()}. ` : "Answer shown in the live chapter. ";
-      answer.textContent = label + (quiz.dataset.explain || "");
-      quiz.append(answer);
+      answers.push({
+        number,
+        answer: correct ? correct.textContent.trim() : "See the live chapter.",
+        explain: quiz.dataset.explain || ""
+      });
+      quiz.append(element("p", "print-quiz-ref", `Quick check ${number} - answer in the key at the end.`));
     });
+    return answers;
   }
 
-  function openDisclosures(root) {
-    root.querySelectorAll("details").forEach((details) => {
-      details.open = true;
-      details.setAttribute("open", "");
-    });
+  function buildAnswerKey(worksheetAnswers, quizAnswers) {
+    const key = element("section", "print-answer-key");
+    key.append(
+      element("p", "eyebrow", "Answer key"),
+      element("h2", "", "Worksheet solutions and quick-check answers"),
+      element("p", "print-answer-intro", "Work each problem on paper first, then check it here. The live chapter marks your answer immediately and offers progressive hints before showing any solution.")
+    );
+
+    if (worksheetAnswers.length) {
+      const block = element("div", "print-answer-block");
+      block.append(element("h3", "", "By-hand worksheet"));
+      const list = element("ol", "print-answer-list");
+      worksheetAnswers.forEach((entry) => {
+        const item = document.createElement("li");
+        item.append(element("strong", "", `${entry.label} `), entry.solution);
+        list.append(item);
+      });
+      block.append(list);
+      key.append(block);
+    }
+
+    if (quizAnswers.length) {
+      const block = element("div", "print-answer-block");
+      block.append(element("h3", "", "Quick checks"));
+      const list = element("ol", "print-answer-list");
+      quizAnswers.forEach((entry) => {
+        const item = document.createElement("li");
+        item.append(element("strong", "", entry.answer));
+        if (entry.explain) item.append(document.createTextNode(` ${entry.explain}`));
+        list.append(item);
+      });
+      block.append(list);
+      key.append(block);
+    }
+
+    return key;
   }
 
   function buildCover(sourceDoc) {
@@ -145,9 +169,9 @@
     cover.append(
       element("p", "eyebrow", "LLM Soup to Nuts - Chapter 4 - Print edition"),
       element("h1", "", sourceDoc.getElementById("page-title").textContent.trim()),
-      element("p", "print-cover-deck", "Probability, vectors, forward passes, softmax, gradients, backpropagation, and a real browser-trained next-word model - with every learner-controlled transition expanded into a readable static sequence.")
+      element("p", "print-cover-deck", "Probability, vectors, forward passes, softmax, gradients, backpropagation, and a real browser-trained next-word model - a compact companion you can read and work through on paper.")
     );
-    cover.append(liveNote("This print edition preserves the worked states. For sliders, animation, answer checking, and training, use the live chapter:"));
+    cover.append(liveNote("This is the short form. For the step-by-step walkthroughs, sliders, animation, answer checking, and training, use the live chapter:"));
     const date = element("p", "microcopy", `Generated ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`);
     cover.append(date);
     return cover;
@@ -187,38 +211,14 @@
     const sourceDoc = frame.contentDocument;
     await sourceDoc.fonts?.ready;
 
-    setStatus("Capturing five forward-pass states...");
-    const forward = await captureStepper(win, sourceDoc, {
-      eyebrow: "Five forward-pass states",
-      heading: "One forward pass, laid out from lookup to logits",
-      count: 5,
-      setter: "setForwardStep",
-      titleId: "forward-step-title",
-      copyId: "forwardStepCopy",
-      panelId: "forwardPanel"
-    });
-    setStatus("Capturing four softmax states...");
-    const softmax = await captureStepper(win, sourceDoc, {
-      eyebrow: "Four softmax states",
-      heading: "Temperature, stabilization, exponentiation, normalization, and loss",
-      count: 4,
-      setter: "setSoftmaxStep",
-      titleId: "softmax-step-title",
-      copyId: "softmaxStepCopy",
-      panelId: "softmaxStepPanel"
-    });
-    setStatus("Capturing four gradient-descent states...");
-    const gradient = await captureStepper(win, sourceDoc, {
-      eyebrow: "Four gradient-descent states",
-      heading: "Measure the loss, find the gradient, plan the update, check the result",
-      count: 4,
-      setter: "setGradientWalkthroughStep",
-      titleId: "gradient-step-title",
-      copyId: "gradientStepCopy",
-      panelId: "gradientStepPanel"
-    });
-    setStatus("Solving and capturing the 13-step worksheet...");
-    const worksheet = await captureWorksheet(win, sourceDoc);
+    setStatus("Setting each walkthrough to its opening state...");
+    win.setForwardStep(0);
+    win.setSoftmaxStep(0);
+    win.setGradientWalkthroughStep(0);
+    await nextPaint(win);
+
+    setStatus("Collecting the 13 worksheet prompts...");
+    const { transcript: worksheet, answers: worksheetAnswers } = await captureWorksheet(win, sourceDoc);
 
     // Prepare deterministic snapshots for panels that otherwise begin blank.
     setStatus("Preparing deterministic training snapshots...");
@@ -233,19 +233,18 @@
     setStatus("Assembling the print edition...");
     const chapter = imported(sourceDoc.querySelector("main"), false);
     chapter.classList.add("print-chapter");
-    chapter.querySelector("#forward-walkthrough")?.replaceWith(forward);
-    chapter.querySelector("#softmax-walkthrough")?.replaceWith(softmax);
-    chapter.querySelector("#gradient-walkthrough")?.replaceWith(gradient);
+    stepperNote(chapter.querySelector("#forward-walkthrough"), 5);
+    stepperNote(chapter.querySelector("#softmax-walkthrough"), 4);
+    stepperNote(chapter.querySelector("#gradient-walkthrough"), 4);
     chapter.querySelector("#byHandLab")?.replaceWith(worksheet);
     chapter.querySelectorAll("[frozen]").forEach((node) => node.removeAttribute("frozen"));
-    openDisclosures(chapter);
-    revealQuizAnswers(chapter);
+    const quizAnswers = collectQuizAnswers(chapter);
 
     chapter.querySelectorAll(".trainer, .math-lab-grid, .vector-grid, .network-grid, .backprop-grid").forEach((panel) => {
       panel.insertAdjacentElement("beforebegin", liveNote());
     });
 
-    output.replaceChildren(buildCover(sourceDoc), buildToc(chapter), chapter);
+    output.replaceChildren(buildCover(sourceDoc), buildToc(chapter), chapter, buildAnswerKey(worksheetAnswers, quizAnswers));
     document.title = "Chapter 4 - The Math Behind Predicting the Next Word - Print Edition";
     document.body.classList.add("is-ready");
     document.documentElement.dataset.printReady = "true";
