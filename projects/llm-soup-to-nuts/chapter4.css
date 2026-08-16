@@ -5118,6 +5118,37 @@ body {
   color: #2f7d52;
 }
 
+.chapter-download {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  margin: 18px 0 22px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--green);
+  background: #f4f9f5;
+}
+
+.chapter-download-link {
+  color: #1c4f39;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.chapter-download-note {
+  flex: 1 1 260px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+@media print {
+  .chapter-download {
+    display: none;
+  }
+}
+
 .backprop-sequential-lesson {
   min-width: 0;
   margin: 0 14px;
