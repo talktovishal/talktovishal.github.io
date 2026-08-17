@@ -92,6 +92,11 @@ const state = {
   // Attention stepper
   qkvStep: 0,
   qkvPlayTimer: null,
+  // Self-attention theatre
+  satStep: 0,
+  satCausal: false,
+  satPlayTimer: null,
+  satAnims: [],
   // Attention heatmap
   hasViewedHeatmap: false,
   // Multi-head attention
@@ -103,6 +108,7 @@ const state = {
 };
 
 const dom = {};
+const satNodes = {};
 function grab(id) { return document.getElementById(id); }
 
 // ---------------------------------------------------------------------------
@@ -530,6 +536,378 @@ function toggleQkvPlay() {
 }
 
 // ---------------------------------------------------------------------------
+// "Self-attention, in motion": the whole 6-token operation as a drivable scene.
+//
+// Built on inline SVG plus the browser's Web Animations API. No animation
+// library: the matrix is 6x6, and WAAPI already gives us cancellation, timing
+// and reduced-motion handling for free, which keeps the page self-contained.
+// ---------------------------------------------------------------------------
+
+const SVGNS = "http://www.w3.org/2000/svg";
+
+const SAT = {
+  rowTop: 62,
+  rowGap: 58,
+  rowH: 40,
+  tokX: 8,
+  tokW: 104,
+  cell: 15,
+  cellGap: 2,
+  qX: 128,
+  kX: 204,
+  vX: 280,
+  gridX: 386,
+  gridCellW: 42,
+  gridGap: 2,
+  outX: 690,
+  outW: 150
+};
+
+const SAT_STAGES = [
+  {
+    title: "Six tokens arrive, one vector each",
+    caption: "Nothing has happened yet. Each token is a single row of numbers - the embedding from the previous layer. No queries, no keys, no values."
+  },
+  {
+    title: "Each vector fans out into a query, a key and a value",
+    caption: "Watch the dots: every token sends its one vector into three learned matrices and gets three vectors back. Same input, three different questions. This is the step people skip, and it is the one that makes the rest make sense."
+  },
+  {
+    title: "Every query meets every key",
+    caption: "Thirty-six dot products, all at once. Each dot flying into the grid is one query meeting one key, and the number it leaves behind is that pair's score after dividing by \u221ad. Bright cells are strong matches. This grid is why attention is called quadratic: six tokens make 36 cells, but a thousand tokens make a million."
+  },
+  {
+    title: "Cover the future",
+    caption: "With the mask on, the upper-right half goes dark: those pairs would let a token read words it has not generated yet. Their scores are set to negative infinity, so softmax will give them exactly zero weight."
+  },
+  {
+    title: "Softmax turns each row into weights",
+    caption: "Every row is now a set of percentages adding to 100%. Read across a row to see where that token chose to look. The 'it' row is the one to watch."
+  },
+  {
+    title: "The weights blend the values",
+    caption: "Finally the value vectors flow right, each scaled by its weight, and land as one new vector per token. Every output on the right is a mixture of the whole sentence - which is exactly what 'context-aware' means."
+  }
+];
+
+function satRowY(i) { return SAT.rowTop + i * SAT.rowGap; }
+function satRowMid(i) { return satRowY(i) + SAT.rowH / 2; }
+function satVecX(base, d) { return base + d * (SAT.cell + SAT.cellGap); }
+function satGridX(j) { return SAT.gridX + j * (SAT.gridCellW + SAT.gridGap); }
+
+function svgEl(name, attrs, cls) {
+  const el = document.createElementNS(SVGNS, name);
+  Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, String(v)));
+  if (cls) el.setAttribute("class", cls);
+  return el;
+}
+
+function satPrefersReducedMotion() {
+  return Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+}
+
+// Colour a vector cell by magnitude so the strips read as data, not decoration.
+function satCellShade(value, max) {
+  const t = max > 0 ? clamp(Math.abs(value) / max, 0, 1) : 0;
+  return t;
+}
+
+function buildSatScene() {
+  const svg = dom.satSvg;
+  if (!svg) return;
+  svg.replaceChildren();
+  satNodes.tokens = [];
+  satNodes.q = [];
+  satNodes.k = [];
+  satNodes.v = [];
+  satNodes.grid = [];
+  satNodes.gridText = [];
+  satNodes.out = [];
+  satNodes.outText = [];
+
+  const headers = svgEl("g", {}, "sat-headers");
+  [
+    ["x", SAT.tokX + SAT.tokW / 2],
+    ["q", satVecX(SAT.qX, 1.5)],
+    ["k", satVecX(SAT.kX, 1.5)],
+    ["v", satVecX(SAT.vX, 1.5)]
+  ].forEach(([label, x]) => {
+    headers.append(Object.assign(svgEl("text", { x, y: 34, "text-anchor": "middle" }, "sat-header"), { textContent: label }));
+  });
+  headers.append(Object.assign(
+    svgEl("text", { x: satGridX(2.5) + SAT.gridCellW / 2, y: 22, "text-anchor": "middle" }, "sat-header"),
+    { textContent: "scores: query row \u00d7 key column" }
+  ));
+  TOKENS.forEach((tok, j) => {
+    headers.append(Object.assign(
+      svgEl("text", { x: satGridX(j) + SAT.gridCellW / 2, y: 40, "text-anchor": "middle" }, "sat-colhead"),
+      { textContent: tok.word }
+    ));
+  });
+  headers.append(Object.assign(
+    svgEl("text", { x: SAT.outX + SAT.outW / 2, y: 34, "text-anchor": "middle" }, "sat-header"),
+    { textContent: "new vector" }
+  ));
+  svg.append(headers);
+
+  TOKENS.forEach((tok, i) => {
+    const y = satRowY(i);
+
+    const g = svgEl("g", {}, "sat-token");
+    g.append(svgEl("rect", { x: SAT.tokX, y, width: SAT.tokW, height: SAT.rowH, rx: 8 }, "sat-token-box"));
+    g.append(Object.assign(
+      svgEl("text", { x: SAT.tokX + SAT.tokW / 2, y: y + 25, "text-anchor": "middle" }, "sat-token-text"),
+      { textContent: tok.word }
+    ));
+    svg.append(g);
+    satNodes.tokens.push(g);
+
+    [["q", SAT.qX], ["k", SAT.kX], ["v", SAT.vX]].forEach(([role, baseX]) => {
+      const strip = svgEl("g", {}, `sat-strip sat-strip-${role}`);
+      const cells = [];
+      for (let d = 0; d < DIM; d += 1) {
+        const rect = svgEl("rect", {
+          x: satVecX(baseX, d),
+          y: y + (SAT.rowH - SAT.cell) / 2,
+          width: SAT.cell,
+          height: SAT.cell,
+          rx: 3
+        }, `sat-cell sat-cell-${role}`);
+        strip.append(rect);
+        cells.push(rect);
+      }
+      svg.append(strip);
+      satNodes[role].push({ group: strip, cells, baseX });
+    });
+
+    const rowCells = [];
+    const rowTexts = [];
+    TOKENS.forEach((_, j) => {
+      const rect = svgEl("rect", {
+        x: satGridX(j), y, width: SAT.gridCellW, height: SAT.rowH, rx: 5
+      }, "sat-grid-cell");
+      const text = svgEl("text", {
+        x: satGridX(j) + SAT.gridCellW / 2, y: y + 25, "text-anchor": "middle"
+      }, "sat-grid-text");
+      svg.append(rect, text);
+      rowCells.push(rect);
+      rowTexts.push(text);
+    });
+    satNodes.grid.push(rowCells);
+    satNodes.gridText.push(rowTexts);
+
+    const outG = svgEl("g", {}, "sat-out");
+    outG.append(svgEl("rect", { x: SAT.outX, y, width: SAT.outW, height: SAT.rowH, rx: 8 }, "sat-out-box"));
+    const outText = svgEl("text", { x: SAT.outX + SAT.outW / 2, y: y + 25, "text-anchor": "middle" }, "sat-out-text");
+    outG.append(outText);
+    svg.append(outG);
+    satNodes.out.push(outG);
+    satNodes.outText.push(outText);
+  });
+
+  satNodes.fx = svgEl("g", {}, "sat-fx");
+  svg.append(satNodes.fx);
+}
+
+function satClearFx() {
+  state.satAnims.forEach((a) => { try { a.cancel(); } catch (e) { /* already gone */ } });
+  state.satAnims = [];
+  if (satNodes.fx) satNodes.fx.replaceChildren();
+}
+
+function satFly(x1, y1, x2, y2, options) {
+  const opts = options || {};
+  const dot = svgEl("circle", { cx: x1, cy: y1, r: opts.r || 3.2 }, `sat-dot ${opts.tone || ""}`);
+  satNodes.fx.append(dot);
+  const anim = dot.animate([
+    { transform: "translate(0px, 0px)", opacity: 0 },
+    { opacity: 1, offset: 0.15 },
+    { opacity: 1, offset: 0.8 },
+    { transform: `translate(${x2 - x1}px, ${y2 - y1}px)`, opacity: 0 }
+  ], {
+    duration: opts.duration || 620,
+    delay: opts.delay || 0,
+    easing: "cubic-bezier(.42,.02,.34,1)",
+    fill: "forwards"
+  });
+  anim.onfinish = () => dot.remove();
+  anim.oncancel = () => dot.remove();
+  state.satAnims.push(anim);
+  return anim;
+}
+
+function satPlayStage(stage) {
+  if (satPrefersReducedMotion()) return;
+
+  if (stage === 2) {
+    TOKENS.forEach((_, i) => {
+      const y = satRowMid(i);
+      [["q", SAT.qX], ["k", SAT.kX], ["v", SAT.vX]].forEach(([role, baseX], r) => {
+        for (let d = 0; d < DIM; d += 1) {
+          satFly(SAT.tokX + SAT.tokW, y, satVecX(baseX, d) + SAT.cell / 2, y, {
+            delay: i * 70 + r * 40 + d * 24,
+            duration: 560,
+            tone: `is-${role}`
+          });
+        }
+      });
+    });
+    return;
+  }
+
+  if (stage === 3) {
+    TOKENS.forEach((_, i) => {
+      TOKENS.forEach((_, j) => {
+        const target = { x: satGridX(j) + SAT.gridCellW / 2, y: satRowMid(i) };
+        // One dot from the query of this row, one from the key of this column.
+        satFly(satVecX(SAT.qX, DIM - 1) + SAT.cell, satRowMid(i), target.x, target.y, {
+          delay: (i * 6 + j) * 26, duration: 620, tone: "is-q"
+        });
+        satFly(satVecX(SAT.kX, DIM - 1) + SAT.cell, satRowMid(j), target.x, target.y, {
+          delay: (i * 6 + j) * 26 + 60, duration: 620, tone: "is-k"
+        });
+      });
+    });
+    return;
+  }
+
+  if (stage === 6) {
+    const rows = TOKENS.map((_, i) => attentionRow(i, state.satCausal));
+    rows.forEach((row, i) => {
+      row.weights.forEach((w, j) => {
+        if (w < 0.06) return;
+        // Heavier weights send more dots, so the blend is visibly lopsided.
+        const count = Math.max(1, Math.round(w * 8));
+        for (let c = 0; c < count; c += 1) {
+          satFly(satVecX(SAT.vX, DIM - 1) + SAT.cell, satRowMid(j), SAT.outX, satRowMid(i), {
+            delay: i * 130 + c * 55 + j * 18,
+            duration: 720,
+            r: 2.6 + w * 3,
+            tone: "is-v"
+          });
+        }
+      });
+    });
+  }
+}
+
+function renderSat(options) {
+  const svg = dom.satSvg;
+  if (!svg) return;
+  const opts = options || {};
+  const step = state.satStep;
+
+  if (!satNodes.tokens || !satNodes.tokens.length) buildSatScene();
+  satClearFx();
+
+  svg.classList.toggle("is-idle", step === 0);
+  dom.satPill.textContent = step === 0 ? "press Next" : `stage ${step} of ${SAT_STAGES.length}`;
+
+  if (step === 0) {
+    dom.satCaption.textContent = "Press \u201cNext stage\u201d to run the whole attention block, from six plain token vectors to six context-aware ones.";
+  } else {
+    const stage = SAT_STAGES[step - 1];
+    dom.satCaption.innerHTML = `<strong>Stage ${step}. ${stage.title}.</strong> ${stage.caption}`;
+  }
+
+  const rows = TOKENS.map((_, i) => attentionRow(i, state.satCausal));
+  const maxQ = Math.max(...TOKENS.flatMap((t) => t.q.map(Math.abs)));
+  const maxK = Math.max(...TOKENS.flatMap((t) => t.k.map(Math.abs)));
+  const maxV = Math.max(...TOKENS.flatMap((t) => t.v.map(Math.abs)));
+  const maxScore = Math.max(...rows.flatMap((r) => r.rawScores.map((s) => (s === null ? 0 : s))));
+
+  satNodes.tokens.forEach((g, i) => {
+    g.classList.toggle("is-on", step >= 1);
+    g.style.transitionDelay = step === 1 ? `${i * 60}ms` : "0ms";
+  });
+
+  [["q", maxQ], ["k", maxK], ["v", maxV]].forEach(([role, max]) => {
+    satNodes[role].forEach((strip, i) => {
+      strip.group.classList.toggle("is-on", step >= 2);
+      strip.cells.forEach((cell, d) => {
+        const value = TOKENS[i][role][d];
+        cell.style.setProperty("--shade", step >= 2 ? satCellShade(value, max).toFixed(3) : "0");
+        cell.setAttribute("aria-hidden", "true");
+      });
+    });
+  });
+
+  satNodes.grid.forEach((rowCells, i) => {
+    rowCells.forEach((cell, j) => {
+      const text = satNodes.gridText[i][j];
+      const masked = state.satCausal && j > i;
+      cell.classList.toggle("is-on", step >= 3);
+      cell.classList.toggle("is-masked", step >= 4 && masked);
+      cell.classList.toggle("is-weight", step >= 5);
+      if (step < 3) {
+        cell.style.setProperty("--shade", "0");
+        text.textContent = "";
+        return;
+      }
+      if (step >= 5) {
+        const w = rows[i].weights[j];
+        const hidden = step >= 4 && masked;
+        cell.style.setProperty("--shade", hidden ? "0" : w.toFixed(3));
+        text.textContent = hidden ? "" : `${Math.round(w * 100)}%`;
+        text.classList.toggle("is-light", !hidden && w > 0.34);
+      } else {
+        const raw = rows[i].rawScores[j];
+        const shown = raw === null ? 0 : raw;
+        const hidden = step >= 4 && masked;
+        cell.style.setProperty("--shade", hidden ? "0" : satCellShade(shown, maxScore).toFixed(3));
+        text.textContent = hidden ? "" : shown.toFixed(2);
+        text.classList.toggle("is-light", !hidden && shown / maxScore > 0.62);
+      }
+    });
+  });
+
+  satNodes.out.forEach((g, i) => {
+    g.classList.toggle("is-on", step >= 6);
+    const text = satNodes.outText[i];
+    text.textContent = step >= 6
+      ? `[${rows[i].output.map((v) => v.toFixed(2)).join(" ")}]`
+      : "";
+  });
+
+  if (opts.animate) satPlayStage(step);
+}
+
+function setSatStep(next, animate) {
+  const clamped = clamp(next, 0, SAT_STAGES.length);
+  const forward = clamped > state.satStep;
+  state.satStep = clamped;
+  renderSat({ animate: animate && forward });
+}
+
+function stopSatPlay() {
+  if (state.satPlayTimer) {
+    clearInterval(state.satPlayTimer);
+    state.satPlayTimer = null;
+  }
+  if (dom.satPlay) dom.satPlay.textContent = "Play";
+}
+
+function toggleSatPlay() {
+  if (state.satPlayTimer) {
+    stopSatPlay();
+    return;
+  }
+  if (satPrefersReducedMotion()) {
+    setSatStep(SAT_STAGES.length, false);
+    return;
+  }
+  if (state.satStep >= SAT_STAGES.length) setSatStep(0, false);
+  dom.satPlay.textContent = "Pause";
+  state.satPlayTimer = setInterval(() => {
+    if (state.satStep >= SAT_STAGES.length) {
+      stopSatPlay();
+      return;
+    }
+    setSatStep(state.satStep + 1, true);
+  }, 2600);
+}
+
+// ---------------------------------------------------------------------------
 // Query/key/value as weighted lookup
 // ---------------------------------------------------------------------------
 
@@ -907,8 +1285,10 @@ function populateSelect(select, selectedIndex) {
 
 function setCausal(value) {
   state.causal = value;
+  state.satCausal = value;
   if (dom.causalToggle) dom.causalToggle.checked = value;
   if (dom.causalToggleHeatmap) dom.causalToggleHeatmap.checked = value;
+  if (dom.satCausal) dom.satCausal.checked = value;
 }
 
 // ---------------------------------------------------------------------------
@@ -1021,6 +1401,24 @@ function wireEvents() {
   dom.qkvStepPlay.addEventListener("click", () => toggleQkvPlay());
   dom.qkvStepReset.addEventListener("click", () => { stopQkvPlay(); setQkvStep(0); });
 
+  // Self-attention theatre
+  dom.satNext.addEventListener("click", () => { stopSatPlay(); setSatStep(state.satStep + 1, true); });
+  dom.satBack.addEventListener("click", () => { stopSatPlay(); setSatStep(state.satStep - 1, false); });
+  dom.satPlay.addEventListener("click", () => toggleSatPlay());
+  dom.satReset.addEventListener("click", () => { stopSatPlay(); setSatStep(0, false); });
+  dom.satCausal.addEventListener("change", () => {
+    stopSatPlay();
+    state.satCausal = dom.satCausal.checked;
+    // The mask is only meaningful once the grid exists, so jump there if needed.
+    if (state.satStep > 0 && state.satStep < 4) state.satStep = 4;
+    if (state.satStep === 0) state.satStep = 4;
+    state.hasViewedHeatmap = true;
+    setCausal(dom.satCausal.checked);
+    renderQkv();
+    renderHeatmap();
+    renderSat({ animate: false });
+  });
+
   // QKV attention
   dom.querySelect.addEventListener("change", () => {
     state.hasExploredQkv = true;
@@ -1033,6 +1431,7 @@ function wireEvents() {
     setCausal(dom.causalToggle.checked);
     renderQkv();
     renderHeatmap();
+    renderSat({ animate: false });
   });
 
   // Attention heatmap
@@ -1041,6 +1440,7 @@ function wireEvents() {
     setCausal(dom.causalToggleHeatmap.checked);
     renderQkv();
     renderHeatmap();
+    renderSat({ animate: false });
   });
 
   // Multi-head attention
@@ -1107,6 +1507,14 @@ function init() {
     qkvStepNext: grab("qkvStepNext"),
     qkvStepPlay: grab("qkvStepPlay"),
     qkvStepReset: grab("qkvStepReset"),
+    satSvg: grab("satSvg"),
+    satPill: grab("satPill"),
+    satCaption: grab("satCaption"),
+    satBack: grab("satBack"),
+    satNext: grab("satNext"),
+    satPlay: grab("satPlay"),
+    satReset: grab("satReset"),
+    satCausal: grab("satCausal"),
     causalToggle: grab("causalToggle"),
     qkvScores: grab("qkvScores"),
     qkvFormula: grab("qkvFormula"),
@@ -1135,6 +1543,7 @@ function init() {
   renderDecodeBars();
   renderDecodeTally();
   renderQkvStepper();
+  renderSat({ animate: false });
   renderQkv();
   renderHeatmap();
   renderMultiHead();

@@ -1105,12 +1105,52 @@ return {
             <code>it</code>, repeated for every token.
           </p>
           <p>
-            Now toggle the <strong>causal mask</strong>. A model that writes left to right
-            is not allowed to peek at the future. When it is processing a token, the
-            tokens that come after it do not exist yet. So each token may only attend to
-            itself and the tokens before it. That blanks out the upper triangle of the map
-            and the remaining weights are renormalized. This one rule is what makes a model
-            a next-token predictor (like GPT) rather than a fill-in-the-blank reader (like
+            Reading about it only gets you so far, though. Below is the whole operation as
+            a machine you can drive: six tokens in on the left, their queries, keys and
+            values, the full score grid, and six context-aware vectors out on the right.
+            Press <em>Next</em> and watch the numbers physically move from where they are
+            made to where they are used. This is the same arithmetic you did by hand one
+            row at a time, now running for all six rows at once.
+          </p>
+        </div>
+
+        <div class="panel sat-panel">
+          <div class="section-title-row">
+            <h3>Self-attention, in motion</h3>
+            <span id="satPill" class="pill">press Next</span>
+          </div>
+          <p class="microcopy">One press is one stage. Each dot you see travelling is a number moving from the box that produced it to the box that consumes it - nothing appears from nowhere.</p>
+          <div class="sat-stage">
+            <svg id="satSvg" class="sat-svg" viewBox="0 0 860 448" role="img" aria-labelledby="sat-title sat-desc">
+              <title id="sat-title">Full self-attention over six tokens</title>
+              <desc id="sat-desc">Six token vectors on the left are projected into query, key and value strips. Every query is scored against every key to fill a six by six grid, the future half of the grid is masked, each row is turned into weights by softmax, and the weights blend the value vectors into six output vectors on the right.</desc>
+            </svg>
+          </div>
+          <p id="satCaption" class="sat-caption" aria-live="polite"></p>
+          <div class="stepper-row">
+            <button id="satBack" class="ghost-button" type="button">Back</button>
+            <button id="satNext" class="primary-button" type="button">Next stage</button>
+            <button id="satPlay" class="ghost-button" type="button">Play</button>
+            <button id="satReset" class="ghost-button" type="button">Replay</button>
+          </div>
+          <label class="check-row sat-mask-row">
+            <input id="satCausal" type="checkbox">
+            <span>Causal mask (each token sees only itself and earlier tokens)</span>
+          </label>
+        </div>
+
+        <div class="section-heading">
+          <h3 class="subsection-title">The mask, and why it makes GPT a generator</h3>
+          <p>
+            Toggle the <strong>causal mask</strong> above and watch the top-right half of
+            the grid go dark. A model that writes left to right is not allowed to peek at
+            the future. When it is processing a token, the tokens that come after it do not
+            exist yet. So each token may only attend to itself and the tokens before it,
+            and the remaining weights are renormalized so each row still adds to 100%.
+          </p>
+          <p>
+            This one rule is what makes a model a next-token predictor (like GPT) rather
+            than a fill-in-the-blank reader (like
             <a href="https://arxiv.org/abs/1810.04805" target="_blank" rel="noreferrer">BERT</a>, whose
             B is for "bidirectional" precisely because it looks both ways).
           </p>
@@ -1121,10 +1161,6 @@ return {
             out over the allowed past. In plain English: cover the future before the model
             can cheat.
           </p>
-          <figure class="intuition-figure">
-            <img src="assets/figures/chapter5-causal-mask.gif" width="720" height="360" alt="Animated attention matrix that reveals only the lower triangle as allowed past attention while future cells are crossed out." decoding="async">
-            <figcaption>Schematic of a causal mask: each row may read itself and the past (lower triangle), never the future (upper triangle).</figcaption>
-          </figure>
           <div class="math-formal" aria-label="Matrix attention in symbols">
             <h3>The whole attention map, in symbols</h3>
             <p>

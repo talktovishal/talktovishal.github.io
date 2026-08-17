@@ -76,7 +76,16 @@ Implement top to bottom, one reviewable item at a time.
 | B4 | **Reversible QKV stepper.** Six beats: embedding -> project to `q` -> raw scores -> scaled scores -> softmax weights -> value blend. Back/Next/Play/Replay, a step-pip track, one arithmetic operation per row, `prefers-reduced-motion` jumps to the final state instead of animating. All numbers derived live from `TOKENS`, so they cannot drift from the prose or the panels. Verified end to end in the browser. | in review |
 | B5 | **By-hand worksheet.** Learner types one dot product, the scaled score, one softmax term, and one output component. Immediate feedback, progressive hints, reveal-after-try. | todo |
 | B6 | Why divide by `sqrt(d)`: show softmax saturating without it, with a live `d` slider. | todo |
-| B7 | Heatmap and causal mask: colocate the mask toggle with the heatmap it drives. | todo |
+| B7 | **Heatmap and causal mask.** Replaced the autoplaying `chapter5-causal-mask.gif` with "Self-attention, in motion": a six-stage drivable SVG scene (tokens -> q/k/v projection -> 36 scores -> mask -> softmax -> value blend) built on inline SVG plus the Web Animations API, no library. Particles are colour-coded by role and the blend sends more dots for heavier weights. Mask toggle is colocated and synced with the other two. Verified: the scene's `it` row reads 11/9/11/46/11/11, identical to the static heatmap, and the output vector matches the stepper. | in review |
+
+### Animation approach (settled)
+
+No animation library. Inline SVG + `element.animate()` (WAAPI). Rationale: D3 is ~270 KB
+for data joins we do not need on a 6x6 matrix; WAAPI already gives cancellation, reversal,
+`currentTime` scrubbing and `playbackRate`. Pattern: build the scene once, one `renderSat(step)`
+sets the static state via classes and a `--shade` custom property, `satPlayStage(step)` spawns
+short-lived particles. Back re-renders statically rather than reversing, so it feels instant.
+All running animations are tracked in `state.satAnims` and cancelled on any step change.
 | B8 | Positional information: absolute vs RoPE as a rotation of `q` and `k` before the dot product. | todo |
 | B9 | Multi-head: three legible heads, plus the split -> concat -> output-projection shape bookkeeping. | todo |
 | B10 | **Live GPT-2 attention viewer.** Opt-in transformers.js; type a sentence, pick a layer and head, see the true attention matrix. Needs a preset that reproduces the coreference case, and a graceful offline fallback. | todo |

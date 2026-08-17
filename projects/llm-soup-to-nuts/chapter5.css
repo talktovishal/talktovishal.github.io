@@ -596,6 +596,145 @@
   margin-top: 8px;
 }
 
+/* ---- "Self-attention, in motion": the animated attention scene ---- */
+.sat-stage {
+  overflow-x: auto;
+  margin: 4px 0 10px;
+  padding-bottom: 4px;
+}
+
+.sat-svg {
+  display: block;
+  width: 100%;
+  min-width: 720px;
+  height: auto;
+}
+
+.sat-header {
+  fill: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sat-colhead {
+  fill: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+/* Every group fades in as its stage arrives; transitions are short so stepping
+   backwards feels instant rather than animated in reverse. */
+.sat-token,
+.sat-strip,
+.sat-out {
+  opacity: 0.18;
+  transition: opacity 0.35s ease;
+}
+
+.sat-token.is-on,
+.sat-strip.is-on,
+.sat-out.is-on {
+  opacity: 1;
+}
+
+.sat-token-box {
+  fill: #fffefa;
+  stroke: var(--line);
+  stroke-width: 1.3;
+}
+
+.sat-token.is-on .sat-token-box {
+  stroke: var(--teal);
+}
+
+.sat-token-text {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sat-cell {
+  stroke: var(--line);
+  stroke-width: 1;
+  transition: fill 0.3s ease;
+}
+
+.sat-cell-q { fill: color-mix(in srgb, var(--teal) calc(var(--shade, 0) * 100%), #fffefa); }
+.sat-cell-k { fill: color-mix(in srgb, var(--gold) calc(var(--shade, 0) * 100%), #fffefa); }
+.sat-cell-v { fill: color-mix(in srgb, var(--coral) calc(var(--shade, 0) * 100%), #fffefa); }
+
+.sat-grid-cell {
+  fill: color-mix(in srgb, var(--teal) calc(var(--shade, 0) * 100%), #fffefa);
+  stroke: var(--line);
+  stroke-width: 1;
+  opacity: 0.18;
+  transition: opacity 0.3s ease, fill 0.35s ease;
+}
+
+.sat-grid-cell.is-on { opacity: 1; }
+
+.sat-grid-cell.is-masked {
+  fill: #efe9de;
+  stroke-dasharray: 3 3;
+  opacity: 0.55;
+}
+
+.sat-grid-text {
+  fill: var(--ink);
+  font-size: 11.5px;
+  font-weight: 800;
+  transition: fill 0.3s ease;
+}
+
+.sat-grid-text.is-light { fill: #fffefa; }
+
+.sat-out-box {
+  fill: var(--teal-soft);
+  stroke: var(--teal);
+  stroke-width: 1.3;
+}
+
+.sat-out-text {
+  fill: var(--ink);
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.sat-dot {
+  fill: var(--teal);
+  pointer-events: none;
+}
+
+.sat-dot.is-q { fill: var(--teal); }
+.sat-dot.is-k { fill: var(--gold); }
+.sat-dot.is-v { fill: var(--coral); }
+
+.sat-caption {
+  margin: 0 0 12px;
+  min-height: 68px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.sat-caption strong { color: var(--ink); }
+
+.sat-mask-row { margin-top: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sat-token,
+  .sat-strip,
+  .sat-out,
+  .sat-cell,
+  .sat-grid-cell,
+  .sat-grid-text {
+    transition: none;
+  }
+}
+
 /* ---- The attention stepper ---- */
 .qkv-step-track {
   display: flex;
