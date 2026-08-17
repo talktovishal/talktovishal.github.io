@@ -959,6 +959,22 @@ return {
           </figure>
         </div>
 
+        <div class="panel qkv-step-panel">
+          <div class="section-title-row">
+            <h3>One attention row, one step at a time</h3>
+            <span id="qkvStepPill" class="pill">press Next</span>
+          </div>
+          <p class="microcopy">The query is <code>it</code> and the six keys are the six tokens of our sentence. Each press does exactly one operation, and you can always go back. Nothing here is hidden: every number on a later step is built from the numbers on an earlier one.</p>
+          <ol id="qkvStepTrack" class="qkv-step-track" aria-hidden="true"></ol>
+          <div id="qkvStepBody" class="qkv-step-body" aria-live="polite"></div>
+          <div class="stepper-row">
+            <button id="qkvStepBack" class="ghost-button" type="button">Back</button>
+            <button id="qkvStepNext" class="primary-button" type="button">Next step</button>
+            <button id="qkvStepPlay" class="ghost-button" type="button">Play</button>
+            <button id="qkvStepReset" class="ghost-button" type="button">Replay</button>
+          </div>
+        </div>
+
         <div class="control-grid section-controls" aria-label="Attention controls">
           <label class="select-row" for="queryTokenSelect">
             <span>Query token</span>

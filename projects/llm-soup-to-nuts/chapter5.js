@@ -85,9 +85,13 @@ const state = {
   hasDecoded: false,
   decodeTally: {},
   decodeRolls: 0,
-  // QKV attention  queryIndex: 5, // default: "it"
+  // QKV attention
+  queryIndex: 5, // default: "it"
   causal: false,
   hasExploredQkv: false,
+  // Attention stepper
+  qkvStep: 0,
+  qkvPlayTimer: null,
   // Attention heatmap
   hasViewedHeatmap: false,
   // Multi-head attention
@@ -306,6 +310,223 @@ function renderDecodeTally() {
     row.append(name, bar);
     el.append(row);
   });
+}
+
+// ---------------------------------------------------------------------------
+// The attention stepper: one operation per press, fully reversible.
+// Every number is derived from TOKENS, so it can never drift from the panels
+// and the worked example in the prose.
+// ---------------------------------------------------------------------------
+
+const STEP_QUERY = 5; // "it"
+const STEP_COUNT = 6;
+
+// The hand-picked embedding and W_Q from the prose, kept here so the stepper's
+// first two beats show the same arithmetic the worked example does.
+const STEP_EMBEDDING = [0.2, 0.1, 0.5, 0.9];
+const STEP_WQ = [
+  [0.0, 0.0, 0.5, 0.5],
+  [1.0, 0.0, 0.0, 0.0],
+  [0.0, 0.0, 0.4, 0.7],
+  [0.0, 0.0, 0.0, 1.5]
+];
+
+const STEP_TITLES = [
+  "The token arrives as one vector",
+  "Project it into a query",
+  "Score the query against every key",
+  "Scale the scores down",
+  "Turn the scores into weights",
+  "Blend the values"
+];
+
+function fixed(n, places) {
+  return Number(n).toFixed(places);
+}
+
+function stepLedger(rows, totalRow) {
+  const wrap = document.createElement("div");
+  wrap.className = "step-ledger";
+  rows.forEach(([label, value, strong]) => {
+    const row = document.createElement("div");
+    row.className = `step-row${strong ? " is-strong" : ""}`;
+    const name = document.createElement("span");
+    name.innerHTML = label;
+    const val = document.createElement("code");
+    val.textContent = value;
+    row.append(name, val);
+    wrap.append(row);
+  });
+  if (totalRow) {
+    const row = document.createElement("div");
+    row.className = "step-row is-total";
+    const name = document.createElement("span");
+    name.innerHTML = totalRow[0];
+    const val = document.createElement("code");
+    val.textContent = totalRow[1];
+    row.append(name, val);
+    wrap.append(row);
+  }
+  return wrap;
+}
+
+function stepNote(html) {
+  const p = document.createElement("p");
+  p.className = "step-note";
+  p.innerHTML = html;
+  return p;
+}
+
+function renderStepTrack() {
+  const track = dom.qkvStepTrack;
+  if (!track) return;
+  track.replaceChildren();
+  STEP_TITLES.forEach((title, index) => {
+    const li = document.createElement("li");
+    const n = index + 1;
+    li.className = `qkv-step-pip${state.qkvStep === n ? " is-current" : ""}${state.qkvStep > n ? " is-done" : ""}`;
+    li.textContent = String(n);
+    li.title = title;
+    track.append(li);
+  });
+}
+
+function renderQkvStepper() {
+  const body = dom.qkvStepBody;
+  if (!body) return;
+  body.replaceChildren();
+  renderStepTrack();
+
+  if (state.qkvStep === 0) {
+    dom.qkvStepPill.textContent = "press Next";
+    body.append(emptyState("Press \u201cNext step\u201d to walk one attention row from the raw embedding to the blended output."));
+    return;
+  }
+
+  dom.qkvStepPill.textContent = `step ${state.qkvStep} of ${STEP_COUNT}`;
+
+  const q = TOKENS[STEP_QUERY].q;
+  const raw = TOKENS.map((t) => dot(q, t.k));
+  const scaled = raw.map((r) => r / SCALE);
+  const weights = softmax(scaled);
+  const output = Array(DIM).fill(0);
+  TOKENS.forEach((t, j) => {
+    for (let d = 0; d < DIM; d += 1) output[d] += weights[j] * t.v[d];
+  });
+
+  const heading = document.createElement("h4");
+  heading.className = "step-heading";
+  heading.textContent = `Step ${state.qkvStep}. ${STEP_TITLES[state.qkvStep - 1]}`;
+  body.append(heading);
+
+  if (state.qkvStep === 1) {
+    body.append(stepLedger([
+      ["Token", "it"],
+      ["Its embedding <code>x</code>", `[ ${STEP_EMBEDDING.map((v) => fixed(v, 1)).join(", ")} ]`, true]
+    ]));
+    body.append(stepNote(
+      "This is <em>all</em> the token has when it walks into the attention head: one row of numbers. No query, no key, no value yet - just <code>x</code>."
+    ));
+    return;
+  }
+
+  if (state.qkvStep === 2) {
+    const rows = q.map((val, out) => {
+      const terms = STEP_EMBEDDING
+        .map((x, i) => `${fixed(x, 1)}(${fixed(STEP_WQ[i][out], 1)})`)
+        .join(" + ");
+      return [`q<sub>${out + 1}</sub> = ${terms}`, fixed(val, 2)];
+    });
+    body.append(stepLedger(rows, ["Query for <code>it</code>", `[ ${q.map((v) => fixed(v, 1)).join(", ")} ]`]));
+    body.append(stepNote(
+      `Four dot products against the four columns of <code>W<sub>Q</sub></code>. The fourth number is much the largest, which is this head's way of saying "I am hunting for something <em>animate</em>." The key and value come from the same <code>x</code> through <code>W<sub>K</sub></code> and <code>W<sub>V</sub></code>.`
+    ));
+    return;
+  }
+
+  if (state.qkvStep === 3) {
+    const rows = TOKENS.map((t, j) => [
+      `q &middot; k<sub>${t.word}</sub>`,
+      fixed(raw[j], 2),
+      j === 3
+    ]);
+    body.append(stepLedger(rows));
+    body.append(stepNote(
+      `Six dot products, one per token. <code>cat</code> scores <strong>${fixed(raw[3], 2)}</strong> because its key leans on the same animate channel the query is asking about; <code>fed</code> scores <strong>${fixed(raw[1], 2)}</strong> because a verb has nothing to offer a pronoun. These are raw scores - not yet weights.`
+    ));
+    return;
+  }
+
+  if (state.qkvStep === 4) {
+    const rows = TOKENS.map((t, j) => [
+      `${fixed(raw[j], 2)} &divide; &#8730;${DIM}`,
+      fixed(scaled[j], 2),
+      j === 3
+    ]);
+    body.append(stepLedger(rows));
+    body.append(stepNote(
+      `Every score is divided by <code>&#8730;${DIM} = ${fixed(SCALE, 0)}</code>. The <em>ranking</em> does not change at all - <code>cat</code> still wins. What changes is the spread, which stops the softmax on the next step from collapsing onto a single token.`
+    ));
+    return;
+  }
+
+  if (state.qkvStep === 5) {
+    const expSum = scaled.reduce((s, v) => s + Math.exp(v), 0);
+    const rows = TOKENS.map((t, j) => [
+      `e<sup>${fixed(scaled[j], 2)}</sup> &divide; ${fixed(expSum, 3)}`,
+      `${fixed(weights[j] * 100, 1)}%`,
+      j === 3
+    ]);
+    body.append(stepLedger(rows, ["Total", `${fixed(weights.reduce((s, w) => s + w, 0) * 100, 1)}%`]));
+    body.append(stepNote(
+      `Softmax exponentiates each scaled score and divides by their total, so the six numbers now add to 100%. <code>cat</code> takes <strong>${fixed(weights[3] * 100, 1)}%</strong> of the attention. The model has, in effect, decided what <code>it</code> refers to.`
+    ));
+    return;
+  }
+
+  const rows = TOKENS.map((t, j) => [
+    `${fixed(weights[j] * 100, 1)}% &times; v<sub>${t.word}</sub>`,
+    `[ ${t.v.map((v) => fixed(weights[j] * v, 2)).join(", ")} ]`,
+    j === 3
+  ]);
+  body.append(stepLedger(rows, ["Sum: the new vector for <code>it</code>", `[ ${output.map((v) => fixed(v, 2)).join(", ")} ]`]));
+  body.append(stepNote(
+    `Each value vector is scaled by its weight and the six are added up. Compare this output with the plain embedding from step 1: the <em>animate</em> channel has jumped to <strong>${fixed(output[3], 2)}</strong>, borrowed almost entirely from <code>cat</code>. That is the whole trick. The token <code>it</code> now carries the cat with it.`
+  ));
+}
+
+function setQkvStep(next) {
+  state.qkvStep = clamp(next, 0, STEP_COUNT);
+  renderQkvStepper();
+}
+
+function stopQkvPlay() {
+  if (state.qkvPlayTimer) {
+    clearInterval(state.qkvPlayTimer);
+    state.qkvPlayTimer = null;
+  }
+  if (dom.qkvStepPlay) dom.qkvStepPlay.textContent = "Play";
+}
+
+function toggleQkvPlay() {
+  if (state.qkvPlayTimer) {
+    stopQkvPlay();
+    return;
+  }
+  // Reduced-motion users get the finished state rather than a timed sequence.
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setQkvStep(STEP_COUNT);
+    return;
+  }
+  if (state.qkvStep >= STEP_COUNT) setQkvStep(0);
+  dom.qkvStepPlay.textContent = "Pause";
+  state.qkvPlayTimer = setInterval(() => {
+    if (state.qkvStep >= STEP_COUNT) {
+      stopQkvPlay();
+      return;
+    }
+    setQkvStep(state.qkvStep + 1);
+  }, 2200);
 }
 
 // ---------------------------------------------------------------------------
@@ -794,6 +1015,12 @@ function wireEvents() {
     state.decodeTally = {}; state.decodeRolls = 0; renderDecodeTally();
   });
 
+  // Attention stepper
+  dom.qkvStepNext.addEventListener("click", () => { stopQkvPlay(); setQkvStep(state.qkvStep + 1); });
+  dom.qkvStepBack.addEventListener("click", () => { stopQkvPlay(); setQkvStep(state.qkvStep - 1); });
+  dom.qkvStepPlay.addEventListener("click", () => toggleQkvPlay());
+  dom.qkvStepReset.addEventListener("click", () => { stopQkvPlay(); setQkvStep(0); });
+
   // QKV attention
   dom.querySelect.addEventListener("change", () => {
     state.hasExploredQkv = true;
@@ -873,6 +1100,13 @@ function init() {
     decodeResetBtn: grab("decodeResetBtn"),
     decodeTally: grab("decodeTally"),
     querySelect: grab("queryTokenSelect"),
+    qkvStepTrack: grab("qkvStepTrack"),
+    qkvStepBody: grab("qkvStepBody"),
+    qkvStepPill: grab("qkvStepPill"),
+    qkvStepBack: grab("qkvStepBack"),
+    qkvStepNext: grab("qkvStepNext"),
+    qkvStepPlay: grab("qkvStepPlay"),
+    qkvStepReset: grab("qkvStepReset"),
     causalToggle: grab("causalToggle"),
     qkvScores: grab("qkvScores"),
     qkvFormula: grab("qkvFormula"),
@@ -900,6 +1134,7 @@ function init() {
   renderGenLoop();
   renderDecodeBars();
   renderDecodeTally();
+  renderQkvStepper();
   renderQkv();
   renderHeatmap();
   renderMultiHead();

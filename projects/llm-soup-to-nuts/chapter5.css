@@ -596,6 +596,108 @@
   margin-top: 8px;
 }
 
+/* ---- The attention stepper ---- */
+.qkv-step-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.qkv-step-pip {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f4efe6;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.qkv-step-pip.is-done {
+  background: var(--teal-soft);
+  border-color: var(--teal);
+  color: var(--ink);
+}
+
+.qkv-step-pip.is-current {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fffefa;
+}
+
+.qkv-step-body {
+  min-height: 210px;
+}
+
+.step-heading {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.step-ledger {
+  display: grid;
+  gap: 6px;
+}
+
+.step-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  font-size: 0.86rem;
+}
+
+.step-row span { color: var(--muted); }
+
+.step-row code {
+  justify-self: end;
+  font-weight: 800;
+  color: var(--ink);
+  font-size: 0.84rem;
+  white-space: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.step-row.is-strong {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.step-row.is-strong span { color: var(--ink); }
+
+.step-row.is-total {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+  font-weight: 900;
+}
+
+.step-row.is-total span { color: var(--ink); }
+
+.step-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 720px) {
+  .step-row { grid-template-columns: 1fr; gap: 4px; }
+  .step-row code { justify-self: start; }
+}
+
 /* ---- "One vector in, three vectors out": the Q/K/V projection ---- */
 .subsection-title {
   margin: 26px 0 10px;

@@ -73,7 +73,7 @@ Implement top to bottom, one reviewable item at a time.
 | B1 | Opener and prereqs: keep the coreference hook, forward-point to the real attention map as the payoff. | todo |
 | B2 | Motivate attention from Chapter 2's failure before naming it. | todo |
 | B3 | **Where Q, K, V come from.** Added the "One vector in, three vectors out" subsection: a `W_Q`/`W_K`/`W_V` fan-out diagram, the plain statement that the three roles are *questions asked of one vector* rather than properties of the token, a fully worked 4x4 projection `x_it = [0.2, 0.1, 0.5, 0.9]` -> `q_it = [0.1, 0.0, 0.3, 1.8]`, and a quick-check quiz. Verified in the browser. | in review |
-| B4 | **Reversible QKV stepper.** Six beats: embedding -> project -> raw scores -> scaled scores -> softmax weights -> value blend. Back/Next/Play/Replay, one arithmetic operation per row, `prefers-reduced-motion` falls back to static frames. | todo |
+| B4 | **Reversible QKV stepper.** Six beats: embedding -> project to `q` -> raw scores -> scaled scores -> softmax weights -> value blend. Back/Next/Play/Replay, a step-pip track, one arithmetic operation per row, `prefers-reduced-motion` jumps to the final state instead of animating. All numbers derived live from `TOKENS`, so they cannot drift from the prose or the panels. Verified end to end in the browser. | in review |
 | B5 | **By-hand worksheet.** Learner types one dot product, the scaled score, one softmax term, and one output component. Immediate feedback, progressive hints, reveal-after-try. | todo |
 | B6 | Why divide by `sqrt(d)`: show softmax saturating without it, with a live `d` slider. | todo |
 | B7 | Heatmap and causal mask: colocate the mask toggle with the heatmap it drives. | todo |
