@@ -596,6 +596,284 @@
   margin-top: 8px;
 }
 
+/* ---- Real key/value tensor inspector ---- */
+.peek-output {
+  margin-top: 12px;
+  min-height: 60px;
+}
+
+.peek-ledger {
+  display: grid;
+  gap: 6px;
+}
+
+.peek-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  font-size: 0.86rem;
+}
+
+.peek-row span { color: var(--muted); }
+
+.peek-row code {
+  justify-self: end;
+  font-weight: 800;
+  color: var(--ink);
+  font-size: 0.8rem;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.peek-row.is-highlight {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.peek-row.is-highlight span { color: var(--ink); }
+
+.peek-row.is-total {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+  font-weight: 900;
+}
+
+.peek-row.is-total span { color: var(--ink); }
+
+@media (max-width: 720px) {
+  .peek-row { grid-template-columns: 1fr; }
+  .peek-row code { justify-self: start; }
+}
+
+/* ---- Why divide by sqrt(d) ---- */
+.scale-compare {
+  display: grid;
+  gap: 14px;
+  min-height: 120px;
+  margin-top: 12px;
+}
+
+.scale-row {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffefa;
+}
+
+.scale-row.is-nocache { border-left: 3px solid var(--coral); }
+.scale-row.is-cache { border-left: 3px solid var(--teal); }
+
+.scale-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.scale-row-head strong { font-size: 0.94rem; }
+
+.scale-max {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.scale-bars { display: grid; gap: 5px; }
+
+.scale-bar-row {
+  display: grid;
+  grid-template-columns: minmax(58px, 78px) 1fr 52px auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.scale-word { font-weight: 800; }
+
+.scale-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #e8e1d7;
+  overflow: hidden;
+}
+
+.scale-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+.scale-fill.is-nocache { background: var(--coral); }
+.scale-fill.is-cache { background: var(--teal); }
+
+.scale-val {
+  font-weight: 900;
+  text-align: right;
+}
+
+.scale-score {
+  color: var(--muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.scale-note { margin: 10px 0 0; }
+
+@media (max-width: 720px) {
+  .scale-bar-row { grid-template-columns: minmax(52px, 1fr) 1.3fr 46px; }
+  .scale-score { display: none; }
+}
+
+/* ---- By-hand worksheet ---- */
+.worksheet {
+  display: grid;
+  gap: 14px;
+}
+
+.ws-card {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
+  border-radius: 10px;
+  background: #fffefa;
+  transition: border-color 0.25s ease;
+}
+
+.ws-card.is-solved {
+  border-left-color: var(--teal);
+  background: #f7fcfb;
+}
+
+.ws-head {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.ws-num {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--gold-soft);
+  border: 1px solid var(--gold);
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.ws-card.is-solved .ws-num {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fffefa;
+}
+
+.ws-prompt {
+  margin: 0;
+  line-height: 1.55;
+  font-size: 0.94rem;
+}
+
+.ws-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding-left: 36px;
+}
+
+.ws-input {
+  width: 150px;
+  flex: 0 0 auto;
+}
+
+.ws-unit {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-style: italic;
+}
+
+.ws-check { flex: 0 0 auto; }
+
+.ws-help {
+  margin: 6px 0 0;
+  padding-left: 36px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.ws-feedback {
+  margin: 10px 0 0;
+  padding-left: 36px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.ws-feedback:empty { display: none; }
+
+.ws-feedback.is-right { color: #16624f; }
+.ws-feedback.is-right strong { color: var(--teal); }
+.ws-feedback.is-wrong { color: #9a3412; }
+.ws-feedback.is-revealed strong { color: var(--gold); }
+
+.ws-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding-left: 36px;
+}
+
+.ws-actions .ghost-button {
+  font-size: 0.82rem;
+  padding: 5px 12px;
+}
+
+.ws-hints {
+  padding-left: 36px;
+}
+
+.ws-hint {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--gold);
+  background: var(--gold-soft);
+  border-radius: 0 6px 6px 0;
+  color: var(--ink);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.pill.is-complete {
+  background: var(--teal);
+  color: #fffefa;
+  border-color: var(--teal);
+}
+
+@media (max-width: 720px) {
+  .ws-input-row,
+  .ws-help,
+  .ws-feedback,
+  .ws-actions,
+  .ws-hints {
+    padding-left: 0;
+  }
+  .ws-input { width: 100%; }
+}
+
 /* ---- "Self-attention, in motion": the animated attention scene ---- */
 .sat-stage {
   overflow-x: auto;

@@ -866,6 +866,34 @@
               <span>Where sliding-window attention was worked out carefully, including how stacked layers extend the effective receptive field.</span>
             </li>
             <li>
+              <a href="https://arxiv.org/abs/1911.02150" target="_blank" rel="noreferrer">Shazeer, Fast Transformer Decoding: One Write-Head is All You Need</a>
+              <span>Multi-query attention, the key/value sharing idea that grouped-query attention later softened into a compromise.</span>
+            </li>
+            <li>
+              <a href="https://arxiv.org/abs/1904.10509" target="_blank" rel="noreferrer">Child et al., Generating Long Sequences with Sparse Transformers</a>
+              <span>The sparse attention patterns GPT-3 interleaved with full attention layers.</span>
+            </li>
+            <li>
+              <a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noreferrer">Fedus, Zoph, and Shazeer, Switch Transformers</a>
+              <span>A clear route into sparse mixture-of-experts and the total-versus-active parameter distinction.</span>
+            </li>
+            <li>
+              <a href="https://arxiv.org/abs/2401.04088" target="_blank" rel="noreferrer">Jiang et al., Mixtral of Experts</a>
+              <span>A modern open-weight sparse MoE model, useful for seeing real expert counts and routing choices.</span>
+            </li>
+            <li>
+              <a href="https://arxiv.org/abs/1910.07467" target="_blank" rel="noreferrer">Zhang &amp; Sennrich, Root Mean Square Layer Normalization</a>
+              <span>RMSNorm, the cheaper normalization layer that replaced LayerNorm in nearly every modern block.</span>
+            </li>
+            <li>
+              <a href="https://arxiv.org/abs/2002.05202" target="_blank" rel="noreferrer">Shazeer, GLU Variants Improve Transformer</a>
+              <span>Where SwiGLU comes from, the feed-forward activation used by Llama, Gemma, and Qwen.</span>
+            </li>
+            <li>
+              <a href="https://arxiv.org/abs/2211.17192" target="_blank" rel="noreferrer">Leviathan, Kalman, and Matias, Fast Inference via Speculative Decoding</a>
+              <span>A draft model proposes several tokens and the large model verifies them in parallel, cutting latency without changing the output distribution.</span>
+            </li>
+            <li>
               <a href="https://web.stanford.edu/~jurafsky/slp3/" target="_blank" rel="noreferrer">Jurafsky &amp; Martin, Speech and Language Processing, Chapter 8: Transformers</a>
               <span>Section 8.8, "Dealing with Scale," covers scaling laws and the KV cache with the same worked-example spirit as this course.</span>
             </li>

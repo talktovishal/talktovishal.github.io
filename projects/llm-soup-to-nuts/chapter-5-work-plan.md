@@ -74,8 +74,8 @@ Implement top to bottom, one reviewable item at a time.
 | B2 | Motivate attention from Chapter 2's failure before naming it. | todo |
 | B3 | **Where Q, K, V come from.** Added the "One vector in, three vectors out" subsection: a `W_Q`/`W_K`/`W_V` fan-out diagram, the plain statement that the three roles are *questions asked of one vector* rather than properties of the token, a fully worked 4x4 projection `x_it = [0.2, 0.1, 0.5, 0.9]` -> `q_it = [0.1, 0.0, 0.3, 1.8]`, and a quick-check quiz. Verified in the browser. | in review |
 | B4 | **Reversible QKV stepper.** Six beats: embedding -> project to `q` -> raw scores -> scaled scores -> softmax weights -> value blend. Back/Next/Play/Replay, a step-pip track, one arithmetic operation per row, `prefers-reduced-motion` jumps to the final state instead of animating. All numbers derived live from `TOKENS`, so they cannot drift from the prose or the panels. Verified end to end in the browser. | in review |
-| B5 | **By-hand worksheet.** Learner types one dot product, the scaled score, one softmax term, and one output component. Immediate feedback, progressive hints, reveal-after-try. | todo |
-| B6 | Why divide by `sqrt(d)`: show softmax saturating without it, with a live `d` slider. | todo |
+| B5 | **By-hand worksheet.** Four steps on a *different* query (`fed`, a verb hunting its object) so it is genuinely the learner's turn: raw dot product 2.52 -> scaled 1.26 -> weight 37.7% -> output animate channel 0.46. Feedback names which direction the answer is off, two progressive hints, reveal only after a try. Exact answers say "Correct"; tolerance-accepted ones say so explicitly. Empty and non-numeric input handled. | in review |
+| B6 | **Why divide by sqrt(d).** Prose that names the real failure (softmax saturates, then gradients through the flattened weights vanish) plus a live width slider: unscaled climbs 78.8% -> 99.995% -> 100.000% as `d` goes 4 -> 64 -> 512, while the scaled row holds at 46.3% at every width. | in review |
 | B7 | **Heatmap and causal mask.** Replaced the autoplaying `chapter5-causal-mask.gif` with "Self-attention, in motion": a six-stage drivable SVG scene (tokens -> q/k/v projection -> 36 scores -> mask -> softmax -> value blend) built on inline SVG plus the Web Animations API, no library. Particles are colour-coded by role and the blend sends more dots for heavier weights. Mask toggle is colocated and synced with the other two. Verified: the scene's `it` row reads 11/9/11/46/11/11, identical to the static heatmap, and the output vector matches the stepper. | in review |
 
 ### Animation approach (settled)
@@ -88,10 +88,30 @@ short-lived particles. Back re-renders statically rather than reversing, so it f
 All running animations are tracked in `state.satAnims` and cancelled on any step change.
 | B8 | Positional information: absolute vs RoPE as a rotation of `q` and `k` before the dot product. | todo |
 | B9 | Multi-head: three legible heads, plus the split -> concat -> output-projection shape bookkeeping. | todo |
-| B10 | **Live GPT-2 attention viewer.** Opt-in transformers.js; type a sentence, pick a layer and head, see the true attention matrix. Needs a preset that reproduces the coreference case, and a graceful offline fallback. | todo |
-| B11 | Code cells: softmax, scaled dot-product attention reproducing 46%, and the causal mask - each gated behind a predict-first `.code-quiz`. | todo |
-| B12 | Colab notebook 1: same sentence, same vectors, numpy attention -> multi-head -> a real GPT-2 attention map. | todo |
-| B13 | References: inline concept links plus a curated further-reading list. | todo |
+| B10 | **Live model.** See the finding below - a real in-browser attention map is impossible. Delivered instead: a real key/value tensor inspector (verified against distilGPT-2: 6 layers, 12 heads, d=64, 216 KiB for a 6-token prompt) plus an honest subsection explaining why the map is not here, pointing at the notebook. | in review |
+| B11 | Code cells: softmax and scaled dot-product attention, both gated behind predict-first quizzes. A third mask cell was dropped - the animated scene and the heatmap already teach masking interactively, and a code cell would have been a third copy. 14 quizzes on the page in total. | in review |
+| B12 | **Colab notebook** at `assets/downloads/chapter5-attention.ipynb`. 26 cells. Part 1 rebuilds the chapter in NumPy and *asserts* it reproduces `q_it = [0.1, 0, 0.3, 1.8]` and `46.3%`. Part 2 loads real GPT-2 with `output_attentions=True`, searches all 144 heads for the strongest `it` -> `cat`, and plots real attention maps. Math verified locally against the chapter. | in review |
+| B13 | **References.** Moved the ten efficiency papers (GQA, FlashAttention, MQA, sparse, RMSNorm, SwiGLU, Switch, Mixtral, speculative decoding) to Chapter 6 where they now belong. Added Transformer Explainer and the companion notebook to Chapter 5. | in review |
+
+### Finding: real attention maps cannot be shown in the browser
+
+Verified empirically, not assumed. `AutoModelForCausalLM` for `Xenova/distilgpt2` with
+`output_attentions: true` returns only:
+
+```
+logits, present.0.key, present.0.value, ... present.5.key, present.5.value
+```
+
+No `attentions` key, and the ONNX session's `outputNames` confirms the graph simply does not
+export them. Attention weights are computed inside the graph and discarded. The same is true of
+fused attention kernels in PyTorch, which is why the notebook passes
+`attn_implementation="eager"`.
+
+Consequences, all of them deliberate:
+- Chapter 5 says this out loud in a subsection rather than quietly omitting the feature.
+- The real attention map lives in the Colab notebook, where PyTorch gives it up freely.
+- The browser gets what it genuinely *can* do: the real `present.N.key/value` tensors, which
+  doubles as a concrete hand-off into Chapter 6's KV cache section.
 
 ## Phase C - Chapter 6 polish
 

@@ -97,6 +97,13 @@ const state = {
   satCausal: false,
   satPlayTimer: null,
   satAnims: [],
+  // By-hand worksheet
+  wsValues: ["", "", "", ""],
+  wsHints: [0, 0, 0, 0],
+  wsTried: [false, false, false, false],
+  wsSolved: [false, false, false, false],
+  // Scaling demo
+  hasScaled: false,
   // Attention heatmap
   hasViewedHeatmap: false,
   // Multi-head attention
@@ -908,6 +915,335 @@ function toggleSatPlay() {
 }
 
 // ---------------------------------------------------------------------------
+// Why divide by sqrt(d): a dot product over d terms drifts from zero in
+// proportion to sqrt(d), so we hold the per-sqrt(d) score fixed at the values
+// from our own worked example and let the raw score grow with the width.
+// ---------------------------------------------------------------------------
+
+const SCALE_DIMS = [4, 8, 16, 32, 64, 128, 256, 512];
+
+function renderScaleDemo() {
+  const idx = Number(dom.scaleDim.value);
+  const d = SCALE_DIMS[idx];
+  dom.scaleDimLabel.textContent = String(d);
+  const el = dom.scaleCompare;
+  if (!el) return;
+  el.replaceChildren();
+
+  if (!state.hasScaled) {
+    el.append(emptyState("Drag the width slider to see what the division is protecting you from."));
+    return;
+  }
+  dom.scalePill.textContent = `d = ${d}`;
+
+  // Per-sqrt(d) scores, taken straight from the "it" row of our example.
+  const base = TOKENS.map((t) => dot(TOKENS[5].q, t.k) / Math.sqrt(DIM));
+  const rawScores = base.map((b) => b * Math.sqrt(d));
+  const unscaled = softmax(rawScores);
+  const scaled = softmax(base);
+
+  const makeRow = (label, weights, scores, tone, note) => {
+    const wrap = document.createElement("div");
+    wrap.className = `scale-row is-${tone}`;
+    const head = document.createElement("div");
+    head.className = "scale-row-head";
+    const name = document.createElement("strong");
+    name.innerHTML = label;
+    const top = document.createElement("span");
+    const maxW = Math.max(...weights);
+    top.className = "scale-max";
+    top.textContent = `top weight ${(maxW * 100).toFixed(maxW > 0.999 ? 3 : 1)}%`;
+    head.append(name, top);
+    wrap.append(head);
+
+    const bars = document.createElement("div");
+    bars.className = "scale-bars";
+    TOKENS.forEach((tok, j) => {
+      const row = document.createElement("div");
+      row.className = "scale-bar-row";
+      const word = document.createElement("span");
+      word.className = "scale-word";
+      word.textContent = tok.word;
+      const track = document.createElement("span");
+      track.className = "scale-track";
+      const fill = document.createElement("span");
+      fill.className = `scale-fill is-${tone}`;
+      fill.style.width = `${clamp(weights[j] * 100, 0.4, 100)}%`;
+      track.append(fill);
+      const val = document.createElement("span");
+      val.className = "scale-val";
+      val.textContent = `${(weights[j] * 100).toFixed(1)}%`;
+      const sc = document.createElement("span");
+      sc.className = "scale-score";
+      sc.textContent = `score ${scores[j].toFixed(2)}`;
+      row.append(word, track, val, sc);
+      bars.append(row);
+    });
+    wrap.append(bars);
+
+    const p = document.createElement("p");
+    p.className = "microcopy scale-note";
+    p.innerHTML = note;
+    wrap.append(p);
+    return wrap;
+  };
+
+  const maxUn = Math.max(...unscaled);
+  el.append(makeRow(
+    "Without the division",
+    unscaled,
+    rawScores,
+    "nocache",
+    maxUn > 0.99
+      ? `At <code>d = ${d}</code> the winner takes <strong>${(maxUn * 100).toFixed(3)}%</strong> and everything else is effectively zero. Softmax has stopped comparing and started picking. Gradients through those flattened weights would vanish too.`
+      : `At <code>d = ${d}</code> the raw scores are still small enough to behave, but watch what happens as you widen the head.`
+  ));
+  el.append(makeRow(
+    "With &divide; &#8730;d, as a real head does",
+    scaled,
+    base,
+    "cache",
+    `Identical at every width: <code>cat</code> holds <strong>${(scaled[3] * 100).toFixed(1)}%</strong> and the rest keep a real share. Dividing by <code>&#8730;${d}</code> cancels exactly the growth that the extra dimensions introduced.`
+  ));
+}
+
+// ---------------------------------------------------------------------------
+// By-hand worksheet: the learner computes one attention row themselves.
+// The query is "fed" (a verb hunting for its object), so it is genuinely their
+// turn rather than a retype of the worked example. Answers are derived from
+// TOKENS, so they can never drift from the rest of the chapter.
+// ---------------------------------------------------------------------------
+
+const WS_QUERY = 1;   // "fed"
+const WS_TARGET = 3;  // "cat"
+
+function worksheetSteps() {
+  const q = TOKENS[WS_QUERY].q;
+  const kTarget = TOKENS[WS_TARGET].k;
+  const raw = dot(q, kTarget);
+  const scaled = raw / SCALE;
+  const allScaled = TOKENS.map((t) => dot(q, t.k) / SCALE);
+  const weights = softmax(allScaled);
+  const weightPct = weights[WS_TARGET] * 100;
+  const expSum = allScaled.reduce((s, v) => s + Math.exp(v), 0);
+  const animate = TOKENS.reduce((sum, t, j) => sum + weights[j] * t.v[DIM - 1], 0);
+
+  const qStr = `[${q.map((v) => v.toFixed(1)).join(", ")}]`;
+  const kStr = `[${kTarget.map((v) => v.toFixed(1)).join(", ")}]`;
+
+  return [
+    {
+      prompt: `Score <code>fed</code> against <code>cat</code>. Take the dot product of the query <code>q = ${qStr}</code> with the key <code>k = ${kStr}</code>.`,
+      unit: "raw dot product",
+      answer: raw,
+      places: 2,
+      tolerance: 0.011,
+      hints: [
+        "A dot product multiplies matching positions and adds the results: q\u2081k\u2081 + q\u2082k\u2082 + q\u2083k\u2083 + q\u2084k\u2084.",
+        `Three of the four products are zero here. Only the last position has two non-zero numbers: ${q[DIM - 1].toFixed(1)} \u00d7 ${kTarget[DIM - 1].toFixed(1)}.`
+      ],
+      solution: `Only the fourth position contributes: ${q[DIM - 1].toFixed(1)} \u00d7 ${kTarget[DIM - 1].toFixed(1)} = ${raw.toFixed(2)}. The verb's query and the noun's key both lean on the animate channel, which is exactly why they match.`
+    },
+    {
+      prompt: `Now scale it. Divide that raw score by <code>&#8730;d</code>, where <code>d = ${DIM}</code> is the width of the query and key vectors.`,
+      unit: "scaled score",
+      answer: scaled,
+      places: 2,
+      tolerance: 0.011,
+      hints: [
+        `\u221a${DIM} = ${SCALE.toFixed(0)}, so you are halving the previous answer.`,
+        `${raw.toFixed(2)} \u00f7 ${SCALE.toFixed(0)} = ?`
+      ],
+      solution: `${raw.toFixed(2)} \u00f7 ${SCALE.toFixed(0)} = ${scaled.toFixed(2)}. Scaling never changes which token wins; it keeps the numbers small enough that softmax does not collapse onto a single token.`
+    },
+    {
+      prompt: `Turn it into a weight. The six scaled scores for this row exponentiate to a total of <code>${expSum.toFixed(3)}</code>. What percentage of the attention does <code>cat</code> get?`,
+      unit: "percent",
+      answer: weightPct,
+      places: 1,
+      tolerance: 0.6,
+      suffix: "%",
+      hints: [
+        "Softmax divides each exponentiated score by the total of all of them.",
+        `e^${scaled.toFixed(2)} = ${Math.exp(scaled).toFixed(3)}. Divide that by ${expSum.toFixed(3)}, then multiply by 100 to get a percentage.`
+      ],
+      solution: `e^${scaled.toFixed(2)} = ${Math.exp(scaled).toFixed(3)}, and ${Math.exp(scaled).toFixed(3)} \u00f7 ${expSum.toFixed(3)} = ${(weights[WS_TARGET]).toFixed(3)}, or ${weightPct.toFixed(1)}%. The verb <code>fed</code> puts more than a third of its attention on its object.`
+    },
+    {
+      prompt: `Last one: blend the values. Only three tokens carry anything in the fourth (<em>animate</em>) channel - <code>Sarah</code> at ${TOKENS[0].v[DIM - 1].toFixed(1)}, <code>cat</code> at ${TOKENS[3].v[DIM - 1].toFixed(1)}, and <code>it</code> at ${TOKENS[5].v[DIM - 1].toFixed(1)}. Their weights are ${(weights[0] * 100).toFixed(1)}%, ${weightPct.toFixed(1)}% and ${(weights[5] * 100).toFixed(1)}%. What is the animate channel of <code>fed</code>'s new vector?`,
+      unit: "output value",
+      answer: animate,
+      places: 2,
+      tolerance: 0.015,
+      hints: [
+        "Multiply each token's value by its weight, then add the three contributions together.",
+        `${(weights[0]).toFixed(3)} \u00d7 ${TOKENS[0].v[DIM - 1].toFixed(1)}, plus ${(weights[3]).toFixed(3)} \u00d7 ${TOKENS[3].v[DIM - 1].toFixed(1)}, plus ${(weights[5]).toFixed(3)} \u00d7 ${TOKENS[5].v[DIM - 1].toFixed(1)}.`
+      ],
+      solution: `${(weights[0]).toFixed(3)}(${TOKENS[0].v[DIM - 1].toFixed(1)}) + ${(weights[3]).toFixed(3)}(${TOKENS[3].v[DIM - 1].toFixed(1)}) + ${(weights[5]).toFixed(3)}(${TOKENS[5].v[DIM - 1].toFixed(1)}) = ${animate.toFixed(2)}. The verb has absorbed a large dose of "animate" from its object. That is the whole point of attention: <code>fed</code> now knows what got fed.`
+    }
+  ];
+}
+
+function renderWorksheet() {
+  const host = dom.worksheet;
+  if (!host) return;
+  host.replaceChildren();
+  const steps = worksheetSteps();
+
+  steps.forEach((step, index) => {
+    const card = document.createElement("div");
+    card.className = "ws-card";
+    const solved = state.wsSolved[index];
+    if (solved) card.classList.add("is-solved");
+
+    const head = document.createElement("div");
+    head.className = "ws-head";
+    const num = document.createElement("span");
+    num.className = "ws-num";
+    num.textContent = String(index + 1);
+    const prompt = document.createElement("p");
+    prompt.className = "ws-prompt";
+    prompt.innerHTML = step.prompt;
+    head.append(num, prompt);
+    card.append(head);
+
+    const row = document.createElement("div");
+    row.className = "ws-input-row";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.inputMode = "decimal";
+    input.className = "control-input ws-input";
+    input.placeholder = "Enter your value";
+    input.setAttribute("aria-label", `Answer for step ${index + 1}, ${step.unit}`);
+    if (state.wsValues[index]) input.value = state.wsValues[index];
+    const unit = document.createElement("span");
+    unit.className = "ws-unit";
+    unit.textContent = step.suffix ? `${step.unit} (${step.suffix})` : step.unit;
+    const check = document.createElement("button");
+    check.type = "button";
+    check.className = "primary-button ws-check";
+    check.textContent = "Check";
+    row.append(input, unit, check);
+    card.append(row);
+
+    const help = document.createElement("p");
+    help.className = "ws-help";
+    help.textContent = "Type a number, then press Check or hit Enter.";
+    card.append(help);
+
+    const feedback = document.createElement("p");
+    feedback.className = "ws-feedback";
+    feedback.setAttribute("aria-live", "polite");
+    card.append(feedback);
+
+    const actions = document.createElement("div");
+    actions.className = "ws-actions";
+    const hintBtn = document.createElement("button");
+    hintBtn.type = "button";
+    hintBtn.className = "ghost-button ws-hint-btn";
+    hintBtn.textContent = "Need a hint?";
+    const answerBtn = document.createElement("button");
+    answerBtn.type = "button";
+    answerBtn.className = "ghost-button ws-answer-btn";
+    answerBtn.textContent = "Show the answer";
+    answerBtn.hidden = !state.wsTried[index];
+    actions.append(hintBtn, answerBtn);
+    card.append(actions);
+
+    const hintBox = document.createElement("div");
+    hintBox.className = "ws-hints";
+    card.append(hintBox);
+
+    const showHints = () => {
+      hintBox.replaceChildren();
+      const shown = state.wsHints[index] || 0;
+      for (let h = 0; h < shown; h += 1) {
+        const p = document.createElement("p");
+        p.className = "ws-hint";
+        p.innerHTML = `<strong>Hint ${h + 1}.</strong> ${step.hints[h]}`;
+        hintBox.append(p);
+      }
+      if ((state.wsHints[index] || 0) >= step.hints.length) {
+        hintBtn.disabled = true;
+        hintBtn.textContent = "No more hints";
+      }
+    };
+
+    const reveal = () => {
+      feedback.className = "ws-feedback is-revealed";
+      feedback.innerHTML = `<strong>Answer: ${step.answer.toFixed(step.places)}${step.suffix || ""}.</strong> ${step.solution}`;
+      state.wsSolved[index] = true;
+      card.classList.add("is-solved");
+      updateWsPill();
+    };
+
+    const grade = () => {
+      const rawInput = input.value.trim().replace(/[%\s,]/g, "");
+      state.wsValues[index] = input.value;
+      if (!rawInput) {
+        feedback.className = "ws-feedback is-wrong";
+        feedback.textContent = "Enter a number first.";
+        return;
+      }
+      const value = Number(rawInput);
+      if (!Number.isFinite(value)) {
+        feedback.className = "ws-feedback is-wrong";
+        feedback.textContent = "That does not look like a number. Try again.";
+        return;
+      }
+      state.wsTried[index] = true;
+      answerBtn.hidden = false;
+      const diff = Math.abs(value - step.answer);
+      const exact = Math.abs(value - Number(step.answer.toFixed(step.places))) < 1e-9;
+      if (exact) {
+        feedback.className = "ws-feedback is-right";
+        feedback.innerHTML = `<strong>Correct.</strong> ${step.solution}`;
+        state.wsSolved[index] = true;
+        card.classList.add("is-solved");
+      } else if (diff <= step.tolerance) {
+        feedback.className = "ws-feedback is-right";
+        feedback.innerHTML = `<strong>Correct</strong> - accepted with a little rounding room. ${step.solution}`;
+        state.wsSolved[index] = true;
+        card.classList.add("is-solved");
+      } else {
+        feedback.className = "ws-feedback is-wrong";
+        const bigger = value > step.answer;
+        feedback.innerHTML = `Not quite - your answer is a bit <strong>too ${bigger ? "large" : "small"}</strong>. Try a hint, then have another go.`;
+        if (!state.wsHints[index]) {
+          state.wsHints[index] = 1;
+          showHints();
+        }
+      }
+      updateWsPill();
+    };
+
+    check.addEventListener("click", grade);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); grade(); }
+    });
+    hintBtn.addEventListener("click", () => {
+      state.wsHints[index] = Math.min((state.wsHints[index] || 0) + 1, step.hints.length);
+      state.wsTried[index] = true;
+      answerBtn.hidden = false;
+      showHints();
+    });
+    answerBtn.addEventListener("click", reveal);
+
+    showHints();
+    host.append(card);
+  });
+
+  updateWsPill();
+}
+
+function updateWsPill() {
+  if (!dom.wsPill) return;
+  const done = state.wsSolved.filter(Boolean).length;
+  dom.wsPill.textContent = `${done} of 4 done`;
+  dom.wsPill.classList.toggle("is-complete", done === 4);
+}
+
+// ---------------------------------------------------------------------------
 // Query/key/value as weighted lookup
 // ---------------------------------------------------------------------------
 
@@ -1267,6 +1603,82 @@ async function generateContinuation() {
   }
 }
 
+// The ONNX export returns logits plus the per-layer key/value tensors, but not
+// the attention weights, so this is the deepest honest look the browser allows.
+async function peekKeyValues() {
+  if (!state.model) return;
+  const { tokenizer, model } = state.model;
+  const prompt = dom.promptInput.value.trim() || "Sarah fed the cat because it";
+  dom.peekButton.disabled = true;
+  dom.peekOutput.replaceChildren(emptyState("Running a forward pass and collecting the key/value tensors..."));
+  try {
+    const inputs = await tokenizer(prompt);
+    const out = await model(inputs);
+    const keyNames = Object.keys(out).filter((k) => /^present\.\d+\.key$/.test(k));
+    const layers = keyNames.length;
+    const first = out[keyNames[0]];
+    const [, heads, seq, headDim] = first.dims;
+    const tokenIds = Array.from(inputs.input_ids.data).map(Number);
+    const words = tokenIds.map((id) => tokenizer.decode([id]));
+
+    dom.peekOutput.replaceChildren();
+    dom.peekPill.textContent = `${layers} layers \u00d7 ${heads} heads`;
+
+    const rows = [
+      ["Your prompt, as tokens", words.map((w) => JSON.stringify(w)).join(" ")],
+      ["Layers with a cached key and value", String(layers)],
+      ["Attention heads per layer", String(heads)],
+      ["Numbers per head (d)", String(headDim)],
+      ["Tokens in this sequence", String(seq)]
+    ];
+    const ledger = document.createElement("div");
+    ledger.className = "peek-ledger";
+    rows.forEach(([label, value]) => {
+      const row = document.createElement("div");
+      row.className = "peek-row";
+      const n = document.createElement("span");
+      n.textContent = label;
+      const v = document.createElement("code");
+      v.textContent = value;
+      row.append(n, v);
+      ledger.append(row);
+    });
+
+    // The real key vector for the last token, layer 0, head 0.
+    const lastStart = ((0 * seq) + (seq - 1)) * headDim;
+    const sample = Array.from(first.data.slice(lastStart, lastStart + 8))
+      .map((v) => Number(v).toFixed(2));
+    const sampleRow = document.createElement("div");
+    sampleRow.className = "peek-row is-highlight";
+    const sn = document.createElement("span");
+    sn.innerHTML = `Real key vector for <code>${JSON.stringify(words[words.length - 1])}</code>, layer 1, head 1 <em>(first 8 of ${headDim} numbers)</em>`;
+    const sv = document.createElement("code");
+    sv.textContent = `[${sample.join(", ")} ...]`;
+    sampleRow.append(sn, sv);
+    ledger.append(sampleRow);
+
+    const bytes = 2 * layers * heads * headDim * seq * 4;
+    const totalRow = document.createElement("div");
+    totalRow.className = "peek-row is-total";
+    const tn = document.createElement("span");
+    tn.textContent = "Cache held for this one short prompt";
+    const tv = document.createElement("code");
+    tv.textContent = `${(bytes / 1024).toFixed(1)} KiB`;
+    totalRow.append(tn, tv);
+    ledger.append(totalRow);
+    dom.peekOutput.append(ledger);
+
+    const note = document.createElement("p");
+    note.className = "microcopy";
+    note.innerHTML = `Those numbers are not illustrative - they came out of the model a moment ago. Notice the shape: <strong>2 &times; ${layers} &times; ${heads} &times; ${headDim}</strong> numbers for <em>every single token</em>. That is the exact formula the next chapter uses to work out why long conversations get expensive.`;
+    dom.peekOutput.append(note);
+  } catch (error) {
+    dom.peekOutput.replaceChildren(emptyState(`Could not read the tensors: ${error.message}`));
+  } finally {
+    dom.peekButton.disabled = false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Wiring
 // ---------------------------------------------------------------------------
@@ -1434,6 +1846,9 @@ function wireEvents() {
     renderSat({ animate: false });
   });
 
+  // Why divide by sqrt(d)
+  dom.scaleDim.addEventListener("input", () => { state.hasScaled = true; renderScaleDemo(); });
+
   // Attention heatmap
   dom.causalToggleHeatmap.addEventListener("change", () => {
     state.hasViewedHeatmap = true;
@@ -1454,6 +1869,7 @@ function wireEvents() {
   dom.loadModelButton.addEventListener("click", () => loadModel());
   dom.predictButton.addEventListener("click", () => predictNextTokens());
   dom.generateButton.addEventListener("click", () => generateContinuation());
+  dom.peekButton.addEventListener("click", () => peekKeyValues());
 
   // Runnable code cells
   document.querySelectorAll(".chapter5-code-cell .run-button").forEach((button) => {
@@ -1515,6 +1931,12 @@ function init() {
     satPlay: grab("satPlay"),
     satReset: grab("satReset"),
     satCausal: grab("satCausal"),
+    worksheet: grab("worksheet"),
+    wsPill: grab("wsPill"),
+    scaleDim: grab("scaleDim"),
+    scaleDimLabel: grab("scaleDimLabel"),
+    scaleCompare: grab("scaleCompare"),
+    scalePill: grab("scalePill"),
     causalToggle: grab("causalToggle"),
     qkvScores: grab("qkvScores"),
     qkvFormula: grab("qkvFormula"),
@@ -1532,7 +1954,10 @@ function init() {
     predictButton: grab("predictButton"),
     generateButton: grab("generateButton"),
     nextTokenBars: grab("nextTokenBars"),
-    generatedText: grab("generatedText")
+    generatedText: grab("generatedText"),
+    peekButton: grab("peekButton"),
+    peekOutput: grab("peekOutput"),
+    peekPill: grab("peekPill")
   });
 
   populateSelect(dom.querySelect, state.queryIndex);
@@ -1544,6 +1969,8 @@ function init() {
   renderDecodeTally();
   renderQkvStepper();
   renderSat({ animate: false });
+  renderWorksheet();
+  renderScaleDemo();
   renderQkv();
   renderHeatmap();
   renderMultiHead();

@@ -975,6 +975,51 @@ return {
           </div>
         </div>
 
+        <div class="section-heading">
+          <h3 class="subsection-title">Why divide by &#8730;d?</h3>
+          <p>
+            Step 4 of that walkthrough probably felt like the arbitrary one. We divided
+            every score by <code>&#8730;d</code> and I said it "keeps the numbers tame,"
+            which is the kind of hand-wave I promised not to do. So here is the real reason,
+            and it is worth understanding because it explains a failure mode.
+          </p>
+          <p>
+            A dot product adds up <code>d</code> separate products. Add more terms and the
+            sum naturally drifts further from zero - roughly in proportion to
+            <code>&#8730;d</code>. Our toy uses <code>d = 4</code>, so scores land around 1
+            or 2. A real head uses <code>d = 64</code> or <code>128</code>, where the same
+            vectors would produce scores in the tens.
+          </p>
+          <p>
+            Now recall what softmax does with big gaps: it exponentiates. A score of 13
+            against a score of 2 is not "somewhat more attention," it is
+            <code>e<sup>11</sup></code> times more - about sixty thousand to one. The
+            distribution collapses onto a single token, the other weights become
+            indistinguishable from zero, and during training the gradients through those
+            near-zero weights vanish with them. The model stops being able to learn from
+            anything except its current favourite.
+          </p>
+          <p>
+            Dividing by <code>&#8730;d</code> cancels exactly that growth, so the spread of
+            scores stays roughly the same no matter how wide the head is. Drag the width
+            below and watch the unscaled row collapse while the scaled row holds steady.
+          </p>
+        </div>
+
+        <div class="panel scale-panel">
+          <div class="section-title-row">
+            <h3>What happens as the head gets wider</h3>
+            <span id="scalePill" class="pill">move the slider</span>
+          </div>
+          <p class="microcopy">Same six tokens, same query, same relative directions - only the number of dimensions changes. The top row skips the division; the bottom row does what a real Transformer does.</p>
+          <label class="range-row" for="scaleDim">
+            <span>Dimensions per head (<code>d</code>)</span>
+            <input id="scaleDim" type="range" min="0" max="7" step="1" value="0">
+            <output id="scaleDimLabel" for="scaleDim">4</output>
+          </label>
+          <div id="scaleCompare" class="scale-compare" aria-live="polite"></div>
+        </div>
+
         <div class="control-grid section-controls" aria-label="Attention controls">
           <label class="select-row" for="queryTokenSelect">
             <span>Query token</span>
@@ -1012,6 +1057,21 @@ return {
           </div>
           <p class="microcopy">This table exposes the same calculation as the bars. The raw dot product is scaled by <code>&#8730;4 = 2</code>, then softmax turns the scaled scores into attention weights.</p>
           <div id="qkvMath" class="qkv-math-table" aria-live="polite"></div>
+        </div>
+
+        <div class="panel worksheet-panel">
+          <div class="section-title-row">
+            <h3>Your turn: work a row by hand</h3>
+            <span id="wsPill" class="pill">0 of 4 done</span>
+          </div>
+          <p class="microcopy">
+            Reading someone else's arithmetic is not the same as doing it. This time the
+            query is <code>fed</code>, a verb hunting for its object, and you compute the
+            row. Same sentence, same vectors, same four steps you just watched. Work them in
+            order - each answer feeds the next. Hints are there if you want them, and you
+            can always reveal the answer after a try.
+          </p>
+          <div id="worksheet" class="worksheet" aria-live="polite"></div>
         </div>
 
         <div class="code-quiz" data-quiz-type="predict" data-explain="Relevance scoring compares the current token's query with every token's key using a dot product, then softmax turns those scores into weights. The values are what get blended afterward, in step two.">
@@ -1623,6 +1683,56 @@ return {
               <div id="generatedText" class="generated-output" aria-live="polite"></div>
             </div>
           </div>
+
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Look inside: the real keys and values</h3>
+              <span id="peekPill" class="pill">press the button</span>
+            </div>
+            <p class="microcopy">
+              A forward pass hands back more than logits. It also returns the key and value
+              tensors this model computed for every layer and every head - the genuine
+              article, from the same run that produced the bars above.
+            </p>
+            <div class="stepper-row">
+              <button id="peekButton" class="primary-button" type="button">Show the key/value tensors</button>
+            </div>
+            <div id="peekOutput" class="peek-output" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <h3 class="subsection-title">Why you cannot see the attention map here</h3>
+          <p>
+            You might reasonably expect a button that draws the real attention matrix for
+            your own sentence, the way the toy scene did earlier. I tried to build it, and I
+            want to tell you why it is not here rather than quietly leaving it out.
+          </p>
+          <p>
+            To run in a browser, this model is converted to a format called <strong>ONNX</strong>,
+            which fixes in advance exactly which values the model hands back. For this
+            export that list is the logits plus the key and value tensors you just inspected.
+            The attention weights are computed <em>inside</em> the graph and thrown away
+            before anything comes out. They are real, they are used, and they are simply not
+            on the guest list.
+          </p>
+          <p>
+            Getting at them needs the full PyTorch model, where you can ask for
+            <code>output_attentions=True</code> and receive one matrix per layer per head.
+            That does not fit in a browser tab, so it lives in a companion notebook instead.
+            It runs free in Google Colab, uses the real GPT-2, and draws the actual attention
+            map for our own sentence - including the head where a pronoun really does look
+            back at its noun.
+          </p>
+          <p class="example-note">
+            <strong>Companion notebook.</strong>
+            <a href="https://colab.research.google.com/github/talktovishal/talktovishal.github.io/blob/master/projects/llm-soup-to-nuts/assets/downloads/chapter5-attention.ipynb" target="_blank" rel="noreferrer">Open Chapter 5 in Google Colab</a>
+            (or <a href="assets/downloads/chapter5-attention.ipynb" download>download the notebook</a>).
+            It rebuilds this chapter's attention by hand in NumPy - same sentence, same
+            vectors, and it reproduces the <code>46.3%</code> you have seen all the way
+            through - then loads the real GPT-2 and plots its true attention maps beside it.
+            Nothing to install; it runs in your browser on Google's machines.
+          </p>
         </div>
 
         <details class="exercise-card">
@@ -1735,40 +1845,12 @@ return {
             <span>Evidence that long-context models often use information near the beginning and end more reliably than information in the middle.</span>
           </li>
           <li>
-            <a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noreferrer">Ainslie et al., GQA: Grouped-Query Attention</a>
-            <span>The shared key/value scheme behind Llama 2 and 3.</span>
+            <a href="https://poloclub.github.io/transformer-explainer/" target="_blank" rel="noreferrer">Transformer Explainer (Georgia Tech)</a>
+            <span>A live GPT-2 running in your browser with every intermediate tensor on screen. If the animated scene in this chapter left you wanting to poke at the real thing, go here next.</span>
           </li>
           <li>
-            <a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noreferrer">Dao et al., FlashAttention</a>
-            <span>IO-aware attention that speeds up training and inference without changing the math.</span>
-          </li>
-          <li>
-            <a href="https://arxiv.org/abs/1904.10509" target="_blank" rel="noreferrer">Child et al., Sparse Transformers</a>
-            <span>A long-context attention pattern that attends to selected positions instead of the full past.</span>
-          </li>
-          <li>
-            <a href="https://arxiv.org/abs/1911.02150" target="_blank" rel="noreferrer">Shazeer, Multi-Query Attention</a>
-            <span>The key/value sharing idea that grouped-query attention builds on.</span>
-          </li>
-          <li>
-            <a href="https://arxiv.org/abs/1910.07467" target="_blank" rel="noreferrer">Zhang &amp; Sennrich, RMSNorm</a>
-            <span>A simpler normalization layer used in many modern Transformer blocks.</span>
-          </li>
-          <li>
-            <a href="https://arxiv.org/abs/2002.05202" target="_blank" rel="noreferrer">Shazeer, GLU Variants Improve Transformer</a>
-            <span>The source of SwiGLU-style feed-forward activations used in newer LLM blocks.</span>
-          </li>
-          <li>
-            <a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noreferrer">Fedus, Zoph, and Shazeer, Switch Transformers</a>
-            <span>A clear route into sparse Mixture-of-Experts Transformers and the total-vs-active-parameters distinction.</span>
-          </li>
-          <li>
-            <a href="https://arxiv.org/abs/2401.04088" target="_blank" rel="noreferrer">Jiang et al., Mixtral of Experts</a>
-            <span>A modern open-weight sparse MoE model where only a subset of experts is active for each token.</span>
-          </li>
-          <li>
-            <a href="https://arxiv.org/abs/2211.17192" target="_blank" rel="noreferrer">Leviathan, Kalman, and Matias, Speculative Decoding</a>
-            <span>A serving-time decoding method where a draft model proposes tokens and the larger model verifies them.</span>
+            <a href="https://colab.research.google.com/github/talktovishal/talktovishal.github.io/blob/master/projects/llm-soup-to-nuts/assets/downloads/chapter5-attention.ipynb" target="_blank" rel="noreferrer">This chapter's companion notebook (Google Colab)</a>
+            <span>Rebuilds our attention by hand in NumPy, checks it reproduces the same 46.3%, then pulls the true attention maps out of a real GPT-2 - the part a browser cannot do.</span>
           </li>
           <li>
             <a href="https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html" target="_blank" rel="noreferrer">Olsson et al., In-Context Learning and Induction Heads</a>
