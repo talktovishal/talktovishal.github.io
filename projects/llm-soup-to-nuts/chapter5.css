@@ -596,6 +596,60 @@
   margin-top: 8px;
 }
 
+/* ---- "One vector in, three vectors out": the Q/K/V projection ---- */
+.subsection-title {
+  margin: 26px 0 10px;
+  font-size: 1.08rem;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.diagram-figure .proj-svg { max-width: 520px; }
+
+.proj-matrix-wrap {
+  overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
+  margin: 12px 0;
+}
+
+.proj-matrix {
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  background: #fffefa;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.proj-matrix caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: 6px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.proj-matrix th,
+.proj-matrix td {
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+  text-align: right;
+}
+
+.proj-matrix thead th {
+  background: var(--gold-soft);
+  font-weight: 900;
+  text-align: center;
+}
+
+.proj-matrix tbody th {
+  background: var(--teal-soft);
+  font-weight: 900;
+  text-align: left;
+  white-space: nowrap;
+}
+
 /* ---- Query/key/value role list ---- */
 .qkv-roles {
   margin: 0 0 4px;

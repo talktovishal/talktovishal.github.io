@@ -24,6 +24,7 @@
       <a href="chapter-2.html">Ch 2</a>
       <a href="chapter-3.html">Ch 3</a>
       <a href="chapter-4.html">Ch 4</a>
+      <a href="chapter-6.html">Ch 6</a>
     </nav>
   </header>
 
@@ -41,10 +42,9 @@
       <a href="#block"><span>08</span>Inside the block</a>
       <a href="#position"><span>09</span>Position information</a>
       <a href="#multihead"><span>10</span>Multi-head attention</a>
-      <a href="#kvcache"><span>11</span>The KV cache</a>
-      <a href="#realmodel"><span>12</span>A real Transformer</a>
-      <a href="#improvements"><span>13</span>Recent improvements</a>
-      <a href="#references"><span>14</span>Going deeper</a>
+      <a href="#realmodel"><span>11</span>A real Transformer</a>
+      <a href="#whatsnext"><span>12</span>What we left out</a>
+      <a href="#references"><span>13</span>Going deeper</a>
     </nav>
   </aside>
 
@@ -156,7 +156,7 @@
                 scores into weights that add to 1).
               </li>
             </ul>
-            <p>What you do <strong>not</strong> need yet: how the model <em>got</em> its weights. We treat the model as already trained here, and save the story of pretraining for <strong>Chapter 6</strong>.</p>
+            <p>What you do <strong>not</strong> need yet: how the model <em>got</em> its weights. We treat the model as already trained here, and save the story of pretraining for <strong><a href="chapter-7.html">Chapter 7</a></strong>. We also leave every efficiency question - the KV cache, grouped-query attention, FlashAttention - for <strong><a href="chapter-6.html">Chapter 6</a></strong>, so that nothing here competes with the mechanism itself.</p>
           </div>
         </article>
       </div>
@@ -710,14 +710,154 @@ return {
             Now the heart of the whole thing. Suppose the current token is
             <code>it</code>. It is basically asking, "what thing in the sentence am I
             standing in for?" Attention turns that question into three little vectors for
-            every token. In a real model these vectors are learned; in our tiny model I
-            set them by hand so we can see the machinery clearly.
+            every token, and gives each one a job:
           </p>
           <ul class="qkv-roles">
             <li><strong>Query</strong>: the question the current token is asking.</li>
             <li><strong>Key</strong>: the label each token holds up, "here is what I can help with."</li>
             <li><strong>Value</strong>: the information that token will hand over if it is useful.</li>
           </ul>
+          <p>
+            Before we use them, though, I owe you an answer to the question I would be
+            asking right now: <em>where do those three vectors come from?</em> Because it
+            sounds like each token arrives carrying three separate things, and it does not.
+          </p>
+
+          <h3 class="subsection-title">One vector in, three vectors out</h3>
+          <p>
+            Each token arrives with exactly <strong>one</strong> vector: the embedding from
+            <a href="chapter-2.html">Chapter 2</a>, possibly already updated by earlier
+            blocks. Call it <code>x</code>. The query, key, and value are all made
+            <em>from that same <code>x</code></em>, by multiplying it with three different
+            matrices that the model learned during training:
+          </p>
+          <div class="formula-stack">
+            <code>q = x &middot; W<sub>Q</sub>   &larr; turn x into "what am I looking for?"</code>
+            <code>k = x &middot; W<sub>K</sub>   &larr; turn x into "what can I offer?"</code>
+            <code>v = x &middot; W<sub>V</sub>   &larr; turn x into "what do I hand over?"</code>
+          </div>
+          <p>
+            This is the bit that took me embarrassingly long to internalise, so let me say
+            it as plainly as I can. <strong>The three roles are not three properties of the
+            token. They are three questions we ask of the same vector.</strong> The word
+            <code>cat</code> does not <em>have</em> a key; it produces one when
+            <code>W<sub>K</sub></code> is applied to it. Change
+            <code>W<sub>K</sub></code> and the very same word offers a different label to
+            the sentence.
+          </p>
+          <p>
+            And those three matrices are ordinary learned weights, exactly like the ones you
+            trained by hand in <a href="chapter-4.html#backprop">Chapter 4</a>. They start as
+            small random numbers and get nudged by gradient descent until the queries and
+            keys that <em>should</em> match actually do. Nobody told the model that pronouns
+            should look for animate nouns. That fell out of predicting the next token, over
+            and over, across a very large amount of text.
+          </p>
+          <figure class="diagram-figure">
+            <svg class="pipeline-svg proj-svg" viewBox="0 0 520 220" role="img" aria-labelledby="proj-title proj-desc">
+              <title id="proj-title">One embedding produces query, key, and value</title>
+              <desc id="proj-desc">A single token embedding x flows into three separate learned weight matrices, W-Q, W-K and W-V, which produce the query vector, the key vector, and the value vector for that token.</desc>
+              <rect x="16" y="82" width="118" height="56" rx="9" class="svg-box-soft"></rect>
+              <text x="75" y="105" class="svg-word" text-anchor="middle">x for "it"</text>
+              <text x="75" y="123" class="svg-caption" text-anchor="middle">one embedding</text>
+
+              <line x1="134" y1="110" x2="214" y2="42" class="svg-arrow" marker-end="url(#proj-arrow)"></line>
+              <line x1="134" y1="110" x2="214" y2="110" class="svg-arrow" marker-end="url(#proj-arrow)"></line>
+              <line x1="134" y1="110" x2="214" y2="178" class="svg-arrow" marker-end="url(#proj-arrow)"></line>
+
+              <rect x="214" y="20" width="88" height="44" rx="8" class="svg-box-accent"></rect>
+              <text x="258" y="47" class="svg-model-text" text-anchor="middle">W_Q</text>
+              <rect x="214" y="88" width="88" height="44" rx="8" class="svg-box-accent"></rect>
+              <text x="258" y="115" class="svg-model-text" text-anchor="middle">W_K</text>
+              <rect x="214" y="156" width="88" height="44" rx="8" class="svg-box-accent"></rect>
+              <text x="258" y="183" class="svg-model-text" text-anchor="middle">W_V</text>
+
+              <line x1="302" y1="42" x2="360" y2="42" class="svg-arrow" marker-end="url(#proj-arrow)"></line>
+              <line x1="302" y1="110" x2="360" y2="110" class="svg-arrow" marker-end="url(#proj-arrow)"></line>
+              <line x1="302" y1="178" x2="360" y2="178" class="svg-arrow" marker-end="url(#proj-arrow)"></line>
+
+              <rect x="360" y="20" width="146" height="44" rx="8" class="svg-box-plain"></rect>
+              <text x="433" y="39" class="svg-word" text-anchor="middle">query</text>
+              <text x="433" y="55" class="svg-caption" text-anchor="middle">what am I looking for?</text>
+              <rect x="360" y="88" width="146" height="44" rx="8" class="svg-box-plain"></rect>
+              <text x="433" y="107" class="svg-word" text-anchor="middle">key</text>
+              <text x="433" y="123" class="svg-caption" text-anchor="middle">what can I offer?</text>
+              <rect x="360" y="156" width="146" height="44" rx="8" class="svg-box-plain"></rect>
+              <text x="433" y="175" class="svg-word" text-anchor="middle">value</text>
+              <text x="433" y="191" class="svg-caption" text-anchor="middle">what do I hand over?</text>
+
+              <defs>
+                <marker id="proj-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>Every token takes this same three-way split. The matrices are shared across all tokens and all positions; only the incoming <code>x</code> differs.</figcaption>
+          </figure>
+
+          <div class="worked-example" aria-label="Projecting one embedding into a query vector">
+            <h3>Let's actually do one projection</h3>
+            <p>
+              Talk is cheap, so here is the arithmetic for a single vector. Suppose the
+              embedding arriving for <code>it</code> is these four numbers:
+            </p>
+            <div class="formula-stack">
+              <code>x_it = [ 0.2, 0.1, 0.5, 0.9 ]</code>
+            </div>
+            <p>
+              And here is the query matrix. Read it as: <em>row i says how much input
+              channel i contributes to each output channel.</em> Every one of these sixteen
+              numbers would be learned during training; I picked round ones so the
+              multiplication stays readable.
+            </p>
+            <div class="proj-matrix-wrap">
+              <table class="proj-matrix">
+                <caption>W<sub>Q</sub>, four inputs across, four outputs down</caption>
+                <thead>
+                  <tr><th scope="col">from x</th><th scope="col">&rarr; q&#8321;</th><th scope="col">&rarr; q&#8322;</th><th scope="col">&rarr; q&#8323;</th><th scope="col">&rarr; q&#8324;</th></tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">x&#8321; = 0.2</th><td>0.0</td><td>0.0</td><td>0.5</td><td>0.5</td></tr>
+                  <tr><th scope="row">x&#8322; = 0.1</th><td>1.0</td><td>0.0</td><td>0.0</td><td>0.0</td></tr>
+                  <tr><th scope="row">x&#8323; = 0.5</th><td>0.0</td><td>0.0</td><td>0.4</td><td>0.7</td></tr>
+                  <tr><th scope="row">x&#8324; = 0.9</th><td>0.0</td><td>0.0</td><td>0.0</td><td>1.5</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              Each output number is a dot product of <code>x</code> with one column. Four
+              columns, four little sums:
+            </p>
+            <div class="formula-stack">
+              <code>q&#8321; = 0.2(0.0) + 0.1(1.0) + 0.5(0.0) + 0.9(0.0) = 0.1</code>
+              <code>q&#8322; = 0.2(0.0) + 0.1(0.0) + 0.5(0.0) + 0.9(0.0) = 0.0</code>
+              <code>q&#8323; = 0.2(0.5) + 0.1(0.0) + 0.5(0.4) + 0.9(0.0) = 0.10 + 0.20 = 0.3</code>
+              <code>q&#8324; = 0.2(0.5) + 0.1(0.0) + 0.5(0.7) + 0.9(1.5) = 0.10 + 0.35 + 1.35 = 1.8</code>
+              <code>q_it = [ 0.1, 0.0, 0.3, 1.8 ]</code>
+            </div>
+            <p class="microcopy">
+              That last line is the query vector every demo on this page uses for
+              <code>it</code> - notice how heavily it leans on the fourth channel, the one I
+              am calling <em>animate</em>. Its key and its value come from the very same
+              <code>x_it</code>, just through <code>W<sub>K</sub></code> and
+              <code>W<sub>V</sub></code> instead. To keep the arithmetic on this page
+              readable I set the remaining query, key, and value vectors by hand rather than
+              writing out three more matrices; a real head does nothing but this
+              multiplication, at every position, in every layer.
+            </p>
+          </div>
+
+          <div class="code-quiz" data-quiz-type="predict" data-explain="Query, key, and value are three different linear projections of the same incoming token vector. The model learns W_Q, W_K, and W_V during training, so the same word can produce a different key if those weights change.">
+            <p class="quiz-prompt">Quick check: a token's query and its key look nothing alike. How is that possible if both come from the same embedding?</p>
+            <div class="quiz-options" role="group" aria-label="Why query and key differ">
+              <button class="quiz-option" type="button" data-feedback="There is only one vector per token coming into the block. The three roles are produced from it, not stored alongside it.">The tokenizer stores a separate query and key for each token</button>
+              <button class="quiz-option" type="button" data-correct="true">They pass through different learned matrices, W<sub>Q</sub> and W<sub>K</sub></button>
+              <button class="quiz-option" type="button" data-feedback="Position information is added separately and affects all three roles. It is not what makes a query differ from a key.">The key includes the token's position and the query does not</button>
+            </div>
+            <p class="quiz-feedback" aria-live="polite" hidden></p>
+          </div>
+
+          <h3 class="subsection-title">Now the two steps</h3>
           <p>
             With those in hand, attention runs in exactly two steps.
             <strong>Step one, relevance scoring:</strong> take the current token's query
@@ -1371,92 +1511,10 @@ return {
       </div>
     </section>
 
-    <section id="kvcache" class="band band-muted" aria-labelledby="kvcache-title">
+    <section id="realmodel" class="band band-muted" aria-labelledby="realmodel-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">11. The KV cache</p>
-          <h2 id="kvcache-title">Save the past keys and values.</h2>
-          <p>
-            Now the name <strong>KV cache</strong> should feel less mysterious. During
-            generation, every past token has already produced a key vector and a value
-            vector for each attention layer. Those vectors do not change once the token is
-            fixed. So when the model appends one new token, it should not recompute keys
-            and values for the entire prefix.
-          </p>
-          <p>
-            The cache stores those past keys and values. On the next step, the model
-            computes the new token's query, key, and value, then compares the new query
-            with cached keys and blends cached values. Same attention math, far less
-            repeated work.
-          </p>
-          <p>
-            Slide the length below. Without the cache, generating \(n\) tokens pays
-            \(1 + 2 + \cdots + n\) token-stream computations. With the cache, each new
-            step pays for one new token, plus lookups into saved keys and values. The
-            difference is why modern inference systems treat the cache as a first-class
-            part of the model.
-          </p>
-          <div class="math-formal" aria-label="KV cache work in symbols">
-            <h3>The work shape, in symbols</h3>
-            <p>
-              This is a deliberately simple count: one unit means processing one token's
-              stream for one generation step. It is enough to see the shape of the win.
-            </p>
-            $$\text{without cache} = \sum_{t=1}^{n} t = \frac{n(n+1)}{2} \qquad \text{with cache} \approx n$$
-            <ul class="symbol-glossary">
-              <li>\(n\): how many new tokens we generate.</li>
-              <li>\(\frac{n(n+1)}{2}\): the triangle of repeated prefix work.</li>
-              <li>\(n\): the line you get when each step adds only the new token.</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="control-grid section-controls" aria-label="KV cache controls">
-          <label class="range-row" for="kvTokens">
-            <span>Tokens to generate</span>
-            <input id="kvTokens" type="range" min="4" max="64" step="1" value="24">
-            <output id="kvTokensLabel" for="kvTokens">24</output>
-          </label>
-          <label class="check-row">
-            <input id="kvCacheToggle" type="checkbox" checked>
-            <span>KV cache on (reuse past keys and values)</span>
-          </label>
-        </div>
-
-        <div class="panel">
-          <div class="section-title-row">
-            <h3>Total token-computations to finish</h3>
-            <span id="kvStatusPill" class="pill">cache on</span>
-          </div>
-          <p class="microcopy">One unit is "process one token's stream once." Without the cache, step <em>k</em> re-processes all <em>k</em> tokens; with it, step <em>k</em> processes just the one new token.</p>
-          <div id="kvCompare" class="kv-compare" aria-live="polite"></div>
-        </div>
-
-        <div class="panel">
-          <div class="section-title-row">
-            <h3>Step trace</h3>
-            <span class="pill">why the curve bends</span>
-          </div>
-          <p class="microcopy">This shows the first few generation steps. The uncached model keeps paying for the whole prefix; the cached model pays for only the new token.</p>
-          <div id="kvTrace" class="kv-trace" aria-live="polite"></div>
-        </div>
-
-        <div class="code-quiz" data-quiz-type="predict" data-explain="The KV cache stores the key and value vectors of past tokens so they are computed once and reused. Without it, every generation step re-processes the entire growing prefix, so total work grows quadratically with length.">
-          <p class="quiz-prompt">Quick check: what does the KV cache actually save you from doing?</p>
-          <div class="quiz-options" role="group" aria-label="What the KV cache saves">
-            <button class="quiz-option" type="button" data-feedback="It does not change the vocabulary or the LM head; it caches per-token attention vectors so the past is not recomputed.">Storing the whole vocabulary in memory</button>
-            <button class="quiz-option" type="button" data-correct="true">Recomputing the past tokens' keys and values on every new step</button>
-            <button class="quiz-option" type="button" data-feedback="The cache speeds up generation, but the model still produces one token per forward pass either way.">Running more than one forward pass per token</button>
-          </div>
-          <p class="quiz-feedback" aria-live="polite" hidden></p>
-        </div>
-      </div>
-    </section>
-
-    <section id="realmodel" class="band" aria-labelledby="realmodel-title">
-      <div class="section-shell">
-        <div class="section-heading">
-          <p class="eyebrow">12. A real Transformer</p>
+          <p class="eyebrow">11. A real Transformer</p>
           <h2 id="realmodel-title">Now run a real GPT-style model in your browser.</h2>
           <p>
             Everything so far was a hand-built miniature. Time for the real thing. The
@@ -1532,153 +1590,49 @@ return {
       </div>
     </section>
 
-    <section id="improvements" class="band" aria-labelledby="improvements-title">
+    <section id="whatsnext" class="band" aria-labelledby="whatsnext-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">13. Recent improvements</p>
-          <h2 id="improvements-title">The original idea still stands, but engineers keep making it faster.</h2>
+          <p class="eyebrow">12. What we left out</p>
+          <h2 id="whatsnext-title">Everything here is correct. Almost none of it is affordable.</h2>
           <p>
-            The Transformer you just built is, remarkably, still the core of a 2024-era
-            model like Llama 3. But a few well-earned tweaks make modern models faster and
-            cheaper. Most of the tweaks answer one of three practical questions: can we
-            make attention less expensive, can we make the block easier to train, and can
-            we serve the next token faster? Here is a field guide, aka the names you will
-            keep seeing in LLM architecture diagrams.
+            Take a moment, because you have just built the actual mechanism behind every
+            large language model in use today. The attention operation you worked out by
+            hand - query dot key, scale, softmax, blend the values - is unchanged in a 2026
+            trillion-parameter model. That is not a simplification I am making for teaching.
+            It is genuinely the same operation.
           </p>
           <p>
-            There is also a research question hiding inside the machinery: what do these
-            heads and streams actually learn? One famous interpretability finding is the
-            <strong>induction head</strong>, an attention circuit that notices a repeated
-            pattern like <code>A B ... A</code> and boosts <code>B</code> as the next token.
-            That is one possible mechanism behind in-context learning: the model learns
-            from the prompt during the forward pass, without changing its weights.
+            But I have been quietly hiding a bill from you. Our sentence had six tokens. A
+            real prompt might have a hundred thousand, and every token scores against every
+            token before it, so the number of scores grows with the <em>square</em> of the
+            length. Worse, the generation loop from the very first section re-runs the whole
+            prefix through every layer just to add one token to the end.
           </p>
-          <div class="idea-flow improve-flow" aria-label="Modern Transformer improvements">
-            <div>
-              <strong>Local / sparse attention</strong>
-              <span>Full attention is the costliest step, since every token looks at every other. Sparse and sliding-window attention let a token see only a nearby slice. GPT-3 interleaved full and sparse blocks to keep quality while cutting cost.</span>
-            </div>
-            <div>
-              <strong>Multi-query &amp; grouped-query attention</strong>
-              <span>Instead of every head owning a full set of keys and values, heads <em>share</em> them: all of them for multi-query, or in groups for grouped-query. Far less memory moves at inference. Llama 2 and 3 use grouped-query.</span>
-            </div>
-            <div>
-              <strong>Flash Attention</strong>
-              <span>Same math, smarter bookkeeping: it is careful about what gets moved between a GPU's fast and slow memory, giving big speedups for both training and inference without changing the result.</span>
-            </div>
-            <div>
-              <strong>Pre-norm, RMSNorm, SwiGLU</strong>
-              <span>Modern blocks normalize <em>before</em> each sub-layer instead of after, use the simpler, faster <strong>RMSNorm</strong>, and swap the old ReLU for a <strong>SwiGLU</strong> activation in the feed-forward network.</span>
-            </div>
-            <div>
-              <strong>Mixture of Experts (MoE)</strong>
-              <span>Replace one dense FFN with several expert FFNs plus a router. A token uses only a few experts, so total parameters can grow faster than active compute per token.</span>
-            </div>
-            <div>
-              <strong>Document packing</strong>
-              <span>Training contexts are long but many documents are short, so several are <em>packed</em> into one context with separators to avoid wasting the window on padding. It is a small efficiency trick with a real impact at scale.</span>
-            </div>
-            <div>
-              <strong>Speculative decoding</strong>
-              <span>A small draft model proposes a few next tokens. The large model verifies them in parallel, keeping the same target-model distribution while reducing latency when drafts are accepted.</span>
-            </div>
-            <div>
-              <strong>Induction heads</strong>
-              <span>Some attention heads learn a copy-after-a-repeat circuit, helping the model extend patterns it sees in the prompt. This is one concrete clue for how in-context learning can happen inside a forward pass.</span>
-            </div>
-          </div>
-          <div class="worked-example" aria-label="Dense model versus mixture-of-experts parameters">
-            <h3>Total parameters are not always active parameters</h3>
-            <p>
-              Dense model: every token runs through the same FFN weights in every layer.
-              MoE model: a router picks a few expert FFNs for each token. That is why a
-              model can advertise a large total parameter count while using a smaller
-              active parameter count per token.
-            </p>
-            <div class="formula-stack">
-              <code>dense: one FFN path per token, all dense FFN weights active</code>
-              <code>MoE: 8 expert FFNs, top-2 router -> 2 experts active for this token</code>
-              <code>model-card habit: ask for both total parameters and active parameters</code>
-            </div>
-          </div>
-          <figure class="diagram-figure">
-            <svg class="pipeline-svg gqa-svg" viewBox="0 0 460 210" role="img" aria-labelledby="gqa-title gqa-desc">
-              <title id="gqa-title">Multi-head vs grouped-query vs multi-query attention</title>
-              <desc id="gqa-desc">Multi-head attention gives every query head its own key and value; grouped-query shares one key and value per group of heads; multi-query shares a single key and value across all heads.</desc>
-              <text x="76" y="20" class="svg-word" text-anchor="middle">Multi-head</text>
-              <text x="230" y="20" class="svg-word" text-anchor="middle">Grouped-query</text>
-              <text x="384" y="20" class="svg-word" text-anchor="middle">Multi-query</text>
-              <g class="gqa-col">
-                <rect x="40" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="60" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="80" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="100" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="40" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
-                <rect x="60" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
-                <rect x="80" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
-                <rect x="100" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
-                <text x="78" y="104" class="svg-caption" text-anchor="middle">4 queries, 4 KV</text>
-              </g>
-              <g class="gqa-col">
-                <rect x="194" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="214" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="234" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="254" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="204" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
-                <rect x="244" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
-                <text x="232" y="104" class="svg-caption" text-anchor="middle">4 queries, 2 KV</text>
-              </g>
-              <g class="gqa-col">
-                <rect x="348" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="368" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="388" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="408" y="36" width="16" height="20" rx="3" class="gqa-q"></rect>
-                <rect x="376" y="64" width="16" height="20" rx="3" class="gqa-kv"></rect>
-                <text x="384" y="104" class="svg-caption" text-anchor="middle">4 queries, 1 KV</text>
-              </g>
-              <text x="230" y="138" class="svg-caption" text-anchor="middle">Teal = query heads. Gold = shared KV sets.</text>
-              <text x="230" y="156" class="svg-caption" text-anchor="middle">Fewer KV sets means less memory to move.</text>
-            </svg>
-            <figcaption>Sharing keys and values across heads (grouped-query, then multi-query) shrinks the memory traffic at inference, which is why large models adopt it.</figcaption>
-          </figure>
+          <p>
+            None of that changes what attention <em>is</em>. It changes what it costs. So
+            that is the entire subject of the next chapter: the KV cache, grouped-query and
+            latent attention, sliding windows, FlashAttention, mixture of experts, and the
+            linear-attention experiments that are still being argued about right now. Every
+            one of them is an answer to a cost you can now feel.
+          </p>
+          <p class="example-note">
+            <em>One honest note before you go.</em> The heads you designed here had tidy
+            jobs, because I chose their numbers. Real heads are messier and mostly
+            uninterpretable - though not always. Researchers have found
+            <strong>induction heads</strong>: attention circuits that spot a repeated pattern
+            like <code>A B ... A</code> and push <code>B</code> up as the next token. That is
+            one concrete clue for how a model can appear to learn from your prompt during a
+            single forward pass, without a single weight changing.
+          </p>
         </div>
-
-        <div class="code-quiz" data-quiz-type="predict" data-explain="Grouped-query and multi-query attention reduce how many separate key/value sets the model keeps, so there is less memory to move during generation. The attention math itself is unchanged.">
-          <p class="quiz-prompt">Quick check: what is the main thing grouped-query attention saves compared with classic multi-head attention?</p>
-          <div class="quiz-options" role="group" aria-label="What grouped-query attention saves">
-            <button class="quiz-option" type="button" data-feedback="It does not change what attention computes; queries still score against keys and blend values. It only shares the key/value sets.">It replaces the dot-product score with a cheaper one</button>
-            <button class="quiz-option" type="button" data-feedback="The number of query heads can stay the same; what shrinks is the number of key/value sets they share.">It removes the query heads entirely</button>
-            <button class="quiz-option" type="button" data-correct="true">Memory: heads share key/value sets instead of each owning one</button>
-          </div>
-          <p class="quiz-feedback" aria-live="polite" hidden></p>
-        </div>
-
-        <details class="exercise-card">
-          <summary>Exercise: pick the right upgrade</summary>
-          <p>
-            Match each bottleneck to a likely improvement: "GPU memory traffic dominates
-            attention," "the model needs cheaper inference-time key/value storage,"
-            "many training examples are shorter than the context window," and "very long
-            documents make full attention expensive," "you want more parameters without
-            running all of them for every token," and "the large model is waiting on one
-            autoregressive step at a time."
-          </p>
-          <p>
-            Answer: FlashAttention targets GPU memory traffic; grouped-query or
-            multi-query attention shrinks key/value storage; document packing reduces
-            wasted context during training; local or sparse attention trims the full
-            attention pattern for long sequences; MoE increases total parameters while
-            activating only a few experts; speculative decoding drafts ahead and lets the
-            large model verify.
-          </p>
-        </details>
       </div>
     </section>
 
     <section id="references" class="band band-muted" aria-labelledby="references-title">
       <div class="section-shell">
         <div class="section-heading">
-          <p class="eyebrow">14. Going deeper</p>
+          <p class="eyebrow">13. Going deeper</p>
           <h2 id="references-title">Further reading.</h2>
           <p>
             If you want to keep going, start with the SLP Transformer chapter for the
@@ -1782,7 +1736,12 @@ return {
 
     <section class="chapter-nav-band" aria-label="Chapter navigation">
       <div class="section-shell">
-        <nav class="chapter-nav chapter-nav-single">
+        <nav class="chapter-nav">
+          <a class="chapter-nav-card" href="chapter-6.html">
+            <span>Next</span>
+            <strong>Chapter 6: Making attention fast</strong>
+            <em>The KV cache, grouped-query attention, FlashAttention, and mixture of experts.</em>
+          </a>
           <a class="chapter-nav-card" href="index.html">
             <span>Course overview</span>
             <strong>Back to the overview</strong>

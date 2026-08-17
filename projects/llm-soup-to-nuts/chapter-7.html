@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Training and Alignment - LLM Soup to Nuts</title>
+  <link rel="stylesheet" href="styles.css?v=20260726">
+  <link rel="stylesheet" href="chapter7.css?v=20260816">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="LLM Soup to Nuts overview">
+      <span class="brand-mark" aria-hidden="true">L</span>
+      <span>
+        <strong>LLM Soup to Nuts</strong>
+        <small>Chapter 7</small>
+      </span>
+    </a>
+    <nav class="topnav course-nav" aria-label="Course chapters">
+      <a href="https://talktovishal.github.io/">Home</a>
+      <a href="index.html">Overview</a>
+      <a href="chapter-1.html">Ch 1</a>
+      <a href="chapter-2.html">Ch 2</a>
+      <a href="chapter-3.html">Ch 3</a>
+      <a href="chapter-4.html">Ch 4</a>
+      <a href="chapter-5.html">Ch 5</a>
+      <a href="chapter-6.html">Ch 6</a>
+    </nav>
+  </header>
+
+  <aside class="lesson-toc" aria-label="Table of contents">
+    <p>Chapter 7</p>
+    <nav>
+      <a href="#overview"><span>00</span>Overview</a>
+      <a href="#stages"><span>01</span>Training stages</a>
+      <a href="#pretraining"><span>02</span>Pretraining loss</a>
+      <a href="#data"><span>03</span>Training data</a>
+      <a href="#scaling"><span>04</span>Scaling and systems</a>
+      <a href="#evaluation"><span>05</span>Evaluation and safety</a>
+      <a href="#sft"><span>06</span>SFT and LoRA</a>
+      <a href="#alignment"><span>07</span>Preference alignment</a>
+      <a href="#testtime"><span>08</span>Test-time compute</a>
+      <a href="#references"><span>09</span>References</a>
+    </nav>
+  </aside>
+
+  <main id="top">
+    <section id="overview" class="workbench-band" aria-labelledby="page-title">
+      <div class="workbench">
+        <article class="intro-copy">
+          <div class="progress-banner" role="status">
+            <span class="progress-banner-badge">In Progress</span>
+            <p class="progress-banner-text">This chapter is still being written and reviewed, so parts may be rough or change. <a href="index.html#stay-notified">Get notified</a> when it is officially published.</p>
+          </div>
+          <p class="eyebrow">Learning by doing</p>
+          <h1 id="page-title">Training and alignment: how a base model becomes useful.</h1>
+          <p class="lead">
+            In Chapters 5 and 6 you ran a finished Transformer and saw how it is made fast
+            enough to serve. This chapter answers the question that naturally follows: where
+            did that model come from, and why is a raw pretrained model still not the same
+            thing as a helpful assistant?
+          </p>
+          <p>
+            The path has stages. First comes <strong>pretraining</strong>, where the model
+            predicts the next token across enormous text streams. Then comes
+            <strong>post-training</strong>: supervised instruction tuning, preference
+            alignment, and sometimes extra thinking at inference time. The same next-token
+            machine is underneath, but the training signal changes what behavior we ask it
+            to learn.
+          </p>
+          <p class="example-note source-note">
+            This rewrite is grounded in the open <em>Speech and Language Processing</em>
+            lectures on Large Language Models and Post-training. I am using those lectures
+            as the coverage map, while keeping the course pattern: intuition, a small
+            worked calculation, symbols, and a live panel.
+          </p>
+          <div class="idea-flow" aria-label="Chapter flow">
+            <div>
+              <strong>Pretrain</strong>
+              <span>Predict the next token with teacher forcing and cross-entropy.</span>
+            </div>
+            <div>
+              <strong>Choose data</strong>
+              <span>Filter, deduplicate, document, and notice what the corpus teaches.</span>
+            </div>
+            <div>
+              <strong>Scale</strong>
+              <span>Balance parameters, tokens, compute, and memory.</span>
+            </div>
+            <div>
+              <strong>Align</strong>
+              <span>Use instructions and preferences to make the model more helpful.</span>
+            </div>
+            <div>
+              <strong>Think at test time</strong>
+              <span>Spend extra inference work when a task needs step-by-step reasoning.</span>
+            </div>
+          </div>
+          <div class="example-note prereq-note">
+            <p><em>Before we dive in, a few needed prerequisites are in order.</em> This chapter stitches together the pieces you have already built. Use the links as quick refreshers if one of them feels rusty.</p>
+            <ul>
+              <li><strong><a href="chapter-1.html">Next-token prediction</a>.</strong> A language model assigns probabilities to possible next tokens.</li>
+              <li><strong><a href="chapter-3.html#why">Tokenization</a>.</strong> Text becomes token IDs before the model ever sees it.</li>
+              <li><strong><a href="chapter-4.html#softmax">Softmax, cross-entropy, and gradients</a>.</strong> Training lowers surprise by nudging weights.</li>
+              <li><strong><a href="chapter-5.html#forward">Transformer forward pass</a>.</strong> Tokens become vectors, blocks update them, and the LM head makes logits.</li>
+            </ul>
+            <p>What you do <strong>not</strong> need yet: production distributed-systems detail. We will count memory and compute enough to understand the pressure, then leave cluster engineering for deeper references.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="stages" class="band" aria-labelledby="stages-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">1. Training stages</p>
+          <h2 id="stages-title">A model is trained more than once.</h2>
+          <p>
+            A base model starts as random numbers. Pretraining teaches it broad language,
+            facts, styles, and patterns by asking one simple question again and again:
+            given the previous tokens, what comes next? That makes it a strong text
+            predictor, but not automatically a good assistant.
+          </p>
+          <p>
+            Post-training changes the behavior we care about. <strong>Instruction tuning</strong>
+            shows the model examples of requests and good responses. <strong>Preference
+            alignment</strong> shows it pairs of responses and asks it to prefer the one
+            humans judge as better. <strong>Test-time compute</strong> is different again:
+            it spends extra work during inference, often by encouraging intermediate
+            reasoning steps.
+          </p>
+        </div>
+
+        <div class="stage-map" aria-label="Model training stages">
+          <button class="stage-card is-active" type="button" data-stage="pretraining">
+            <span>1</span>
+            <strong>Pretraining</strong>
+            <em>next-token loss on huge text</em>
+          </button>
+          <button class="stage-card" type="button" data-stage="sft">
+            <span>2</span>
+            <strong>Instruction tuning</strong>
+            <em>supervised request and response data</em>
+          </button>
+          <button class="stage-card" type="button" data-stage="preference">
+            <span>3</span>
+            <strong>Preference alignment</strong>
+            <em>chosen vs rejected responses</em>
+          </button>
+          <button class="stage-card" type="button" data-stage="testtime">
+            <span>4</span>
+            <strong>Test-time compute</strong>
+            <em>extra inference work</em>
+          </button>
+        </div>
+        <div id="stageReadout" class="panel stage-readout" aria-live="polite"></div>
+
+        <div class="model-card-reader" aria-label="How to read model-card details">
+          <div class="section-title-row">
+            <h3>How to read a model card without mixing things up</h3>
+            <span class="pill">architecture vs weights</span>
+          </div>
+          <p class="microcopy">
+            Model cards often put several kinds of facts next to each other. Keep them
+            separate and the rest of this chapter becomes easier to place.
+          </p>
+          <div class="model-card-grid">
+            <div>
+              <strong>Architecture</strong>
+              <span>The recipe: decoder-only Transformer, attention, FFN, norms, RoPE, dense or MoE.</span>
+            </div>
+            <div>
+              <strong>Configuration</strong>
+              <span>The shape: layers, width, heads, vocabulary size, context length, dense vs active parameters.</span>
+            </div>
+            <div>
+              <strong>Weights</strong>
+              <span>The learned numbers after training. Same architecture, different weights, different model.</span>
+            </div>
+            <div>
+              <strong>Training stage</strong>
+              <span>Base, instruction-tuned, preference-aligned, or a system spending extra test-time compute.</span>
+            </div>
+          </div>
+          <p class="insight-note">
+            A 70B base model and a 70B chat model may share the same broad architecture.
+            The behavior difference usually comes from weights and post-training, not a
+            brand-new forward pass.
+          </p>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="A base model is pretrained to predict text. An aligned assistant has usually gone through post-training, such as instruction tuning and preference alignment, to better match human requests and preferences.">
+          <p class="quiz-prompt">Quick check: which model has learned broad next-token prediction but has not yet been instruction-tuned or preference-aligned?</p>
+          <div class="quiz-options" role="group" aria-label="Base model meaning">
+            <button class="quiz-option" type="button" data-feedback="Instruction-tuned models have already learned from request/response examples.">An instruction-tuned assistant</button>
+            <button class="quiz-option" type="button" data-correct="true">A base model</button>
+            <button class="quiz-option" type="button" data-feedback="Preference-aligned models come after another stage of training on preferences.">A preference-aligned model</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="pretraining" class="band band-muted" aria-labelledby="pretraining-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">2. Pretraining loss</p>
+          <h2 id="pretraining-title">The text itself supplies the labels.</h2>
+          <p>
+            Pretraining is <strong>self-supervised</strong>. We do not need humans to label
+            every token because the next token is already sitting in the text. At position
+            \(t\), the model reads the true prefix \(w_1,\ldots,w_t\), predicts a
+            distribution over the vocabulary, and pays loss on the real next token
+            \(w_{t+1}\).
+          </p>
+          <p>
+            During training we use <strong>teacher forcing</strong>: even if the model
+            would have guessed the wrong token at one position, the next training position
+            still receives the true history from the corpus. That keeps the learning signal
+            clean and parallelizable across the whole sequence.
+          </p>
+          <div class="worked-example" aria-label="Pretraining loss by hand">
+            <h3>One tiny batch by hand</h3>
+            <p>
+              Suppose the corpus slice is <code>So long and thanks for all</code>. The
+              model predicts after each prefix. If it assigns these probabilities to the
+              correct next tokens, the batch loss is the average negative log probability:
+            </p>
+            <div class="formula-stack">
+              <code>P(long | So) = 0.50, loss = -ln(0.50) = 0.69</code>
+              <code>P(and | So long) = 0.40, loss = -ln(0.40) = 0.92</code>
+              <code>P(thanks | So long and) = 0.25, loss = -ln(0.25) = 1.39</code>
+              <code>average loss = (0.69 + 0.92 + 1.39) / 3 = 1.00 nats</code>
+              <code>perplexity = exp(1.00) = 2.7 effective next-token choices</code>
+            </div>
+          </div>
+          <div class="math-formal" aria-label="Pretraining loss in symbols">
+            <h3>The same training step, in symbols</h3>
+            <p>
+              Cross-entropy over a one-hot target collapses to the negative log probability
+              of the true next token. Average that over a sequence or batch:
+            </p>
+            $$L_t = -\sum_{w \in V} y_t[w]\log \hat{y}_t[w] = -\log \hat{y}_t[w_{t+1}]$$
+            $$L_{\text{batch}} = \frac{1}{T}\sum_{t=1}^{T} -\log \hat{y}_t[w_{t+1}] \qquad \text{perplexity}=e^{L_{\text{batch}}}$$
+            <ul class="symbol-glossary">
+              <li>\(V\): the vocabulary of tokens.</li>
+              <li>\(y_t\): the one-hot target, 1 for the true next token and 0 elsewhere.</li>
+              <li>\(\hat{y}_t\): the model's predicted distribution from the LM head.</li>
+              <li>\(T\): the number of predicted positions in the batch.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Teacher forcing controls">
+          <label class="range-row" for="teacherStepSlider">
+            <span>Training position</span>
+            <input id="teacherStepSlider" type="range" min="0" max="4" step="1" value="2">
+            <output id="teacherStepLabel" for="teacherStepSlider">position 3</output>
+          </label>
+        </div>
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Teacher forcing trace</h3>
+            <span class="pill">true history, true target</span>
+          </div>
+          <div id="teacherTrace" class="teacher-trace" aria-live="polite"></div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="No humans are needed to label pretraining data. At each position the correct next token is already in the text, so the data supplies its own labels. That is what self-supervised means.">
+          <p class="quiz-prompt">Quick check: pretraining is called <em>self-supervised</em>. Where do the training labels come from?</p>
+          <div class="quiz-options" role="group" aria-label="Where pretraining labels come from">
+            <button class="quiz-option" type="button" data-correct="true">From the text itself: the next token is the label at every position</button>
+            <button class="quiz-option" type="button" data-feedback="No human labeling is needed; that is exactly what self-supervised avoids.">From human annotators who label each token</button>
+            <button class="quiz-option" type="button" data-feedback="Pretraining uses raw text, not a purchased per-task labeled set.">From a separate labeled dataset bought for the task</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="data" class="band" aria-labelledby="data-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">3. Training data</p>
+          <h2 id="data-title">The corpus is a curriculum, whether we admit it or not.</h2>
+          <p>
+            Let me start with the part that took me a while to really accept: a model never
+            meets the world. It only ever meets the text we hand it. So the corpus is not
+            just fuel - it is the entire curriculum, and whatever shows up often in that text
+            quietly becomes the model's idea of what is normal. Keep that in mind as we look
+            at where the text actually comes from.
+          </p>
+          <p>
+            Large language models are trained on web crawls plus curated sources such as
+            books, Wikipedia, academic papers, code, and dialogue. The source lecture names
+            open corpora like Common Crawl derivatives, C4, The Pile, and Dolma to make
+            the scale concrete. The exact mixture matters because the model learns from
+            frequency, not from what we wish were important.
+          </p>
+          <p>
+            A data pipeline filters for language and quality, removes boilerplate and
+            duplicates, tries to reduce personal information and unsafe content, checks for
+            benchmark contamination, and then tokenizes the cleaned text. Every stage is a
+            choice. A strict toxicity filter may reduce some harmful generations while
+            also removing dialectal text unfairly. Deduplication can stop one copied page
+            from overpowering thousands of unique pages. Copyright, data consent, privacy,
+            and geographic skew are not side notes; they shape what the base model knows.
+          </p>
+          <figure class="diagram-figure">
+            <svg class="pipeline-svg data-pipeline-svg" viewBox="0 0 760 210" role="img" aria-labelledby="data-svg-title data-svg-desc">
+              <title id="data-svg-title">Pretraining data funnel</title>
+              <desc id="data-svg-desc">Raw crawls and curated sources flow through quality filtering, deduplication, safety and privacy checks, contamination checks, mixture weighting, and tokenization.</desc>
+              <rect x="20" y="50" width="110" height="58" rx="8" class="svg-box-soft"></rect>
+              <text x="75" y="72" class="svg-word" text-anchor="middle">raw crawl</text>
+              <text x="75" y="91" class="svg-caption" text-anchor="middle">plus curated data</text>
+              <line x1="130" y1="79" x2="165" y2="79" class="svg-arrow" marker-end="url(#data-arrow)"></line>
+              <rect x="165" y="50" width="104" height="58" rx="8" class="svg-box-plain"></rect>
+              <text x="217" y="72" class="svg-word" text-anchor="middle">quality</text>
+              <text x="217" y="91" class="svg-caption" text-anchor="middle">language, boilerplate</text>
+              <line x1="269" y1="79" x2="304" y2="79" class="svg-arrow" marker-end="url(#data-arrow)"></line>
+              <rect x="304" y="50" width="104" height="58" rx="8" class="svg-box-plain"></rect>
+              <text x="356" y="72" class="svg-word" text-anchor="middle">dedup</text>
+              <text x="356" y="91" class="svg-caption" text-anchor="middle">less repetition</text>
+              <line x1="408" y1="79" x2="443" y2="79" class="svg-arrow" marker-end="url(#data-arrow)"></line>
+              <rect x="443" y="50" width="104" height="58" rx="8" class="svg-box-plain"></rect>
+              <text x="495" y="72" class="svg-word" text-anchor="middle">safety</text>
+              <text x="495" y="91" class="svg-caption" text-anchor="middle">PII, toxicity</text>
+              <line x1="547" y1="79" x2="582" y2="79" class="svg-arrow" marker-end="url(#data-arrow)"></line>
+              <rect x="582" y="50" width="154" height="58" rx="8" class="svg-box-accent"></rect>
+              <text x="659" y="72" class="svg-model-text" text-anchor="middle">token stream</text>
+              <text x="659" y="91" class="svg-caption-light" text-anchor="middle">weighted mixture for training</text>
+              <text x="380" y="158" class="svg-caption" text-anchor="middle">Benchmark contamination checks sit before evaluation, because a memorized test is not a real test.</text>
+              <defs>
+                <marker id="data-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" class="svg-arrowhead"></path>
+                </marker>
+              </defs>
+            </svg>
+            <figcaption>The data funnel is not just cleanup. It decides which evidence the model sees often, rarely, or never.</figcaption>
+          </figure>
+          <div class="worked-example" aria-label="Deduplication and mixture by hand">
+            <h3>Deduplication by hand</h3>
+            <p>
+              If one page appears 100 times beside 900 single-copy pages, it is 10% of the
+              examples before deduplication. After exact deduplication, it is one page out
+              of 901:
+            </p>
+            <div class="formula-stack">
+              <code>before dedup: 100 / (100 + 900) = 10%</code>
+              <code>after dedup: 1 / (1 + 900) = 0.11%</code>
+              <code>mixture example: 100B tokens * 20% code = 20B code tokens</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="scaling" class="band band-muted" aria-labelledby="scaling-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">4. Scaling and systems</p>
+          <h2 id="scaling-title">Spend a fixed compute budget without starving the model.</h2>
+          <p>
+            Imagine someone hands you a fixed pile of compute and says, "build the best
+            model you can with this." Your first instinct is probably "make it as big as
+            possible." Hold that thought - it is exactly the trap this section is about.
+          </p>
+          <p>
+            Scaling laws say that loss falls predictably as we add parameters, data, and
+            compute. The trap is that training compute is roughly \(C \approx 6ND\), where
+            \(N\) is parameter count and \(D\) is training tokens. With a fixed budget, a
+            bigger model must see fewer tokens. If it sees too little data, it is
+            undertrained.
+          </p>
+          <p>
+            For a dense decoder Transformer, a rough parameter estimate is
+            \(N \approx 12\,n_{\text{layer}}d^2\). A GPT-3-scale shape with 96 layers and
+            width 12,288 lands around 175B parameters. During training, examples are often
+            packed into full context windows with end-of-text separators, and batches are
+            counted in tokens, not just documents.
+          </p>
+          <p>
+            That estimate is for a <strong>dense</strong> model, where every token uses the
+            same feed-forward weights. Mixture-of-Experts models complicate model-card
+            reading: they may report a large total parameter count, but a router activates
+            only a few expert FFNs for each token. When you compare compute or inference
+            cost, look for <strong>active parameters</strong>, not only total parameters.
+          </p>
+          <div class="worked-example" aria-label="Scaling law compute by hand">
+            <h3>Compute by hand</h3>
+            <p>
+              If you train a 1B-parameter model on 20B tokens, the run costs about
+              \(1.2 \times 10^{20}\) FLOPs by the rough dense-Transformer rule:
+            </p>
+            <div class="formula-stack">
+              <code>C = 6 * 1B parameters * 20B tokens = 1.2e20 FLOPs</code>
+              <code>same C with 10B parameters gives D = C / (6N) = 2B tokens</code>
+              <code>tokens per parameter: 2B / 10B = 0.2, far below a Chinchilla-style balance</code>
+            </div>
+            <p class="microcopy">
+              <strong>Chinchilla's rule of thumb:</strong> for a dense model, compute-optimal
+              training spends roughly <strong>20 tokens per parameter</strong> - so that 10B model
+              really wants about 200B tokens, not 2B. Several early giant models were badly
+              <em>undertrained</em>: too many parameters fed too little text, which is exactly the
+              imbalance the slider lets you feel below.
+            </p>
+          </div>
+          <div class="math-formal" aria-label="Scaling equations">
+            <h3>The scaling pressure, in symbols</h3>
+            <p>
+              The constants vary across architectures and datasets, but the lesson is
+              stable: loss has separate terms for model size and data size, while compute
+              ties them together.
+            </p>
+            $$L(N,D) \approx E + \frac{A}{N^\alpha} + \frac{B}{D^\beta} \qquad C \approx 6ND$$
+            $$N \approx 12\,n_{\text{layer}}d^2$$
+            <ul class="symbol-glossary">
+              <li>\(N\): non-embedding parameter count.</li>
+              <li>\(D\): training tokens.</li>
+              <li>\(C\): training compute in FLOPs.</li>
+              <li>\(d\): model width, the size of each residual stream.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Scaling controls">
+          <label class="range-row" for="computeSlider">
+            <span>Compute budget</span>
+            <input id="computeSlider" type="range" min="18" max="24" step="1" value="21">
+            <output id="computeLabel" for="computeSlider">budget</output>
+          </label>
+          <label class="range-row" for="sizeSlider">
+            <span>Model size along the budget</span>
+            <input id="sizeSlider" type="range" min="0" max="100" step="1" value="50">
+            <output id="sizeLabel" for="sizeSlider">size</output>
+          </label>
+        </div>
+
+        <div class="two-column">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Predicted loss at this budget</h3>
+              <span class="pill">lower is better</span>
+            </div>
+            <div id="scalingChart" class="scaling-chart" aria-live="polite"></div>
+            <div class="scaling-legend" aria-hidden="true">
+              <span class="legend-item"><span class="legend-swatch swatch-curve"></span>predicted loss</span>
+              <span class="legend-item"><span class="legend-swatch swatch-optimal"></span>compute-optimal size</span>
+              <span class="legend-item"><span class="legend-dot dot-choice"></span>your choice</span>
+            </div>
+            <p class="microcopy">Every point on the teal curve is a different way to split the same compute budget between model size (x-axis, in parameters) and training tokens. The curve dips to its lowest loss (y-axis) at the compute-optimal size, marked by the gold line; your coral dot is wherever the sliders put you.</p>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Your run</h3>
+              <span class="pill">N, D, and loss</span>
+            </div>
+            <div id="scalingReadout" class="detail-list" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="section-heading systems-heading">
+          <h3>Why one GPU is never enough</h3>
+          <p>
+            Training memory is dominated not only by weights, but also gradients,
+            optimizer state, master weights, activations, and communication buffers.
+            Data parallelism splits batches. Tensor and pipeline parallelism split model
+            computation. ZeRO and FSDP shard weights, gradients, and optimizer state so
+            one device does not carry the whole model.
+          </p>
+          <div class="worked-example" aria-label="Training memory by hand">
+            <h3>Training memory by hand</h3>
+            <div class="formula-stack">
+              <code>bytes per parameter = 2 weight + 2 gradient + 8 Adam state + 4 master weight = 16</code>
+              <code>7B parameters * 16 bytes = 112GB before activations</code>
+              <code>70B parameters * 16 bytes = 1,120GB = 1.12TB before activations</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Memory controls">
+          <label class="range-row" for="memSlider">
+            <span>Model size</span>
+            <input id="memSlider" type="range" min="60" max="120" step="1" value="90">
+            <output id="memLabel" for="memSlider">params</output>
+          </label>
+          <label class="range-row" for="shardSlider">
+            <span>Shard across</span>
+            <input id="shardSlider" type="range" min="1" max="64" step="1" value="1">
+            <output id="shardLabel" for="shardSlider">1 GPU</output>
+          </label>
+        </div>
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Training memory budget</h3>
+            <span class="pill">~16 bytes per parameter</span>
+          </div>
+          <div id="memPanel" class="detail-list" aria-live="polite"></div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Chinchilla showed that for a fixed compute budget, model size and the number of training tokens should grow together. Earlier giant models were undertrained: too many parameters for too few tokens.">
+          <p class="quiz-prompt">Quick check: you have a fixed compute budget. Scaling-law work (Chinchilla) found the best results come from&hellip;</p>
+          <div class="quiz-options" role="group" aria-label="Compute-optimal scaling">
+            <button class="quiz-option" type="button" data-feedback="A huge model on too little data is undertrained - the classic pre-Chinchilla mistake.">Making the model as large as possible, even on a small dataset</button>
+            <button class="quiz-option" type="button" data-correct="true">Scaling model size and training tokens together, in balance</button>
+            <button class="quiz-option" type="button" data-feedback="Re-reading a tiny dataset many times wastes compute and overfits; fresh tokens matter.">Keeping the model tiny and training many epochs on the same data</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="evaluation" class="band" aria-labelledby="evaluation-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">5. Evaluation and safety</p>
+          <h2 id="evaluation-title">Low loss is useful, but it is not the whole report card.</h2>
+          <p>
+            Perplexity measures how surprised the model is by held-out text. Lower is
+            better, and it connects directly to the pretraining loss. But perplexity is
+            sensitive to tokenization, so it is most meaningful when comparing models with
+            the same tokenizer.
+          </p>
+          <p>
+            We also evaluate downstream tasks such as MMLU-style multiple-choice
+            questions, reasoning tasks, translation, summarization, latency, energy,
+            fairness, and robustness. Public benchmarks bring a hard warning:
+            <strong>data contamination</strong>. If test questions leaked into training,
+            the score can overstate real ability.
+          </p>
+          <p>
+            Long-context evaluation needs its own care. A huge context window does not
+            prove the model uses every position equally well. Tests like key-value
+            retrieval and multi-document question answering can reveal a
+            <strong>lost-in-the-middle</strong> pattern, where evidence near the middle of
+            the prompt is harder for the model to use than evidence near the start or end.
+          </p>
+          <p>
+            Safety is not separate from evaluation. A model can hallucinate, agree with a
+            false premise, expose memorized private data, produce toxic or stereotyped
+            text, or give dangerous advice. These are not just bad vibes; they are failure
+            modes of the training objective and data. Post-training tries to reduce them,
+            but evaluation has to keep checking.
+          </p>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Evaluation controls">
+          <label class="range-row" for="evalLossSlider">
+            <span>Average loss (nats)</span>
+            <input id="evalLossSlider" type="range" min="0.5" max="3.0" step="0.1" value="1.2">
+            <output id="evalLossLabel" for="evalLossSlider">1.2</output>
+          </label>
+        </div>
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Perplexity readout</h3>
+            <span class="pill">exp(loss)</span>
+          </div>
+          <div id="evalPanel" class="metric-card-grid" aria-live="polite"></div>
+          <p id="evalNarrative" class="insight-note"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="sft" class="band band-muted" aria-labelledby="sft-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">6. SFT and LoRA</p>
+          <h2 id="sft-title">Instruction tuning teaches the model what a request means.</h2>
+          <p>
+            A pretrained model knows how text tends to continue. That is not the same as
+            knowing that <code>Translate to French: The small dog</code> is a request to
+            translate, not a prefix to continue in English. <strong>Instruction tuning</strong>,
+            also called <strong>SFT</strong>, continues training on instruction-response
+            examples using the same next-token cross-entropy loss.
+          </p>
+          <p>
+            Instruction data can be written by people, converted from existing supervised
+            datasets with templates, created from detailed task guidelines, or generated
+            synthetically and reviewed. The goal is not one task; it is learning the habit
+            of following instructions across tasks and formats.
+          </p>
+          <p>
+            Full fine-tuning updates all parameters. <strong>LoRA</strong> is a
+            parameter-efficient alternative: freeze a large matrix \(W\), train two small
+            matrices \(A\) and \(B\), and add their low-rank product into the forward pass.
+          </p>
+          <div class="worked-example" aria-label="LoRA savings by hand">
+            <h3>LoRA by the numbers</h3>
+            <p>
+              Take one weight matrix inside a Transformer - say a 768 by 768 projection.
+              Fine-tuning it the full way means moving every single entry:
+            </p>
+            <div class="formula-stack">
+              <code>full matrix: 768 * 768 = 589,824 trainable parameters</code>
+              <code>LoRA rank r = 8: A is 768 x 8, B is 8 x 768</code>
+              <code>LoRA params: 768*8 + 8*768 = 6,144 + 6,144 = 12,288</code>
+              <code>ratio: 12,288 / 589,824 ~= 2.1%  (about 48x fewer to train)</code>
+            </div>
+            <p class="microcopy">
+              The frozen matrix still does the heavy lifting; LoRA only learns a small
+              low-rank nudge on top of it. That is why you can fine-tune a large model on one
+              GPU and ship the change as a few megabytes instead of a whole new copy of the
+              weights.
+            </p>
+          </div>
+          <div class="math-formal" aria-label="SFT and LoRA equations">
+            <h3>Same loss, smaller update</h3>
+            <p>
+              SFT uses the same language-modeling loss as pretraining, but the text is
+              curated request-and-response data. LoRA changes how many parameters move:
+            </p>
+            $$L_{\text{SFT}} = \frac{1}{T}\sum_{t=1}^{T} -\log \hat{y}_t[w_{t+1}]$$
+            $$h = xW + xAB \qquad r \ll \min(d,k)$$
+            <ul class="symbol-glossary">
+              <li>\(W\): a frozen pretrained weight matrix.</li>
+              <li>\(A,B\): small trainable matrices whose product has the same shape as \(W\).</li>
+              <li>\(r\): the low rank, much smaller than the original dimensions.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Instruction tuning is supervised because each instruction has a desired response, but the training mechanics are still next-token cross-entropy over that response text.">
+          <p class="quiz-prompt">Quick check: why is instruction tuning called supervised fine-tuning?</p>
+          <div class="quiz-options" role="group" aria-label="Why SFT is supervised">
+            <button class="quiz-option" type="button" data-feedback="It still trains by predicting tokens; it does not need a separate classifier label for each token.">It replaces the LM head with a classifier for every task</button>
+            <button class="quiz-option" type="button" data-feedback="LoRA is one efficient way to fine-tune, but SFT can update all parameters too.">It always uses LoRA and never changes the model weights</button>
+            <button class="quiz-option" type="button" data-correct="true">The data contains instructions paired with desired responses</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="alignment" class="band" aria-labelledby="alignment-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">7. Preference alignment</p>
+          <h2 id="alignment-title">Preferences turn "better response" into a training signal.</h2>
+          <p>
+            After SFT, a model can still be unhelpful, overconfident, unsafe, or correct
+            but awkward. Preference alignment starts from examples like: for this prompt,
+            response A was preferred over response B. The annotator does not have to write
+            the perfect answer; they only need to choose or rank outputs.
+          </p>
+          <p>
+            The Bradley-Terry model gives the bridge from preferences to probabilities.
+            If the reward score for the chosen response is much higher than the rejected
+            response, the model should assign a high probability to the preference. If the
+            scores are close, the preference is uncertain.
+          </p>
+          <div class="worked-example" aria-label="Preference by hand">
+            <h3>Preference by hand</h3>
+            <p>
+              Say a reward model scores the chosen answer <code>8.0</code> and the rejected
+              one <code>5.0</code>. The only thing that matters is the <strong>gap</strong> -
+              here <code>8.0 - 5.0 = 3.0</code>. Squeeze that gap through the sigmoid and you
+              get the probability that a person prefers the chosen answer:
+            </p>
+            <div class="formula-stack">
+              <code>gap = r(chosen) - r(rejected) = 8.0 - 5.0 = 3.0</code>
+              <code>P(prefer chosen) = sigmoid(3.0) = 1 / (1 + e^-3.0) ~= 0.95</code>
+            </div>
+            <p class="microcopy">
+              That is the whole reason a sigmoid shows up: a big positive gap means "almost
+              certainly the better answer" (near 1), a gap of zero means "a coin flip" (0.5),
+              and a negative gap means the scores are backwards (below 0.5). Training just
+              pushes the gap on real preference pairs to be positive. Drag the
+              <em>reward gap</em> slider below and watch this same curve move.
+            </p>
+          </div>
+          <div class="math-formal" aria-label="Preference alignment equations">
+            <h3>Preference math, in symbols</h3>
+            <p>
+              Let \(o_w\) be the winning response and \(o_l\) the losing response for a
+              prompt \(x\). A reward model learns a score \(r(x,o)\), then alignment
+              methods nudge the policy toward preferred outputs without drifting too far
+              from a reference model.
+            </p>
+            $$P(o_w \succ o_l \mid x) = \sigma(r(x,o_w) - r(x,o_l))$$
+            $$L_{\text{reward}} = -\log \sigma(r(x,o_w) - r(x,o_l))$$
+            $$\pi^* = \arg\max_{\pi} \mathbb{E}_{x,o \sim \pi}[r(x,o) - \beta \log \frac{\pi(o|x)}{\pi_{\text{ref}}(o|x)}]$$
+            $$L_{\text{DPO}} = -\log \sigma\!\left(\beta\log\frac{\pi_\theta(o_w|x)}{\pi_{\text{ref}}(o_w|x)} - \beta\log\frac{\pi_\theta(o_l|x)}{\pi_{\text{ref}}(o_l|x)}\right)$$
+            <ul class="symbol-glossary">
+              <li>\(\sigma\): logistic sigmoid, turning a score difference into a probability.</li>
+              <li>\(\pi_\theta\): the model being trained.</li>
+              <li>\(\pi_{\text{ref}}\): the reference model we do not want to drift too far from.</li>
+              <li>\(\beta\): the strength of the stay-close penalty.</li>
+            </ul>
+            <p class="microcopy">
+              Read these four lines as one story. The first scores a preference (the sigmoid
+              of the reward gap you just computed by hand). The second <em>trains</em> a reward
+              model to predict those preferences. The third is the RLHF goal: tune the policy to
+              chase high reward while the \(\beta\) term penalises drifting away from the
+              reference model. The last, <strong>DPO</strong>, is the clever shortcut - it reaches
+              the same goal directly from the preference pairs, with no separate reward model to
+              train at all.
+            </p>
+          </div>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Preference controls">
+          <label class="range-row" for="rewardDiffSlider">
+            <span>Reward gap: chosen minus rejected</span>
+            <input id="rewardDiffSlider" type="range" min="-4" max="4" step="0.1" value="1.5">
+            <output id="rewardDiffLabel" for="rewardDiffSlider">1.5</output>
+          </label>
+          <label class="range-row" for="dpoBetaSlider">
+            <span>DPO beta</span>
+            <input id="dpoBetaSlider" type="range" min="0.01" max="0.5" step="0.01" value="0.10">
+            <output id="dpoBetaLabel" for="dpoBetaSlider">0.10</output>
+          </label>
+        </div>
+        <div class="two-column">
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>Bradley-Terry preference</h3>
+              <span class="pill">sigmoid gap</span>
+            </div>
+            <div id="preferencePanel" class="preference-panel" aria-live="polite"></div>
+          </div>
+          <div class="panel">
+            <div class="section-title-row">
+              <h3>DPO pressure</h3>
+              <span class="pill">prefer, but stay close</span>
+            </div>
+            <div id="dpoPanel" class="detail-list" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="A reward model is trained on human preference comparisons to score responses. That learned score becomes the training signal that nudges the policy model toward answers people prefer.">
+          <p class="quiz-prompt">Quick check: in preference alignment (RLHF), what is the job of the <strong>reward model</strong>?</p>
+          <div class="quiz-options" role="group" aria-label="What the reward model does">
+            <button class="quiz-option" type="button" data-feedback="The policy model writes the answers; the reward model only judges them.">To generate the assistant's final answers directly</button>
+            <button class="quiz-option" type="button" data-feedback="Tokenization happens up front and is unrelated to the reward model's scoring job.">To tokenize the prompt before training</button>
+            <button class="quiz-option" type="button" data-correct="true">To score candidate responses so the policy can be tuned toward the preferred ones</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="testtime" class="band band-muted" aria-labelledby="testtime-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">8. Test-time compute</p>
+          <h2 id="testtime-title">Some work happens after training is over.</h2>
+          <p>
+            Pretraining, SFT, and preference alignment all change parameters. Test-time
+            compute does not. It spends extra inference work when answering a prompt. The
+            classic example is <strong>chain-of-thought prompting</strong>: demonstrations
+            include reasoning steps, so the model is more likely to produce intermediate
+            steps before the final answer.
+          </p>
+          <p>
+            The tradeoff is simple. More generated reasoning tokens can improve difficult
+            reasoning tasks, but they cost time and tokens. The point is not that every
+            response should be long. It is that inference-time work is another lever, after
+            the weights are already trained.
+          </p>
+          <p>
+            Here is the intuition in one image. Ask a model "what is 17 x 24?" and force it
+            to answer in a single token, and it has to guess the whole product at once. Give
+            it room to write "17 x 24 = 17 x 20 + 17 x 4 = 340 + 68 = 408" and each line
+            becomes an easy next-token prediction that leans on the line above. Same weights,
+            same model - the extra tokens are just scratch paper.
+          </p>
+          <div class="worked-example" aria-label="Test-time budget by hand">
+            <h3>Scratch paper by hand</h3>
+            <p>
+              Suppose an answer-only reply costs about 18 tokens, and each reasoning step
+              adds roughly 14 more. Three steps of "show your work" therefore cost:
+            </p>
+            <div class="formula-stack">
+              <code>answer only: 18 tokens</code>
+              <code>3 reasoning steps: 3 * 14 = 42 tokens</code>
+              <code>total: 18 + 42 = 60 tokens (about 3.3x the work)</code>
+            </div>
+            <p class="microcopy">
+              You pay for every one of those tokens in latency and money, so the lever is not
+              "always reason longer" - it is "spend more thinking only when the task is hard
+              enough to earn it." Slide the steps below and watch the budget grow.
+            </p>
+          </div>
+        </div>
+
+        <div class="control-grid section-controls" aria-label="Test-time compute controls">
+          <label class="range-row" for="reasoningStepsSlider">
+            <span>Reasoning steps to generate</span>
+            <input id="reasoningStepsSlider" type="range" min="0" max="6" step="1" value="3">
+            <output id="reasoningStepsLabel" for="reasoningStepsSlider">3</output>
+          </label>
+        </div>
+        <div class="panel">
+          <div class="section-title-row">
+            <h3>Answer-only vs step-by-step</h3>
+            <span class="pill">extra inference tokens</span>
+          </div>
+          <div id="testTimePanel" class="testtime-panel" aria-live="polite"></div>
+        </div>
+
+        <div class="code-quiz" data-quiz-type="predict" data-explain="Test-time compute spends extra work during inference and changes no weights. Chain-of-thought is the classic example: the model writes intermediate steps before committing to a final answer.">
+          <p class="quiz-prompt">Quick check: what makes chain-of-thought a <em>test-time</em> technique rather than a training one?</p>
+          <div class="quiz-options" role="group" aria-label="Why chain-of-thought is test-time">
+            <button class="quiz-option" type="button" data-feedback="That describes SFT or preference tuning, which both change parameters. Chain-of-thought leaves the weights untouched.">It updates the model's weights on reasoning examples</button>
+            <button class="quiz-option" type="button" data-correct="true">It changes nothing in the weights; it just spends extra tokens while answering</button>
+            <button class="quiz-option" type="button" data-feedback="Tokenization is fixed before training and has nothing to do with spending inference compute.">It retrains the tokenizer to add reasoning tokens</button>
+          </div>
+          <p class="quiz-feedback" aria-live="polite" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="references" class="band" aria-labelledby="references-title">
+      <div class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">9. Going deeper</p>
+          <h2 id="references-title">Further reading.</h2>
+          <p>
+            Start with the SLP lectures. They are the backbone for this chapter's
+            pretraining, evaluation, and post-training coverage.
+          </p>
+        </div>
+        <ol class="reference-list">
+          <li>
+            <a href="https://web.stanford.edu/~jurafsky/slp3/" target="_blank" rel="noreferrer">Jurafsky &amp; Martin, Speech and Language Processing, Chapter 7: Large Language Models</a>
+            <span>Conditional generation, sampling, pretraining, corpora, evaluation, and safety.</span>
+          </li>
+          <li>
+            <a href="https://web.stanford.edu/~jurafsky/slp3/" target="_blank" rel="noreferrer">Jurafsky &amp; Martin, Speech and Language Processing, Chapter 9: Post-training</a>
+            <span>Instruction tuning, preference data, reward models, DPO, and test-time compute.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noreferrer">Hoffmann et al., Training Compute-Optimal Large Language Models</a>
+            <span>The Chinchilla result on balancing model size and training tokens.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noreferrer">Kaplan et al., Scaling Laws for Neural Language Models</a>
+            <span>Power-law relationships between loss, model size, data, and compute.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noreferrer">Fedus, Zoph, and Shazeer, Switch Transformers</a>
+            <span>Mixture-of-Experts scaling and why total parameters can differ from active compute.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2401.04088" target="_blank" rel="noreferrer">Jiang et al., Mixtral of Experts</a>
+            <span>A modern sparse MoE model-card example with total and active parameter counts.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2101.00027" target="_blank" rel="noreferrer">Gao et al., The Pile</a>
+            <span>An openly documented large pretraining corpus.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2402.00838" target="_blank" rel="noreferrer">Soldaini et al., Dolma</a>
+            <span>An open pretraining corpus and toolkit from the OLMo project.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2307.03172" target="_blank" rel="noreferrer">Liu et al., Lost in the Middle</a>
+            <span>A long-context evaluation study showing that relevant information in the middle of a prompt can be harder for models to use.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noreferrer">Hu et al., LoRA</a>
+            <span>Low-rank adaptation for parameter-efficient fine-tuning.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noreferrer">Ouyang et al., InstructGPT</a>
+            <span>Instruction tuning and RLHF for more helpful and aligned assistants.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2305.18290" target="_blank" rel="noreferrer">Rafailov et al., Direct Preference Optimization</a>
+            <span>DPO's direct preference loss without an explicit reward-model training loop.</span>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2201.11903" target="_blank" rel="noreferrer">Wei et al., Chain-of-Thought Prompting</a>
+            <span>Using reasoning demonstrations to improve difficult reasoning tasks at inference time.</span>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="chapter-nav-band" aria-label="Chapter navigation">
+      <div class="section-shell">
+        <nav class="chapter-nav chapter-nav-single">
+          <a class="chapter-nav-card" href="index.html">
+            <span>Course overview</span>
+            <strong>Back to the overview</strong>
+            <em>See the chapter map and the chapters that are ready to read now.</em>
+          </a>
+        </nav>
+      </div>
+    </section>
+  </main>
+
+  <script src="chapter7.js?v=20260816"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (window.renderMathInElement) {
+        renderMathInElement(document.body, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "\\(", right: "\\)", display: false }
+          ],
+          throwOnError: false
+        });
+      }
+    });
+  </script>
+  <script defer src="code-quiz.js"></script>
+  <script src="site.js" defer></script>
+</body>
+</html>

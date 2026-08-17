@@ -85,10 +85,7 @@ const state = {
   hasDecoded: false,
   decodeTally: {},
   decodeRolls: 0,
-  // KV cache
-  hasKv: false,
-  // QKV attention
-  queryIndex: 5, // default: "it"
+  // QKV attention  queryIndex: 5, // default: "it"
   causal: false,
   hasExploredQkv: false,
   // Attention heatmap
@@ -309,94 +306,6 @@ function renderDecodeTally() {
     row.append(name, bar);
     el.append(row);
   });
-}
-
-// ---------------------------------------------------------------------------
-// KV cache work counter
-// ---------------------------------------------------------------------------
-
-function renderKvCache() {
-  const n = Number(dom.kvTokens.value);
-  dom.kvTokensLabel.textContent = String(n);
-  const cacheOn = dom.kvCacheToggle.checked;
-  dom.kvStatusPill.textContent = cacheOn ? "cache on" : "cache off";
-  const el = dom.kvCompare;
-  el.replaceChildren();
-  if (!state.hasKv) {
-    el.append(emptyState("Slide the length or flip the cache toggle to compare the work."));
-    renderKvTrace();
-    return;
-  }
-  const noCache = (n * (n + 1)) / 2;
-  const withCache = n;
-  const max = noCache;
-  const makeRow = (label, units, active, mode) => {
-    const row = document.createElement("div");
-    row.className = `kv-row${active ? " is-active" : ""}`;
-    const name = document.createElement("span");
-    name.className = "kv-label";
-    name.textContent = label;
-    const track = document.createElement("span");
-    track.className = "kv-track";
-    const fill = document.createElement("span");
-    fill.className = `kv-fill is-${mode}`;
-    fill.style.width = `${clamp((units / max) * 100, 1.5, 100)}%`;
-    track.append(fill);
-    const val = document.createElement("strong");
-    val.className = "kv-units";
-    val.textContent = `${units.toLocaleString()} units`;
-    row.append(name, track, val);
-    return row;
-  };
-  el.append(makeRow("Without cache", noCache, !cacheOn, "nocache"));
-  el.append(makeRow("With KV cache", withCache, cacheOn, "cache"));
-  const summary = document.createElement("p");
-  summary.className = "microcopy kv-summary";
-  const ratio = (noCache / withCache).toFixed(1);
-  summary.innerHTML = `For ${n} tokens, the cache does about <strong>${ratio}\u00d7 less work</strong>. Without it, the total grows with the square of the length; with it, it grows in a straight line.`;
-  el.append(summary);
-  renderKvTrace();
-}
-
-function renderKvTrace() {
-  const trace = dom.kvTrace;
-  if (!trace) return;
-  trace.replaceChildren();
-  if (!state.hasKv) {
-    trace.append(emptyState("Reveal the cache comparison above to see the first few generation steps."));
-    return;
-  }
-  const n = Number(dom.kvTokens.value);
-  const shown = Math.min(n, 10);
-  const grid = document.createElement("div");
-  grid.className = "kv-trace-grid";
-  ["Step", "Without cache", "With KV cache", "Cache contents"].forEach((label) => {
-    const cell = document.createElement("div");
-    cell.className = "kv-trace-cell is-head";
-    cell.textContent = label;
-    grid.append(cell);
-  });
-  for (let step = 1; step <= shown; step += 1) {
-    const cells = [
-      `#${step}`,
-      `Reprocess ${step} token${step === 1 ? "" : "s"}`,
-      "Compute 1 new token",
-      `Reuse ${Math.max(0, step - 1)} old KV set${step === 2 ? "" : "s"}`
-    ];
-    cells.forEach((text, index) => {
-      const cell = document.createElement("div");
-      cell.className = `kv-trace-cell${index === 2 ? " is-cache" : ""}`;
-      cell.textContent = text;
-      grid.append(cell);
-    });
-  }
-  trace.append(grid);
-  if (n > shown) {
-    const note = document.createElement("p");
-    note.className = "microcopy kv-trace-note";
-    note.textContent = `Only the first ${shown} steps are shown, but the pattern continues through all ${n} generated tokens.`;
-    trace.append(note);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -885,10 +794,6 @@ function wireEvents() {
     state.decodeTally = {}; state.decodeRolls = 0; renderDecodeTally();
   });
 
-  // KV cache
-  dom.kvTokens.addEventListener("input", () => { state.hasKv = true; renderKvCache(); });
-  dom.kvCacheToggle.addEventListener("change", () => { state.hasKv = true; renderKvCache(); });
-
   // QKV attention
   dom.querySelect.addEventListener("change", () => {
     state.hasExploredQkv = true;
@@ -967,12 +872,6 @@ function init() {
     decodePickBtn: grab("decodePickBtn"),
     decodeResetBtn: grab("decodeResetBtn"),
     decodeTally: grab("decodeTally"),
-    kvTokens: grab("kvTokens"),
-    kvTokensLabel: grab("kvTokensLabel"),
-    kvCacheToggle: grab("kvCacheToggle"),
-    kvStatusPill: grab("kvStatusPill"),
-    kvCompare: grab("kvCompare"),
-    kvTrace: grab("kvTrace"),
     querySelect: grab("queryTokenSelect"),
     causalToggle: grab("causalToggle"),
     qkvScores: grab("qkvScores"),
@@ -1001,7 +900,6 @@ function init() {
   renderGenLoop();
   renderDecodeBars();
   renderDecodeTally();
-  renderKvCache();
   renderQkv();
   renderHeatmap();
   renderMultiHead();
