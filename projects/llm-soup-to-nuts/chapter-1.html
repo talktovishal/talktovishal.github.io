@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Language Models Before LLMs - LLM Soup to Nuts</title>
-  <link rel="stylesheet" href="styles.css?v=20260726">
+  <link rel="stylesheet" href="styles.css?v=20260831">
 </head>
 <body>
   <header class="topbar">
@@ -158,7 +158,7 @@
           </p>
           <br>
           <p>
-            Now let's go an do our first exercise!!! Woohoo! We will take a <code>corpus</code> and break it down into <code>tokens</code>. As part of this particular exercise, I have downloaded some text that is freely available from the internet, like the full text of the <i>Alice In Wonderland</i> book, as well as some other different type of <code>corpora</code> (corpus - singular, corpora - plural). We are going to use this corpora to break them down into tokens and explore them further.
+            Now let's go and do our first exercise!!! Woohoo! We will take a <code>corpus</code> and break it down into <code>tokens</code>. As part of this particular exercise, I have downloaded some text that is freely available from the internet, like the full text of the <i>Alice In Wonderland</i> book, as well as some other different type of <code>corpora</code> (corpus - singular, corpora - plural). We are going to use this corpora to break them down into tokens and explore them further.
           </p>
         </div>
 
@@ -364,7 +364,7 @@ return {
                   <strong>Slide the trigram window</strong>
                   <span id="ngramFrameStatus" aria-live="polite">Frame 1 of 6. Press Play or Next.</span>
                 </div>
-                <div class="motion-button-row">
+                <div class="motion-button-row transport-controls">
                   <button id="ngramFrameBack" class="ghost-button" type="button">Back</button>
                   <button id="ngramFramePlay" class="primary-button" type="button">Play</button>
                   <button id="ngramFrameNext" class="ghost-button" type="button">Next</button>
@@ -933,7 +933,7 @@ return explainProbability(sampleText, settings.n, currentContext, selectedToken)
               <div id="surpriseStaircase" class="sequence-stage surprise-staircase" aria-live="polite">
                 <div class="empty-state">Press Start to connect probability, surprise, and perplexity.</div>
               </div>
-              <div class="motion-button-row">
+              <div class="motion-button-row transport-controls">
                 <button id="surpriseBackButton" class="ghost-button" type="button">Back</button>
                 <button id="surpriseStartButton" class="primary-button" type="button">Start</button>
                 <button id="surpriseNextButton" class="ghost-button" type="button">Next</button>

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Transformers and Attention - LLM Soup to Nuts</title>
-  <link rel="stylesheet" href="styles.css?v=20260726">
+  <link rel="stylesheet" href="styles.css?v=20260831">
   <link rel="stylesheet" href="chapter5.css?v=20260701">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
@@ -967,7 +967,7 @@ return {
           <p class="microcopy">The query is <code>it</code> and the six keys are the six tokens of our sentence. Each press does exactly one operation, and you can always go back. Nothing here is hidden: every number on a later step is built from the numbers on an earlier one.</p>
           <ol id="qkvStepTrack" class="qkv-step-track" aria-hidden="true"></ol>
           <div id="qkvStepBody" class="qkv-step-body" aria-live="polite"></div>
-          <div class="stepper-row">
+          <div class="stepper-row transport-controls">
             <button id="qkvStepBack" class="ghost-button" type="button">Back</button>
             <button id="qkvStepNext" class="primary-button" type="button">Next step</button>
             <button id="qkvStepPlay" class="ghost-button" type="button">Play</button>
@@ -1187,7 +1187,7 @@ return {
             </svg>
           </div>
           <p id="satCaption" class="sat-caption" aria-live="polite"></p>
-          <div class="stepper-row">
+          <div class="stepper-row transport-controls">
             <button id="satBack" class="ghost-button" type="button">Back</button>
             <button id="satNext" class="primary-button" type="button">Next stage</button>
             <button id="satPlay" class="ghost-button" type="button">Play</button>

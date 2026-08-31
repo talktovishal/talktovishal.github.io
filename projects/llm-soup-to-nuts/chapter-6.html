@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Making Attention Fast - LLM Soup to Nuts</title>
-  <link rel="stylesheet" href="styles.css?v=20260726">
+  <link rel="stylesheet" href="styles.css?v=20260831">
   <link rel="stylesheet" href="chapter6.css?v=20260816">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
@@ -568,7 +568,7 @@
           <p class="microcopy">Six key scores split into three tiles. The running maximum and running sum are all that need to be kept between tiles - never the whole row.</p>
           <div id="tileStrip" class="tile-strip" aria-live="polite"></div>
           <div id="tileRunning" class="tile-running" aria-live="polite"></div>
-          <div class="stepper-row">
+          <div class="stepper-row transport-controls">
             <button id="tileBackBtn" class="ghost-button" type="button">Back</button>
             <button id="tileNextBtn" class="primary-button" type="button">Next tile</button>
             <button id="tileResetBtn" class="ghost-button" type="button">Reset</button>

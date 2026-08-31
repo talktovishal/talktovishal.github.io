@@ -14,6 +14,9 @@
   --coral-soft: #fff0eb;
   --gold: #9c5a00;
   --gold-soft: #fff4d6;
+  --control: #453f7a;
+  --control-soft: #f4f2fb;
+  --control-line: #b4abe0;
   --green: #27664a;
   --violet: #59546d;
   --shadow: 0 14px 32px rgba(17, 17, 17, 0.08);
@@ -2806,8 +2809,8 @@ a.chapter-nav-card:hover {
   gap: 14px;
   align-items: center;
   padding: 12px 14px;
-  border-top: 1px solid var(--line);
-  background: #fffaf4;
+  border-top: 1px solid var(--control-line);
+  background: var(--control-soft);
 }
 
 .motion-control-bar strong,
@@ -3338,6 +3341,7 @@ a.chapter-nav-card:hover {
   }
 
   .motion-button-row,
+  .transport-controls,
   .staircase-readout,
   .staircase-track,
   .memory-lanes,
@@ -3527,4 +3531,81 @@ a.chapter-nav-card:hover {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+/* Playback/stepper transport controls (Back/Play/Next/Replay). Deliberately
+   styled unlike token-chip content: pill shape, cool violet palette, uppercase
+   labels, and icon glyphs, so learners never mistake controls for tokens. */
+.transport-controls {
+  border: 1px solid var(--control-line);
+  border-radius: 12px;
+  background: var(--control-soft);
+  padding: 8px;
+}
+
+.transport-controls .ghost-button,
+.transport-controls .primary-button,
+.transport-controls .run-button,
+.transport-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--control-line);
+  background: #ffffff;
+  color: var(--control);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.transport-controls .ghost-button:hover,
+.transport-controls button:hover {
+  background: #e9e5f9;
+}
+
+.transport-controls .primary-button,
+.transport-controls .run-button {
+  border-color: var(--control);
+  background: var(--control);
+  color: #ffffff;
+}
+
+.transport-controls .primary-button:hover,
+.transport-controls .run-button:hover {
+  background: #322d5c;
+}
+
+.transport-controls button::before {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.transport-controls [id*="Back" i]::before,
+.transport-controls [data-stepper-back]::before {
+  content: "\23EE";
+}
+
+.transport-controls [id*="Start" i]::before {
+  content: "\25B6";
+}
+
+.transport-controls [id*="Play" i]::before {
+  content: "\25B6";
+}
+
+.transport-controls [id*="Next" i]::before,
+.transport-controls [data-stepper-next]::before {
+  content: "\23ED";
+}
+
+.transport-controls [id*="Replay" i]::before,
+.transport-controls [id*="Reset" i]::before,
+.transport-controls [data-stepper-reset]::before {
+  content: "\21BB";
 }
