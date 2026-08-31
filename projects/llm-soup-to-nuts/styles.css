@@ -14,10 +14,10 @@
   --coral-soft: #fff0eb;
   --gold: #9c5a00;
   --gold-soft: #fff4d6;
-  --control: #453f7a;
-  --control-soft: #f4f2fb;
-  --control-line: #b4abe0;
   --green: #27664a;
+  --control: var(--green);
+  --control-soft: #e8f4ed;
+  --control-line: #a8d39d;
   --violet: #59546d;
   --shadow: 0 14px 32px rgba(17, 17, 17, 0.08);
 }
@@ -3566,7 +3566,7 @@ a.chapter-nav-card:hover {
 
 .transport-controls .ghost-button:hover,
 .transport-controls button:hover {
-  background: #e9e5f9;
+  background: #d7ece0;
 }
 
 .transport-controls .primary-button,
@@ -3578,7 +3578,7 @@ a.chapter-nav-card:hover {
 
 .transport-controls .primary-button:hover,
 .transport-controls .run-button:hover {
-  background: #322d5c;
+  background: #1c4a35;
 }
 
 .transport-controls button::before {
