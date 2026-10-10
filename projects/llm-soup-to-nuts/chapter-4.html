@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260831">
-  <link rel="stylesheet" href="chapter4.css?v=20261009-approved">
+  <link rel="stylesheet" href="chapter4.css?v=20261010-approved">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -1494,7 +1494,7 @@
       </div>
     </section>
 
-    <section id="backpropagation" class="band band-muted" aria-labelledby="backprop-title" frozen="yes">
+    <section id="backpropagation" class="band band-muted" aria-labelledby="backprop-title" frozen="no">
       <div class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">6. Backpropagation</p>
@@ -1502,9 +1502,10 @@
           <p>
               We know the loss, and the preceding gradients section showed what a gradient means. But our tiny network has many knobs buried across two layers. Imagine a factory assembly line: the boss at the end yells, "This car is ruined!" The final assembler replies, "The chassis arrived crooked from the previous station." To fix the factory, we pass responsibility backward through every station in proportion to how strongly that station affected the result.
           </p>
-          <p>
-              That backward accounting is <a href="https://en.wikipedia.org/wiki/Backpropagation" target="_blank" rel="noreferrer">backpropagation</a>. It uses the chain rule to <strong>calculate one gradient for every trainable parameter</strong>. It does not update a single parameter. Only after backprop has finished does <strong>gradient descent apply those gradients</strong> with \(\theta \leftarrow \theta-\eta\nabla\theta\).
+            <p id="backprop-update-rule">
+              That backward accounting is <a href="https://en.wikipedia.org/wiki/Backpropagation" target="_blank" rel="noreferrer">backpropagation</a>. It uses the chain rule to <strong>calculate one gradient for every trainable parameter</strong>. It does not update a single parameter. Only after backprop has finished does <strong>gradient descent apply those gradients</strong> with \(\theta \leftarrow \theta-\eta\,\dfrac{\partial L}{\partial\theta}\).
           </p>
+            <p>Here \(\theta\) stands for one trainable value, such as a weight or bias. Its gradient \(\partial L/\partial\theta\) tells us how the <em>loss</em> changes when that value moves. The actual parameter change is \(-\eta\,\partial L/\partial\theta\): we multiply by the learning rate and move in the opposite direction. We apply the same rule to each trainable value.</p>
         </div>
 
         <div id="backpropNudgeLab" class="backprop-nudge-lab" aria-labelledby="backprop-nudge-title">
@@ -1848,7 +1849,7 @@
               subtracting positive competitor gradients lowers theirs.
             </p>
           </div>
-          <section id="backprop-pass-map" class="backprop-pass-map" aria-labelledby="backprop-pass-map-title" frozen="yes">
+          <section id="backprop-pass-map" class="backprop-pass-map" aria-labelledby="backprop-pass-map-title" frozen="no">
             <div class="backprop-pass-map-intro">
               <p class="eyebrow">The whole algorithm, in the order you perform it</p>
               <h4 id="backprop-pass-map-title">Forward calculates the loss. Backward calculates every gradient.</h4>
@@ -2416,7 +2417,12 @@
                       <span>\(\dfrac{\partial L}{\partial x_1}=(-0.524)(0.40)+(0)(-0.30)\approx-0.210\)</span>
                       <span>\(\dfrac{\partial L}{\partial x_2}=(-0.524)(-0.10)+(0)(0.70)\approx+0.052\)</span>
                     </div>
-                    <p><strong>Meaning:</strong> backpropagation has reached every input-layer weight and bias. Because \(x_1\) and \(x_2\) came from embedding lookup, their gradients \(\partial L / \partial x_m\) are exactly the updates that gradient descent will subtract from those specific coordinates in the embedding table.</p>
+                    <p id="backprop-embedding-update"><strong>Meaning:</strong> backpropagation has reached every input-layer weight and bias. Because \(x_1\) and \(x_2\) came from embedding lookup, their gradients \(\partial L / \partial x_m\) pass back to those specific coordinates in the embedding table. They are loss-change rates, not the parameter changes themselves. Gradient descent multiplies each by the learning rate before subtracting it.</p>
+                    <div>
+                      <p>The same update rule reaches the embedding coordinates:</p>
+                      <div class="backprop-map-equation">\(x_{m,\mathrm{new}}=x_{m,\mathrm{old}}-\eta\,\dfrac{\partial L}{\partial x_m}\)</div>
+                      <p>For example, with \(\eta=0.10\) and the rounded gradient \(\partial L/\partial x_1\approx-0.210\), the change is \(-0.10(-0.210)=+0.021\). The looked-up embedding coordinate moves from \(0.500\) to approximately \(0.521\), not by the full gradient of \(-0.210\).</p>
+                    </div>
                   </article>
                 </div>
               </section>
