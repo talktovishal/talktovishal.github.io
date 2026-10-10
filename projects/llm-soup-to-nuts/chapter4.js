@@ -59,15 +59,7 @@ const dom = {
   gradientMetrics: document.getElementById("gradientMetrics"),
   gradientExplanation: document.getElementById("gradientExplanation"),
   gradientRunNote: document.getElementById("gradientRunNote"),
-  gradientStepTitle: document.getElementById("gradient-step-title"),
-  gradientStepCopy: document.getElementById("gradientStepCopy"),
-  gradientStepCount: document.getElementById("gradientStepCount"),
-  gradientStepPanel: document.getElementById("gradientStepPanel"),
-  gradientBackButton: document.getElementById("gradientBackButton"),
-  gradientPlayButton: document.getElementById("gradientPlayButton"),
-  gradientNextButton: document.getElementById("gradientNextButton"),
-  gradientReplayButton: document.getElementById("gradientReplayButton"),
-  gradientStepButtons: Array.from(document.querySelectorAll("[data-gradient-step]")),
+  gradientStepComparison: document.getElementById("gradientStepComparison"),
   logitA: document.getElementById("logitA"),
   logitB: document.getElementById("logitB"),
   logitC: document.getElementById("logitC"),
@@ -228,8 +220,7 @@ const state = {
   autoLineRun: null,
   hasExploredProbability: true,
   hasExploredGradient: false,
-  gradientWalkthroughStep: 0,
-  gradientWalkthroughTimer: null,
+  lastGradientStep: null,
   softmaxStep: 0,
   softmaxPlayTimer: null,
   forwardFocus: null,
@@ -598,55 +589,6 @@ function lineLossAndGradients(w, b) {
   return { loss: loss / n, dw: dw / n, db: db / n };
 }
 
-const gradientWalkthroughMeta = [
-  { title: "Measure the current mistake", copy: "Start from the line's current slope and intercept, then compress all six point errors into one MSE loss." },
-  { title: "Calculate one gradient per knob", copy: "Average the six point contributions to learn which uphill direction belongs to the slope and which belongs to the intercept." },
-  { title: "Plan the opposite, downhill move", copy: "Multiply each gradient by the learning rate and subtract it from the matching knob. This previews the update without applying it." },
-  { title: "Check the predicted result", copy: "Recompute MSE with the planned slider values. A useful step lowers loss; an oversized step can raise it." }
-];
-
-function stopGradientWalkthroughPlayback() {
-  if (state.gradientWalkthroughTimer) {
-    window.clearInterval(state.gradientWalkthroughTimer);
-    state.gradientWalkthroughTimer = null;
-  }
-  if (dom.gradientPlayButton) dom.gradientPlayButton.textContent = "Play";
-}
-
-function setGradientWalkthroughStep(nextStep, { keepPlaying = false } = {}) {
-  state.gradientWalkthroughStep = clamp(nextStep, 0, gradientWalkthroughMeta.length - 1);
-  if (!keepPlaying) stopGradientWalkthroughPlayback();
-  renderGradient();
-}
-
-function toggleGradientWalkthroughPlayback() {
-  if (state.gradientWalkthroughTimer) {
-    stopGradientWalkthroughPlayback();
-    return;
-  }
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    setGradientWalkthroughStep(gradientWalkthroughMeta.length - 1);
-    return;
-  }
-  if (state.gradientWalkthroughStep >= gradientWalkthroughMeta.length - 1) state.gradientWalkthroughStep = 0;
-  dom.gradientPlayButton.textContent = "Pause";
-  renderGradient();
-  state.gradientWalkthroughTimer = window.setInterval(() => {
-    if (state.gradientWalkthroughStep >= gradientWalkthroughMeta.length - 1) {
-      stopGradientWalkthroughPlayback();
-      return;
-    }
-    state.gradientWalkthroughStep += 1;
-    renderGradient();
-  }, 1600);
-}
-
-function resetGradientWalkthrough() {
-  stopGradientWalkthroughPlayback();
-  state.gradientWalkthroughStep = 0;
-  renderGradient();
-}
-
 function gradientComparisonCard(label, w, b, loss, note, className = "") {
   const card = createElement("article", `gradient-comparison-card ${className}`.trim());
   card.append(
@@ -658,6 +600,23 @@ function gradientComparisonCard(label, w, b, loss, note, className = "") {
   return card;
 }
 
+function renderGradientStepComparison() {
+  const comparison = dom.gradientStepComparison;
+  if (!state.lastGradientStep) {
+    comparison.replaceChildren(createElement("p", "empty-state", "Press Step descent to compare the loss before and after one move."));
+    return;
+  }
+  const { before, after } = state.lastGradientStep;
+  const change = after.loss - before.loss;
+  const cards = createElement("div", "gradient-comparison-grid");
+  const outcome = change < 0 ? "Loss fell." : change > 0 ? "Loss rose." : "Loss is unchanged.";
+  cards.append(
+    gradientComparisonCard("Before the last step", before.w, before.b, before.loss, "The line before applying the update."),
+    gradientComparisonCard("After the last step", after.w, after.b, after.loss, "The actual two-decimal slider values.", change < 0 ? "is-improved" : change > 0 ? "is-worse" : "")
+  );
+  comparison.replaceChildren(cards, createElement("p", "microcopy", `${outcome} MSE changed by ${change > 0 ? "+" : ""}${formatNumber(change, 4)}. Each new step replaces this comparison.`));
+}
+
 function gradientContributionTable(rows, sumError, sumErrorTimesX) {
   function gradientCell(label, value, className = "") {
     const cell = createElement("td", className, value);
@@ -667,10 +626,10 @@ function gradientContributionTable(rows, sumError, sumErrorTimesX) {
 
   const wrap = createElement("div", "deriv-table-wrap");
   const table = createElement("table", "deriv-table gradient-contribution-table");
-  const caption = createElement("caption", "", "Where the two gradient subtotals come from");
+  const caption = createElement("caption", "", "The six points and their loss and gradient contributions");
   const head = createElement("thead");
   const headRow = createElement("tr");
-  ["point", "x", "true y", "prediction ŷ", "error e = ŷ - y", "e × x"].forEach((label) => {
+  ["point", "x", "true y", "prediction ŷ", "error e = ŷ - y", "e²", "e × x"].forEach((label) => {
     headRow.append(createElement("th", "", label));
   });
   head.append(headRow);
@@ -679,11 +638,12 @@ function gradientContributionTable(rows, sumError, sumErrorTimesX) {
   rows.forEach((row, index) => {
     const tableRow = createElement("tr");
     tableRow.append(
-      gradientCell("point", String(index + 1), "row-label"),
+      gradientCell("point", `${String.fromCharCode(65 + index)} (${index + 1})`, "row-label"),
       gradientCell("x", formatNumber(row.x, 2)),
       gradientCell("true y", formatNumber(row.y, 2)),
       gradientCell("prediction ŷ", formatNumber(row.prediction, 3)),
       gradientCell("error e = ŷ - y", formatNumber(row.error, 3), forwardSignClass(row.error)),
+      gradientCell("squared error e²", formatNumber(row.error ** 2, 4)),
       gradientCell("e × x", formatNumber(row.error * row.x, 4), forwardSignClass(row.error * row.x))
     );
     body.append(tableRow);
@@ -697,6 +657,7 @@ function gradientContributionTable(rows, sumError, sumErrorTimesX) {
   totalRow.append(
     totalLabel,
     gradientCell("Σ(error)", formatNumber(sumError, 4), forwardSignClass(sumError)),
+    gradientCell("Σ(error²)", formatNumber(rows.reduce((sum, row) => sum + row.error ** 2, 0), 4)),
     gradientCell("Σ(error × x)", formatNumber(sumErrorTimesX, 4), forwardSignClass(sumErrorTimesX))
   );
   foot.append(totalRow);
@@ -705,74 +666,10 @@ function gradientContributionTable(rows, sumError, sumErrorTimesX) {
   return wrap;
 }
 
-function renderGradientWalkthrough({ w, b, lr, info }) {
-  if (!dom.gradientStepPanel) return;
-  const step = clamp(state.gradientWalkthroughStep, 0, gradientWalkthroughMeta.length - 1);
-  const meta = gradientWalkthroughMeta[step];
-  const n = lineData.length;
-  const rows = lineData.map((point) => {
-    const prediction = w * point.x + b;
-    const error = prediction - point.y;
-    return { ...point, prediction, error };
-  });
-  const sumSquaredError = rows.reduce((sum, row) => sum + row.error ** 2, 0);
-  const sumErrorTimesX = rows.reduce((sum, row) => sum + row.error * row.x, 0);
-  const sumError = rows.reduce((sum, row) => sum + row.error, 0);
-  const plannedW = clamp(w - lr * info.dw, -2, 2);
-  const plannedB = clamp(b - lr * info.db, -1, 1);
-  const appliedW = Math.round(plannedW * 100) / 100;
-  const appliedB = Math.round(plannedB * 100) / 100;
-  const nextLoss = lineLossAndGradients(appliedW, appliedB).loss;
-
-  dom.gradientStepTitle.textContent = meta.title;
-  dom.gradientStepCopy.textContent = meta.copy;
-  dom.gradientStepCount.textContent = `step ${step + 1} of ${gradientWalkthroughMeta.length}`;
-  dom.gradientBackButton.disabled = step === 0;
-  dom.gradientNextButton.disabled = step === gradientWalkthroughMeta.length - 1;
-  dom.gradientStepButtons.forEach((button, index) => {
-    const active = index === step;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
-
-  const nodes = [];
-  if (step === 0) {
-    nodes.push(forwardExplanation("What is being measured?", `The current line is ŷ = ${formatNumber(w, 2)}x + ${formatNumber(b, 2)}. For each of the ${n} dots, subtract the true y from the line's prediction, square that error, then average.`));
-    nodes.push(forwardResultRow("Add squared errors", rows.map((row) => formatNumber(row.error ** 2, 3)).join(" + "), sumSquaredError, "Every gap contributes positively after squaring."));
-    nodes.push(forwardResultRow("Average the total", `${formatNumber(sumSquaredError, 4)} ÷ ${n}`, info.loss, "This scalar MSE is the mistake we want to lower."));
-    nodes.push(createElement("p", "forward-takeaway", `What we learned: the current slope and intercept produce MSE ${formatNumber(info.loss, 4)}. Loss measures the mistake; it does not yet say how either knob should move.`));
-  } else if (step === 1) {
-    nodes.push(forwardExplanation("Give each knob its own slope", "The slope gradient weights each error by x because changing slope affects distant x-values more. The intercept gradient uses each error directly because changing intercept lifts or lowers the whole line equally."));
-    nodes.push(gradientContributionTable(rows, sumError, sumErrorTimesX));
-    nodes.push(createElement("p", "step-lead", `Add the last column to get Σ(error × x) = ${formatNumber(sumErrorTimesX, 4)} for the slope. Add the error column to get Σ(error) = ${formatNumber(sumError, 4)} for the intercept.`));
-    nodes.push(forwardResultRow("Slope gradient", `(2 ÷ ${n}) × Σ(error × x) = (2 ÷ ${n}) × ${formatNumber(sumErrorTimesX, 4)}`, info.dw, "∂L/∂slope: the uphill direction for the line's tilt."));
-    nodes.push(forwardResultRow("Intercept gradient", `(2 ÷ ${n}) × Σ(error) = (2 ÷ ${n}) × ${formatNumber(sumError, 4)}`, info.db, "∂L/∂intercept: the uphill direction for the line's height."));
-    nodes.push(createElement("p", "forward-takeaway", `What we learned: the gradient vector is [${formatNumber(info.dw, 3)}, ${formatNumber(info.db, 3)}]. Each entry belongs to one trainable knob.`));
-  } else if (step === 2) {
-    nodes.push(forwardExplanation("Subtract, because the gradient points uphill", `The learning rate η = ${formatNumber(lr, 2)} scales both moves. A negative gradient makes subtraction increase that knob; a positive gradient makes subtraction decrease it.`));
-    nodes.push(forwardResultRow("Plan new slope", `${formatNumber(w, 2)} − ${formatNumber(lr, 2)} × ${signedFactor(info.dw, 3)}`, plannedW, `The slider stores two decimals, so applying the step uses ${formatNumber(appliedW, 2)}.`));
-    nodes.push(forwardResultRow("Plan new intercept", `${formatNumber(b, 2)} − ${formatNumber(lr, 2)} × ${signedFactor(info.db, 3)}`, plannedB, `The slider stores two decimals, so applying the step uses ${formatNumber(appliedB, 2)}.`));
-    nodes.push(createElement("p", "forward-takeaway", "What we learned: gradient descent applies the gradients; backpropagation or calculus must calculate them first."));
-  } else {
-    nodes.push(forwardExplanation("Did the planned move help?", "Use the exact two-decimal values that the sliders will store, draw the planned line, and recompute the same MSE measurement."));
-    const comparison = createElement("div", "gradient-comparison-grid");
-    const improved = nextLoss < info.loss;
-    comparison.append(
-      gradientComparisonCard("before", w, b, info.loss, "Current slider values."),
-      gradientComparisonCard("after one step", appliedW, appliedB, nextLoss, improved ? "Lower loss: this step heads downhill." : "Higher loss: this step overshoots.", improved ? "is-improved" : "is-worse")
-    );
-    nodes.push(comparison);
-    const change = nextLoss - info.loss;
-    nodes.push(forwardResultRow("Recompute MSE", `${formatNumber(info.loss, 4)} → ${formatNumber(nextLoss, 4)}`, nextLoss, `The change is ${change < 0 ? "a decrease" : "an increase"} of ${formatNumber(Math.abs(change), 4)}.`));
-    nodes.push(createElement("p", "forward-takeaway", improved ? "What we learned: this learning rate produces a useful downhill move. Press Step descent below to apply it." : "What we learned: this learning rate is too aggressive for this position. Lower it before applying the step."));
-  }
-  dom.gradientStepPanel.replaceChildren(...nodes);
-}
-
 function renderGradient() {
   const { w, b, lr } = readLineParams();
   const info = lineLossAndGradients(w, b);
-  renderGradientWalkthrough({ w, b, lr, info });
+  renderGradientStepComparison();
   if (!state.hasExploredGradient) {
     dom.gradientStatus.textContent = "press Step";
     renderLineFitPlaceholder();
@@ -787,8 +684,8 @@ function renderGradient() {
     { label: "slope", value: formatNumber(w, 2), note: "the line's tilt" },
     { label: "intercept", value: formatNumber(b, 2), note: "its height at the centre" }
   ]);
-  const nextW = clamp(w - lr * info.dw, -2, 2);
-  const nextB = clamp(b - lr * info.db, -1, 1);
+  const nextW = Math.round(clamp(w - lr * info.dw, -2, 2) * 100) / 100;
+  const nextB = Math.round(clamp(b - lr * info.db, -1, 1) * 100) / 100;
   const nextLoss = lineLossAndGradients(nextW, nextB).loss;
   renderGradientDerivation({ w, b, lr, info, nextLoss });
 }
@@ -798,53 +695,20 @@ function signedFactor(value, digits = 2) {
   return value < 0 ? `(\u2212${text})` : text;
 }
 
-function derivCell(text) {
-  const td = createElement("td");
-  td.textContent = text;
-  return td;
-}
-
 function renderGradientDerivation({ w, b, lr, info, nextLoss }) {
   const container = dom.gradientExplanation;
   const n = lineData.length;
 
   const intro = createElement("div", "step-lead", `Every step is just this calculation, recomputed from all ${n} points for the current line. The prediction is \u0177 = slope\u00b7x + intercept and the error is e = \u0177 \u2212 y:`);
 
-  const wrap = createElement("div", "deriv-table-wrap");
-  const table = createElement("table", "deriv-table");
-  const thead = createElement("thead");
-  const htr = createElement("tr");
-  ["x", "y", "\u0177", "e", "e\u00b2", "e\u00b7x"].forEach((h) => htr.append(createElement("th", "", h)));
-  thead.append(htr);
-  const tbody = createElement("tbody");
-  let sumSq = 0;
-  let sumEx = 0;
-  let sumE = 0;
-  lineData.forEach((pt) => {
-    const pred = w * pt.x + b;
-    const e = pred - pt.y;
-    sumSq += e * e;
-    sumEx += e * pt.x;
-    sumE += e;
-    const tr = createElement("tr");
-    tr.append(
-      derivCell(formatNumber(pt.x, 2)),
-      derivCell(formatNumber(pt.y, 2)),
-      derivCell(formatNumber(pred, 2)),
-      derivCell(formatNumber(e, 3)),
-      derivCell(formatNumber(e * e, 4)),
-      derivCell(formatNumber(e * pt.x, 3))
-    );
-    tbody.append(tr);
+  const rows = lineData.map((point) => {
+    const prediction = w * point.x + b;
+    return { ...point, prediction, error: prediction - point.y };
   });
-  const tfoot = createElement("tfoot");
-  const ftr = createElement("tr");
-  const sumLabel = createElement("td", "row-label", "sums (\u03a3)");
-  sumLabel.setAttribute("colspan", "3");
-  ftr.append(sumLabel, derivCell(formatNumber(sumE, 3)), derivCell(formatNumber(sumSq, 4)), derivCell(formatNumber(sumEx, 3)));
-  tfoot.append(ftr);
-  table.append(thead, tbody, tfoot);
-  wrap.append(table);
+  const sumSq = rows.reduce((sum, row) => sum + row.error ** 2, 0);
+  const sumEx = rows.reduce((sum, row) => sum + row.error * row.x, 0);
+  const sumE = rows.reduce((sum, row) => sum + row.error, 0);
+  const wrap = gradientContributionTable(rows, sumE, sumEx);
 
   const loss = sumSq / n;
   const dw = (2 * sumEx) / n;
@@ -861,9 +725,15 @@ function renderGradientDerivation({ w, b, lr, info, nextLoss }) {
     `new intercept = ${formatNumber(b, 2)} \u2212 ${formatNumber(lr, 2)} \u00d7 ${signedFactor(db, 3)} = ${formatNumber(newB, 3)}`
   ].forEach((line) => stack.append(createElement("code", "", line)));
 
+  const appliedW = Math.round(clamp(newW, -2, 2) * 100) / 100;
+  const appliedB = Math.round(clamp(newB, -1, 1) * 100) / 100;
+  stack.append(createElement("p", "microcopy", `These are the next proposed updates from the current line. Slider limits and two-decimal rounding apply slope ${formatNumber(appliedW, 2)} and intercept ${formatNumber(appliedB, 2)}. The comparison beside Step descent records the last move you actually applied.`));
+
   const reason = createElement("p");
   const settled = Math.abs(info.dw) < 0.01 && Math.abs(info.db) < 0.01;
-  if (settled) {
+  if (appliedW === w && appliedB === b) {
+    reason.textContent = `The proposed move leaves both stored slider values unchanged after rounding and limits. MSE remains ${formatNumber(info.loss, 4)}; that does not mean both gradients are zero.`;
+  } else if (settled) {
     reason.textContent = "The errors are tiny now, so the sums are near zero and each step barely moves the line - it has essentially fit the dots.";
   } else {
     const heightReason = info.db < -0.01
@@ -876,7 +746,7 @@ function renderGradientDerivation({ w, b, lr, info, nextLoss }) {
       : info.dw > 0.01
         ? "is tilted too steep, so the step flattens it"
         : "already matches their trend";
-    const dir = nextLoss < info.loss ? "down" : "up";
+    const dir = nextLoss < info.loss ? "down" : nextLoss > info.loss ? "up" : "unchanged";
     reason.textContent = `Reading it back: the line ${heightReason}, and it ${tiltReason}. Applying both updates moves the loss from ${formatNumber(info.loss, 4)} to ${formatNumber(nextLoss, 4)} (${dir}).`;
   }
 
@@ -935,19 +805,25 @@ function renderLineFitSvg(w, b) {
 
 function stepGradientDescent() {
   const { w, b, lr } = readLineParams();
-  const { dw, db } = lineLossAndGradients(w, b);
+  const { loss, dw, db } = lineLossAndGradients(w, b);
   const nextW = clamp(w - lr * dw, -2, 2);
   const nextB = clamp(b - lr * db, -1, 1);
   dom.slopeSlider.value = Math.round(nextW * 100);
   dom.interceptSlider.value = Math.round(nextB * 100);
+  const appliedW = Number(dom.slopeSlider.value) / 100;
+  const appliedB = Number(dom.interceptSlider.value) / 100;
+  const result = lineLossAndGradients(appliedW, appliedB);
+  state.lastGradientStep = {
+    before: { w, b, loss },
+    after: { w: appliedW, b: appliedB, loss: result.loss }
+  };
   renderGradient();
-  return lineLossAndGradients(Number(dom.slopeSlider.value) / 100, Number(dom.interceptSlider.value) / 100);
+  return result;
 }
 
 function resetGradient() {
   stopAutoGradient();
-  stopGradientWalkthroughPlayback();
-  state.gradientWalkthroughStep = 0;
+  state.lastGradientStep = null;
   dom.slopeSlider.value = -40;
   dom.interceptSlider.value = 20;
   dom.lineRateSlider.value = 8;
@@ -3577,6 +3453,7 @@ function wireEvents() {
   [dom.slopeSlider, dom.interceptSlider, dom.lineRateSlider].forEach((slider) => {
     slider.addEventListener("input", () => {
       if (state.autoLineTimer) stopAutoGradient("stopped", "Auto train stopped because you changed a control. Press Auto train to begin a fresh bounded run from these values.");
+      state.lastGradientStep = null;
       state.hasExploredGradient = true;
       renderGradient();
     });
@@ -3584,15 +3461,7 @@ function wireEvents() {
   dom.gradientStepButton.addEventListener("click", () => { state.hasExploredGradient = true; stepGradientDescent(); });
   dom.gradientAutoButton.addEventListener("click", () => { state.hasExploredGradient = true; toggleAutoGradient(); });
   dom.gradientResetButton.addEventListener("click", resetGradient);
-  dom.gradientBackButton.addEventListener("click", () => setGradientWalkthroughStep(state.gradientWalkthroughStep - 1));
-  dom.gradientNextButton.addEventListener("click", () => setGradientWalkthroughStep(state.gradientWalkthroughStep + 1));
-  dom.gradientPlayButton.addEventListener("click", toggleGradientWalkthroughPlayback);
-  dom.gradientReplayButton.addEventListener("click", resetGradientWalkthrough);
-  dom.gradientStepButtons.forEach((button) => {
-    button.addEventListener("click", () => setGradientWalkthroughStep(Number(button.dataset.gradientStep)));
-  });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && state.gradientWalkthroughTimer) stopGradientWalkthroughPlayback();
     if (document.hidden && state.softmaxPlayTimer) stopSoftmaxPlayback();
     if (document.hidden && state.autoLineTimer) {
       const steps = state.autoLineRun?.steps || 0;
@@ -3600,7 +3469,6 @@ function wireEvents() {
     }
   });
   window.addEventListener("pagehide", () => {
-    stopGradientWalkthroughPlayback();
     stopSoftmaxPlayback();
     stopAutoGradient();
   });

@@ -792,6 +792,160 @@ body {
   font-weight: 800;
 }
 
+.gradient-problem,
+.gradient-derivation {
+  margin: 22px 0;
+}
+
+#gradients .gradient-problem p,
+#gradients .gradient-derivation p {
+  max-width: none;
+}
+
+.gradient-problem h3,
+.gradient-derivation h3 {
+  font-size: 1.3rem;
+  letter-spacing: 0;
+}
+
+.gradient-point-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.gradient-point-table caption {
+  padding: 8px 0;
+  text-align: left;
+}
+
+.gradient-point-table th {
+  white-space: normal;
+}
+
+.gradient-data-figure {
+  margin: 18px 0;
+}
+
+.gradient-data-svg {
+  display: block;
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  margin: 0 auto 12px;
+}
+
+.gradient-data-ticks,
+.gradient-data-point-labels {
+  fill: currentColor;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.gradient-data-grid {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-opacity: 0.22;
+}
+
+.gradient-data-tick-marks {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
+.gradient-proof-step {
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+
+.gradient-proof-step h4 {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  letter-spacing: 0;
+}
+
+.gradient-proof-step h5 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.gradient-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: 12px 24px;
+  margin: 14px 0;
+}
+
+.gradient-proof-grid > div {
+  min-width: 0;
+}
+
+.gradient-proof-grid p {
+  margin: 8px 0;
+}
+
+.gradient-square-proof {
+  padding: 12px 0;
+}
+
+.gradient-square-proof summary {
+  cursor: pointer;
+}
+
+.gradient-number-ledger {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 16px 24px;
+  margin: 16px 0;
+}
+
+.gradient-number-ledger article {
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.gradient-number-ledger dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.gradient-number-ledger dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.gradient-derivation .katex-display,
+.gradient-problem .katex-display {
+  margin: 12px 0;
+  font-size: 0.95rem;
+}
+
+.gradient-derivation a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .gradient-data-ticks,
+  .gradient-data-point-labels {
+    font-size: 25px;
+  }
+
+  .gradient-number-ledger dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .gradient-number-ledger dd {
+    margin-bottom: 8px;
+  }
+}
+
 .gradient-motion-figure {
   margin: 20px 0 4px;
   padding: 18px;
@@ -1035,8 +1189,13 @@ body {
   line-height: 1.5;
 }
 
-.gradient-walkthrough {
-  margin: 18px 0 22px;
+.gradient-step-comparison {
+  min-width: 0;
+  margin: 14px 0;
+}
+
+.gradient-step-comparison .gradient-comparison-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
 }
 
 .gradient-comparison-grid {

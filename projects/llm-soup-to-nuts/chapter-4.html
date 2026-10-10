@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260831">
-  <link rel="stylesheet" href="chapter4.css?v=20260815y">
+  <link rel="stylesheet" href="chapter4.css?v=20261009-approved">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -1093,7 +1093,7 @@
       </div>
     </section>
 
-    <section id="gradients" class="band" aria-labelledby="gradients-title" frozen="yes">
+    <section id="gradients" class="band" aria-labelledby="gradients-title" frozen="no">
       <div class="section-shell">
         <div class="section-heading">
 
@@ -1108,11 +1108,81 @@
             move the numbers? Let's start simple, we will shrink
             the model to the simplest thing that can possibly learn - a straight line
             with two knobs, a <code>slope</code> and an <code>intercept</code> - and
-            ask it to pass through a cloud of dots. The <strong>mean squared error (MSE) loss</strong> is just
+            ask it to fit a cloud of dots as closely as it can. The <strong>mean squared error (MSE) loss</strong> is just
             the average squared gap between the line and the dots: one number that
             answers "how wrong are we right now?". (Our word model will later swap in
             cross-entropy loss, but the nudging idea is exactly the same.) MSE and cross-entropy are different objectives on different scales, so their raw loss numbers should not be compared with each other.
           </p>
+          <div id="gradient-problem" class="gradient-problem">
+            <h3>First, what are we asking this little model to do?</h3>
+            <p>Let's put the words aside for a moment. I want us to see learning happen on something we can draw: six dots and one straight line. Each dot gives us an input number <strong>\(x\)</strong> and the corresponding answer <strong>\(y\)</strong>. These are hand-picked teaching numbers, not measurements from a real experiment.</p>
+            <p>Our job is to predict \(y\) from \(x\). The model's entire guess is a line: <strong>prediction = slope &times; input + intercept</strong>. We can change its slope and intercept, but we never move the data points. A better line leaves smaller vertical gaps overall. It does not have to pass through every dot, and these six dots do not all lie on one straight line.</p>
+            <h4>Meet the six points</h4>
+            <p>Let's call the dots <strong>A, B, C, D, E, and F</strong>, so we don't confuse their names with the numbers on the axes. The formulas still use a little subscript to count through them: A is point 1, B is point 2, and so on. So \((x_1,y_1)\) means the coordinates of <strong>A</strong>: \(x_1=-0.92\), \(y_1=-0.54\). B has coordinates \((x_2,y_2)=(-0.58,-0.18)\). These are not four trainable parameters or four different axes. Every point uses the same horizontal \(x\)-axis and vertical \(y\)-axis.</p>
+            <table class="deriv-table gradient-point-table">
+              <caption>The fixed data used throughout this exercise</caption>
+              <thead><tr><th scope="col">Point \(i\)</th><th scope="col">Input \(x_i\)</th><th scope="col">True answer \(y_i\)</th></tr></thead>
+              <tbody>
+                <tr data-gradient-point="1"><th scope="row">A (1)</th><td>-0.92</td><td>-0.54</td></tr>
+                <tr data-gradient-point="2"><th scope="row">B (2)</th><td>-0.58</td><td>-0.18</td></tr>
+                <tr data-gradient-point="3"><th scope="row">C (3)</th><td>-0.18</td><td>0.06</td></tr>
+                <tr data-gradient-point="4"><th scope="row">D (4)</th><td>0.26</td><td>0.31</td></tr>
+                <tr data-gradient-point="5"><th scope="row">E (5)</th><td>0.62</td><td>0.68</td></tr>
+                <tr data-gradient-point="6"><th scope="row">F (6)</th><td>0.94</td><td>0.88</td></tr>
+              </tbody>
+            </table>
+            <figure class="gradient-data-figure">
+              <svg class="gradient-data-svg" viewBox="0 0 640 340" role="img" aria-labelledby="gradient-data-title gradient-data-desc">
+                <title id="gradient-data-title">Observations A through F and the starting prediction line</title>
+                <desc id="gradient-data-desc">Point labels A through F match the table. Light grid lines mark intervals of 0.5 on both axes. The observations rise from left to right, while the starting line has slope negative 0.40 and intercept 0.20. Vertical segments connect each true answer to the line's prediction at the same input.</desc>
+                <g class="gradient-data-grid" aria-hidden="true">
+                  <line x1="80" y1="40" x2="80" y2="296"></line>
+                  <line x1="200" y1="40" x2="200" y2="296"></line>
+                  <line x1="440" y1="40" x2="440" y2="296"></line>
+                  <line x1="560" y1="40" x2="560" y2="296"></line>
+                  <line x1="56" y1="60" x2="590" y2="60"></line>
+                  <line x1="56" y1="130" x2="590" y2="130"></line>
+                  <line x1="56" y1="270" x2="590" y2="270"></line>
+                </g>
+                <line class="svg-axis" x1="56" y1="200" x2="590" y2="200"></line>
+                <line class="svg-axis" x1="320" y1="40" x2="320" y2="296"></line>
+                <g class="gradient-data-tick-marks" aria-hidden="true">
+                  <path d="M80 196v8 M200 196v8 M440 196v8 M560 196v8 M316 60h8 M316 130h8 M316 270h8"></path>
+                </g>
+                <g class="gradient-data-ticks">
+                  <text x="80" y="221" text-anchor="middle">-1</text><text x="200" y="221" text-anchor="middle">-0.5</text><text x="307" y="221" text-anchor="end">0</text><text x="440" y="221" text-anchor="middle">0.5</text><text x="560" y="221" text-anchor="middle">1</text>
+                  <text x="305" y="65" text-anchor="end">1</text><text x="305" y="135" text-anchor="end">0.5</text><text x="305" y="275" text-anchor="end">-0.5</text>
+                  <text x="594" y="193">x</text><text x="330" y="35">y</text>
+                </g>
+                <line class="gradient-motion-line is-current" x1="56" y1="110.4" x2="584" y2="233.6"></line>
+                <g class="gradient-motion-errors">
+                  <line x1="99.2" y1="275.6" x2="99.2" y2="120.48"></line>
+                  <line x1="180.8" y1="225.2" x2="180.8" y2="139.52"></line>
+                  <line x1="276.8" y1="191.6" x2="276.8" y2="161.92"></line>
+                  <line x1="382.4" y1="156.6" x2="382.4" y2="186.56"></line>
+                  <line x1="468.8" y1="104.8" x2="468.8" y2="206.72"></line>
+                  <line x1="545.6" y1="76.8" x2="545.6" y2="224.64"></line>
+                </g>
+                <g class="gradient-motion-points">
+                  <circle cx="99.2" cy="275.6" r="6"></circle><circle cx="180.8" cy="225.2" r="6"></circle><circle cx="276.8" cy="191.6" r="6"></circle>
+                  <circle cx="382.4" cy="156.6" r="6"></circle><circle cx="468.8" cy="104.8" r="6"></circle><circle cx="545.6" cy="76.8" r="6"></circle>
+                </g>
+                <g class="gradient-data-point-labels">
+                  <text x="83" y="295">A</text><text x="152" y="255">B</text><text x="260" y="183">C</text>
+                  <text x="366" y="147">D</text><text x="452" y="95">E</text><text x="529" y="67">F</text>
+                </g>
+              </svg>
+              <figcaption><strong>Dots A-F:</strong> the fixed answers \(y_i\). <strong>Light grid:</strong> each interval is 0.5 on its axis; the darker axes cross at zero. <strong>Sloping line:</strong> our predictions \(\hat y_i\), starting at slope \(-0.40\) and intercept \(0.20\). <strong>Vertical dashed segments:</strong> the gaps between answer and prediction at the same \(x_i\). This is a fixed picture of the starting example; the lab below lets you change the line.</figcaption>
+            </figure>
+            <p>That little hat in \(\hat y_i\), pronounced "y-hat," means <strong>our prediction</strong>, not the true answer \(y_i\). For A (point 1), the dot is at \((-0.92,-0.54)\), but the starting line predicts a different height:</p>
+            <div class="gradient-proof-grid">
+              <div><p>Multiply slope by input.</p>$$(-0.40)(-0.92)=0.368$$</div>
+              <div><p>Add the intercept.</p>$$\hat y_1=0.368+0.20=0.568$$</div>
+              <div><p>Subtract the true answer.</p>$$e_1=0.568-(-0.54)$$<p>The error is \(e_1=1.108\).</p></div>
+            </div>
+            <p>Same input, different height. We call prediction minus answer the <strong>signed error</strong>, \(e_i\). A positive error means our guess is too high; a negative one means it is too low.</p>
+            <p>Can you already see the problem? The dots generally rise as we move right, but our starting line falls. Let's work out how the loss tells us to change that tilt and height, one small move at a time.</p>
+          </div>
           <figure class="gradient-motion-figure" aria-labelledby="gradient-motion-title">
             <div class="gradient-motion-intro">
               <p class="eyebrow">See the two knobs before we calculate them</p>
@@ -1202,59 +1272,131 @@
           </div>
         </div>
 
-        <section id="gradient-walkthrough" class="gradient-walkthrough" aria-labelledby="gradient-step-title" frozen="yes">
-          <div class="forward-stepper-head">
-            <div>
-              <p class="eyebrow">One gradient step, under your control</p>
-              <h3 id="gradient-step-title">Measure the current mistake</h3>
-              <p id="gradientStepCopy">Start from the line's current slope and intercept, then compress all six point errors into one MSE loss.</p>
+        <div id="gradient-derivation" class="gradient-derivation" aria-labelledby="gradient-derivation-title">
+          <h3 id="gradient-derivation-title">Where do the two gradient formulas come from?</h3>
+          <p>I don't want these formulas to feel like instructions dropped from the sky. Let's build them from the line we just drew. We will follow one point first, then put all six points together. In the lab below, you will change the line and use these same calculations to make it learn.</p>
+
+          <article class="gradient-proof-step">
+            <h4>1. Write down what can change, and what cannot</h4>
+            <p>To keep the equations readable, let \(m\) stand for the <strong>slope</strong> and \(b\) for the <strong>intercept</strong>. These are the two trainable parameters, the knobs we can turn. The observed coordinates \(x_i\) and \(y_i\) stay fixed. Every point shares the same \(m\) and \(b\); we are fitting one line, not six separate lines.</p>
+            <div class="gradient-proof-grid">
+              <div><p>The line gives a prediction.</p>$$\hat y_i=mx_i+b$$</div>
+              <div><p>The prediction gives an error.</p>$$e_i=\hat y_i-y_i$$</div>
+              <div><p>Substitute the line equation.</p>$$e_i=mx_i+b-y_i$$</div>
             </div>
-            <span id="gradientStepCount" class="pill">step 1 of 4</span>
-          </div>
-          <div class="softmax-step-jumps gradient-step-jumps" role="group" aria-label="Jump to a gradient-descent step">
-            <button type="button" data-gradient-step="0">1 <span>Measure loss</span></button>
-            <button type="button" data-gradient-step="1">2 <span>Find gradients</span></button>
-            <button type="button" data-gradient-step="2">3 <span>Plan update</span></button>
-            <button type="button" data-gradient-step="3">4 <span>Check result</span></button>
-          </div>
-          <div class="softmax-stepper-controls gradient-walkthrough-controls transport-controls" aria-label="Gradient walkthrough controls">
-            <button id="gradientBackButton" class="ghost-button" type="button">Back</button>
-            <button id="gradientPlayButton" class="ghost-button" type="button">Play</button>
-            <button id="gradientNextButton" class="primary-button" type="button">Next</button>
-            <button id="gradientReplayButton" class="ghost-button" type="button">Replay</button>
-          </div>
-          <div id="gradientStepPanel" class="softmax-step-panel gradient-step-panel" aria-live="polite"></div>
-          <p class="microcopy"><strong>Inspect first, apply second.</strong> This walkthrough previews the update using the current sliders without changing them. Press <em>Step descent</em> in the lab below when you want to apply that exact move.</p>
-        </section>
+            <p>Notice the dependency: change a knob, and the prediction changes. That changes the error, which changes the loss. The data itself does not change.</p>
+          </article>
 
-        <div class="math-formal" aria-label="Learning in symbols">
-          <h3>Loss, gradient, and the update rule, in symbols</h3>
-          <p>
-            The loss is the average squared gap between the line's prediction \(\hat{y}\)
-            and the true value \(y\). To fix a bad prediction, we need to know how tweaking our knobs affects that loss. In machine learning, we group all adjustable knobs (like our slope and our intercept) under the universal label of <strong>weights</strong>, represented by the letter \(w\). Think of \(w\) as a generic blank space: the update rule at the bottom is a template. You run the template once substituting \(w\) for the slope, and then you run it again substituting \(w\) for the intercept.
-          </p>
-          <p>
-            The <strong>gradient</strong> \(\frac{\partial L}{\partial w}\) reads as "how fast does the loss \(L\) change if I nudge just this one specific weight \(w\), holding the rest perfectly still." That is all the partial derivative \(\partial\) symbol means: isolating one knob at a time.
-          </p>
-          <p class="microcopy">
-            <em><strong>Calculus Refreshers:</strong> If the \(\partial\) symbol looks unfamiliar, Wikipedia has excellent, visual primers on <u><a href="https://en.wikipedia.org/wiki/Partial_derivative" target="_blank" rel="noreferrer">Partial derivatives</a></u> and the <u><a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">Chain Rule</a></u>.</em>
-          </p>
-          <p>
-            How do we calculate that exact gradient number? We use the Chain Rule. For one data point, the \(2\) from the squared error drops down to the front, and then we multiply by the inner variable attached to our knob. Because our prediction is \((\text{slope} \cdot x + \text{intercept})\), the variable attached to the slope is \(x\). The variable attached to the intercept is just \(1\). Those are the per-point contributions. Because the loss above averages over \(N\) points, the full gradient adds all \(N\) contributions and divides by \(N\) too.
-          </p>
+          <article class="gradient-proof-step">
+            <h4>2. Turn the six errors into one loss</h4>
+            <p>Could we just average the signed errors? Not safely: a guess that is too high and a guess that is too low could cancel, even though both are wrong. Instead, we square each error. Squaring makes both kinds of mistake positive and gives bigger misses more weight. Then we average:</p>
+            <div class="gradient-proof-grid">
+              <div><p>One point's squared error.</p>$$e_i^2=(\hat y_i-y_i)^2$$</div>
+              <div><p>Mean squared error over all points.</p>$$L=\frac{1}{N}\sum_{i=1}^{N}e_i^2$$</div>
+            </div>
+            <p>Here \(L\) is loss, \(N=6\) is the number of points, and \(\sum_{i=1}^{N}\) says "add the contribution from every point, A through F, using indices 1 through 6." The \(1/N\) divides that total by the number of points. For A alone, \(1.108^2=1.227664\). That is one contribution, not the whole loss.</p>
+            <p>We now have a precise goal: change \(m\) and \(b\) so this average squared gap gets smaller.</p>
+          </article>
 
-          $$L = \frac{1}{N}\sum_{i=1}^{N}\big(\hat{y}_i - y_i\big)^2 \qquad (\text{where } \hat{y} = \text{slope} \cdot x + \text{intercept})$$
-          $$\frac{\partial L}{\partial\,\text{slope}} = \frac{2}{N}\sum_{i=1}^{N}(\hat{y}_i-y_i)x_i \qquad \frac{\partial L}{\partial\,\text{intercept}} = \frac{2}{N}\sum_{i=1}^{N}(\hat{y}_i-y_i)$$
-          $$w \leftarrow w - \eta\,\frac{\partial L}{\partial w}$$
+          <article class="gradient-proof-step">
+            <h4>3. Ask how fast a squared error changes</h4>
+            <p>A <strong>derivative</strong> measures how fast an output changes when we make a tiny change to an input. A <strong>partial derivative</strong> asks the same question with several inputs available: turn just one knob and hold the others still. So \(\partial L/\partial m\) asks how fast loss changes with slope, keeping the intercept fixed. It is not the slope of the drawn line; it is the slope of <em>loss as we change that line's slope</em>.</p>
+            <p>First we need a smaller piece of that question: if the error changes, how fast does its square change? For a moment, call one error \(e\), without a point number. Its derivative is \(2e\):</p>
+            $$\frac{d(e^2)}{de}=2e$$
+            <details class="gradient-square-proof">
+              <summary>Why does differentiating a square give \(2e\)?</summary>
+              <p>Give \(e\) a small nonzero nudge \(t\). Expand the new square, subtract the old one, then divide by the size of the nudge:</p>
+              <div class="gradient-proof-grid">
+                <div><p>Expand the new square.</p>$$(e+t)^2=e^2+2et+t^2$$</div>
+                <div><p>Subtract the old square.</p>$$(e+t)^2-e^2=2et+t^2$$</div>
+                <div><p>Change per unit nudge.</p>$$\frac{2et+t^2}{t}=2e+t$$</div>
+              </div>
+              <p>As \(t\) shrinks toward zero, \(2e+t\) approaches \(2e\). That limiting change rate is the derivative. No mystery rule: we expanded a square and watched what survived a tiny nudge.</p>
+            </details>
+            <p>For point \(i\), that gives \(2e_i\). But our knob is not the error itself. We still need to know how slope or intercept changes that error.</p>
+          </article>
 
-          <ul class="symbol-glossary">
-            <li>\(\hat{y}\): the line's prediction; \(y\): the true value in the data.</li>
-            <li>\(N\): how many points we average the loss over.</li>
-            <li>\(w\): a generic "weight"&mdash;a placeholder. You swap in either "slope" or "intercept" when applying the math.</li>
-            <li>\(\frac{\partial L}{\partial w}\): the gradient, representing the uphill slope of the loss for that specific weight \(w\).</li>
-            <li>\(\eta\) (eta): the <strong>learning rate</strong> or step size (the same slider used in the lab).</li>
-            <li>\(\leftarrow\): "becomes" (we replace the old weight with its newly nudged value).</li>
-          </ul>
+          <article class="gradient-proof-step">
+            <h4>4. Trace each knob through the error</h4>
+            <p>Keep the source equation in sight: \(e_i=mx_i+b-y_i\). The <strong>chain rule</strong> says to multiply the change rates along a dependency path. Here that path is <strong>knob &rarr; error &rarr; squared error</strong>. It is the same bookkeeping we will use for a longer path through a neural network.</p>
+            <div class="gradient-proof-grid">
+              <div>
+                <h5>Slope: hold the intercept still</h5>
+                <p>The slope appears in \(mx_i\). Increasing \(m\) by a small amount \(t\) changes the error by \(t x_i\). Divide by \(t\) and the change rate is \(x_i\):</p>
+                $$\frac{\partial e_i}{\partial m}=x_i$$
+                <p>Multiply the two local rates.</p>
+                $$\frac{\partial(e_i^2)}{\partial m}=\frac{d(e_i^2)}{de_i}\frac{\partial e_i}{\partial m}$$
+                $$\frac{\partial(e_i^2)}{\partial m}=2e_i x_i$$
+                <p>For A (point 1):</p>
+                $$2(1.108)=2.216$$
+                $$2.216(-0.92)=-2.03872$$
+                <p>This point wants us to <em>increase</em> the slope: its negative derivative says that increasing slope lowers its squared error. Because its \(x\) is negative, increasing slope lowers the prediction at this point.</p>
+              </div>
+              <div>
+                <h5>Intercept: hold the slope still</h5>
+                <p>The intercept appears as \(+b\). Increasing \(b\) by \(t\) changes every error by exactly \(t\). Divide by \(t\) and the change rate is \(1\):</p>
+                $$\frac{\partial e_i}{\partial b}=1$$
+                <p>Multiply the two local rates.</p>
+                $$\frac{\partial(e_i^2)}{\partial b}=\frac{d(e_i^2)}{de_i}\frac{\partial e_i}{\partial b}$$
+                $$\frac{\partial(e_i^2)}{\partial b}=2e_i$$
+                <p>For A (point 1):</p>
+                $$2(1.108)(1)=2.216$$
+                <p>This point wants us to <em>decrease</em> the intercept: its prediction is too high. Other points may want the opposite, which is why we must combine all their contributions before moving the shared line.</p>
+              </div>
+            </div>
+            <p>That is where the formulas part company. Tilting the line affects a point in proportion to its signed \(x_i\), including which side of zero it lies on. Lifting the line affects every point equally. At \(x_i=0\), slope has no effect at all on that point's prediction.</p>
+          </article>
+
+          <article class="gradient-proof-step">
+            <h4>5. Average the six contributions</h4>
+            <p>Our loss is an average, \(L=(1/N)\sum_i e_i^2\). The derivative of a sum is the sum of its derivatives, and the fixed multiplier \(1/N\) stays outside. So we average the per-point slopes we just calculated:</p>
+            <div class="gradient-proof-grid">
+              <div>
+                <p><strong>Slope gradient</strong></p>
+                $$\frac{\partial L}{\partial m}=\frac{1}{N}\sum_{i=1}^{N}2e_i x_i$$
+                <p>Pull the common factor 2 outside.</p>
+                $$\boxed{\frac{\partial L}{\partial m}=\frac{2}{N}\sum_{i=1}^{N}e_i x_i}$$
+              </div>
+              <div>
+                <p><strong>Intercept gradient</strong></p>
+                $$\frac{\partial L}{\partial b}=\frac{1}{N}\sum_{i=1}^{N}2e_i$$
+                <p>Pull the common factor 2 outside.</p>
+                $$\boxed{\frac{\partial L}{\partial b}=\frac{2}{N}\sum_{i=1}^{N}e_i}$$
+              </div>
+            </div>
+            <p>The \(2\) came from squaring, the \(x_i\) or \(1\) came from the line equation, and the \(1/N\) came from averaging. Replacing \(e_i\) with \(\hat y_i-y_i\) gives exactly the formulas in the live lab. Let's calculate their inputs for the starting line, \(m=-0.40\), \(b=0.20\):</p>
+            <div class="gradient-number-ledger" aria-label="All six starting contributions before averaging">
+              <article data-gradient-ledger="1"><h5>A (point 1)</h5><dl><dt>Error \(e_i\)</dt><dd>1.108</dd><dt>Squared error \(e_i^2\)</dt><dd>1.227664</dd><dt>Error &times; input \(e_i x_i\)</dt><dd>-1.01936</dd></dl></article>
+              <article data-gradient-ledger="2"><h5>B (point 2)</h5><dl><dt>Error \(e_i\)</dt><dd>0.612</dd><dt>Squared error \(e_i^2\)</dt><dd>0.374544</dd><dt>Error &times; input \(e_i x_i\)</dt><dd>-0.35496</dd></dl></article>
+              <article data-gradient-ledger="3"><h5>C (point 3)</h5><dl><dt>Error \(e_i\)</dt><dd>0.212</dd><dt>Squared error \(e_i^2\)</dt><dd>0.044944</dd><dt>Error &times; input \(e_i x_i\)</dt><dd>-0.03816</dd></dl></article>
+              <article data-gradient-ledger="4"><h5>D (point 4)</h5><dl><dt>Error \(e_i\)</dt><dd>-0.214</dd><dt>Squared error \(e_i^2\)</dt><dd>0.045796</dd><dt>Error &times; input \(e_i x_i\)</dt><dd>-0.05564</dd></dl></article>
+              <article data-gradient-ledger="5"><h5>E (point 5)</h5><dl><dt>Error \(e_i\)</dt><dd>-0.728</dd><dt>Squared error \(e_i^2\)</dt><dd>0.529984</dd><dt>Error &times; input \(e_i x_i\)</dt><dd>-0.45136</dd></dl></article>
+              <article data-gradient-ledger="6"><h5>F (point 6)</h5><dl><dt>Error \(e_i\)</dt><dd>-1.056</dd><dt>Squared error \(e_i^2\)</dt><dd>1.115136</dd><dt>Error &times; input \(e_i x_i\)</dt><dd>-0.99264</dd></dl></article>
+            </div>
+            <p>Add the same quantity across all six cards. These are the three subtotals the next calculation uses:</p>
+            <div class="gradient-proof-grid">
+              <div><p>Total squared error.</p>$$\sum_i e_i^2=3.338068$$<p>Divide by six to get loss.</p>$$L=3.338068/6$$<p>The loss is approximately \(0.556345\).</p></div>
+              <div><p>Total error times input.</p>$$\sum_i e_i x_i=-2.91212$$<p>Multiply by two and divide by six.</p>$$\frac{\partial L}{\partial m}=\frac{2(-2.91212)}{6}$$<p>The slope gradient is approximately \(-0.970707\).</p></div>
+              <div><p>Total signed error.</p>$$\sum_i e_i=-0.066$$<p>Multiply by two and divide by six.</p>$$\frac{\partial L}{\partial b}=\frac{2(-0.066)}{6}$$<p>The intercept gradient is \(-0.022\).</p></div>
+            </div>
+            <p>Notice how A's request to lower the intercept did not win overall. Across all six points the intercept gradient is slightly negative, so the combined request is to raise the line a little. Training listens to the whole dataset here, not just the first dot.</p>
+          </article>
+
+          <article class="gradient-proof-step">
+            <h4>6. Use the gradients to plan one small move</h4>
+            <p>The two partial derivatives together form the <strong>gradient</strong>: one loss-change rate for each knob. It points uphill, toward increasing loss. To try to go downhill, <strong>subtract</strong> it. The <strong>learning rate</strong> \(\eta\), pronounced "eta," controls how much of that recommendation we apply. The lab starts at \(\eta=0.08\).</p>
+            <div class="gradient-proof-grid">
+              <div><p>Update the slope.</p>$$m_{\mathrm{new}}=m-\eta\frac{\partial L}{\partial m}$$<p>Using the rounded gradient:</p>$$-0.40-0.08(-0.970707)$$<p>The planned slope is approximately \(-0.322343\): less downward tilt.</p></div>
+              <div><p>Update the intercept.</p>$$b_{\mathrm{new}}=b-\eta\frac{\partial L}{\partial b}$$<p>Scale the gradient.</p>$$0.08(-0.022)=-0.00176$$<p>Subtract that proposed move.</p>$$0.20-(-0.00176)$$<p>The planned intercept is \(0.20176\), a little higher.</p></div>
+            </div>
+            <p>Both gradients were calculated from the <em>same starting line</em>, before changing either knob. The sliders store two decimal places, so the applied line uses slope \(-0.32\) and intercept \(0.20\). The intercept staying at \(0.20\) is rounding, not a zero gradient. After you press <em>Step descent</em>, the lab compares loss before and after that actual rounded update.</p>
+            <p>You will often see both updates written as one template, \(w\leftarrow w-\eta\,\partial L/\partial w\). Here \(w\) just stands for whichever trainable parameter we are updating: use \(m\) for the slope, then \(b\) for the intercept. The arrow means "replace the old value with this new one." Later we will use the same template for weights and biases in a network.</p>
+            <p>A gradient describes the local direction; it does not promise that any size of step will help. That is why we take a small move and check the loss again. For optional background, see <a href="https://en.wikipedia.org/wiki/Partial_derivative" target="_blank" rel="noreferrer">partial derivatives</a> and the <a href="https://en.wikipedia.org/wiki/Chain_rule" target="_blank" rel="noreferrer">chain rule</a>.</p>
+          </article>
+          <p><strong>Now your turn.</strong> In the lab, press <em>Step descent</em> to apply the move we just calculated. Watch the line change and compare its loss before and after. Then change the slope, intercept, or step size and try again. The live arithmetic shows what the next move will be; <em>Auto train</em> repeats the same update for you.</p>
+        </div>
+
+        <div class="math-formal" aria-label="From two gradients to a network's gradient vector">
           <div class="gradient-vector-bridge">
             <h4>Two derivatives here become millions of derivatives later</h4>
             <p>This line has two trainable knobs, so its gradient is the two-number vector below. A neural network follows the identical rule; its gradient vector simply has one entry for every embedding value, weight, and bias.</p>
@@ -1308,6 +1450,7 @@
               <button id="gradientAutoButton" class="ghost-button" type="button">Auto train</button>
               <button id="gradientResetButton" class="ghost-button" type="button">Reset</button>
             </div>
+            <div id="gradientStepComparison" class="gradient-step-comparison" aria-live="polite"></div>
             <p id="gradientRunNote" class="microcopy" aria-live="polite">Auto train stops when the fit settles, diverges, reaches 80 steps, or runs for 10 seconds. Press Stop at any time.</p>
             <svg id="lineFitSvg" class="line-fit-svg" viewBox="0 0 560 360" role="img" aria-label="Line fit and training points"></svg>
             <p class="microcopy">
@@ -3161,7 +3304,7 @@
   </main>
 
   <script src="corpora.js?v=20260812a"></script>
-  <script src="chapter4.js?v=20260815g"></script>
+  <script src="chapter4.js?v=20261009-gradient-lab"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>
