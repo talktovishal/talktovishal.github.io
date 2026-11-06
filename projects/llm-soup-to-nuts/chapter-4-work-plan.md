@@ -5,7 +5,7 @@
 - [x] Author approved the Section 5 setup, complete MSE derivation, A-F labels, coordinate grid, and consolidated live lab on 2026-10-09.
 - [x] Removed redlines, the retired walkthrough snapshot, review queue, review stylesheet link, and unused review CSS. Approved content now has normal styling.
 - Preserved all six data points, default parameters, live-lab control IDs, and training behavior. Other frozen sections remain untouched.
-- Section 5 remains editable; this approval does not declare the whole chapter finished. PDF work and publication were not requested.
+- Section 5 was refrozen at the author's request on 2026-10-10. This does not declare the remaining Section 6 corrections complete; PDF work remains deferred.
 
 ## Focused Validation
 
@@ -30,6 +30,8 @@
 ## Section 6 Correction Queue
 
 Implement one item at a time, in order of its first appearance in the lesson. Preserve red/green evidence until that item is approved; do not begin the next item while one is awaiting review.
+
+Section 6 and its nested pass map were refrozen at the author's request on 2026-10-10. The remaining items require renewed authorization or the author removing the relevant frozen attributes before implementation.
 
 - [x] Approved 2026-10-10: corrected the opening loss-gradient notation and carried the learning rate into the embedding handoff. Removed the redlines, review queue, review stylesheet link, and scoped redline-padding rule; the approved explanation now has normal styling.
 - [ ] Add learner-controlled motion that respects reduced motion in the live backward graph, retaining a meaningful static baseline.
