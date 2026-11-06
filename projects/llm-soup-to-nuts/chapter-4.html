@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Math Behind Predicting the Next Word - LLM Soup to Nuts</title>
   <link rel="stylesheet" href="styles.css?v=20260831">
-  <link rel="stylesheet" href="chapter4.css?v=20261010-approved">
+  <link rel="stylesheet" href="chapter4.css?v=20261106-approved">
+  <link rel="stylesheet" href="chapter4-3d.css?v=20261105-6">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
@@ -1374,7 +1375,7 @@
               <article data-gradient-ledger="6"><h5>F (point 6)</h5><dl><dt>Error \(e_i\)</dt><dd>-1.056</dd><dt>Squared error \(e_i^2\)</dt><dd>1.115136</dd><dt>Error &times; input \(e_i x_i\)</dt><dd>-0.99264</dd></dl></article>
             </div>
             <p>Add the same quantity across all six cards. These are the three subtotals the next calculation uses:</p>
-            <div class="gradient-proof-grid">
+            <div class="gradient-proof-grid gradient-subtotal-grid">
               <div><p>Total squared error.</p>$$\sum_i e_i^2=3.338068$$<p>Divide by six to get loss.</p>$$L=3.338068/6$$<p>The loss is approximately \(0.556345\).</p></div>
               <div><p>Total error times input.</p>$$\sum_i e_i x_i=-2.91212$$<p>Multiply by two and divide by six.</p>$$\frac{\partial L}{\partial m}=\frac{2(-2.91212)}{6}$$<p>The slope gradient is approximately \(-0.970707\).</p></div>
               <div><p>Total signed error.</p>$$\sum_i e_i=-0.066$$<p>Multiply by two and divide by six.</p>$$\frac{\partial L}{\partial b}=\frac{2(-0.066)}{6}$$<p>The intercept gradient is \(-0.022\).</p></div>
@@ -2683,6 +2684,16 @@
           </div>
         </div>
 
+        <div id="backprop3d" class="backprop-live-bridge" aria-labelledby="backprop3d-title">
+          <p class="eyebrow">Optional: step inside the network</p>
+          <h3 id="backprop3d-title">See the same training step in three dimensions.</h3>
+          <p>We just did the arithmetic by hand. Now let's spread the same network out in space: follow the two inputs forward, watch five output requests meet at a hidden neuron, and see why the closed ReLU blocks its gradient. The numbers are the worksheet's numbers, not a second example.</p>
+          <p>Inspect a connection, change one weight, or follow the complete calculation. Only the separate gradient-update action changes the model during the walkthrough.</p>
+          <button id="backprop3dOpen" class="primary-button" type="button" aria-controls="backprop3dApp" aria-expanded="false">Open the 3D training-step lab</button>
+          <p id="backprop3dLoadStatus" class="microcopy" role="status">Optional local 3D download. The existing diagrams and worksheet remain available.</p>
+          <div id="backprop3dApp" class="bp3d" data-theme="dark" hidden></div>
+        </div>
+
         <div class="backprop-example-vote">
           <p class="eyebrow">One example casts one vote</p>
           <h4>This backward pass does not speak for the whole corpus.</h4>
@@ -2966,13 +2977,23 @@
                 </select>
               </label>
             </div>
-            <svg id="backpropSvg" class="network-svg" viewBox="0 0 560 300" role="img" aria-label="Error flowing backward through the tiny network"></svg>
+            <div id="backprop-motion-review" class="backprop-motion">
+              <div class="section-title-row">
+                <h4>Trace one hidden neuron's gradient</h4>
+                <span id="backpropMotionCount" class="pill">stage 1 of 3</span>
+              </div>
+              <div class="stepper-row transport-controls" aria-label="Backward trace playback controls">
+                <button id="backpropMotionBack" class="ghost-button" type="button">Back</button>
+                <button id="backpropMotionPlay" class="ghost-button" type="button" aria-describedby="backpropMotionNote">Play</button>
+                <button id="backpropMotionNext" class="primary-button" type="button">Next</button>
+                <button id="backpropMotionReplay" class="ghost-button" type="button">Replay</button>
+              </div>
+              <p id="backpropMotionNote" class="microcopy"></p>
+            </div>
+            <svg id="backpropSvg" class="network-svg" viewBox="0 0 560 300" role="img" aria-label="Loss gradients on the tiny network; the selected route runs from outputs toward a hidden neuron"></svg>
+            <div id="backpropMotionCaption" class="backprop-motion-caption" aria-live="polite" aria-atomic="true"></div>
             <p class="microcopy">
-              The orange dashes flow <strong>right to left</strong> - that is the error
-              travelling backward. Each output word shows its <strong>blame</strong>
-              (<code>probability &minus; target</code> because this panel uses <code>T = 1</code>); each hidden neuron shows the
-              gradient that will nudge its weights. <strong>Click a hidden neuron</strong>
-              to trace its chain rule on the right.
+              The graph starts with the computed gradients visible and no motion. Each output shows <code>q - y</code> at <code>T = 1</code>; each hidden neuron shows the loss gradient at its pre-activation. Click a hidden neuron to select its route. The trace explains that gradient; the separate gradient-step button applies the parameter update.
             </p>
             <label class="range-row math-range backprop-rate-row" for="backpropRateSlider">
               <span>Learning rate</span>
@@ -3310,7 +3331,7 @@
   </main>
 
   <script src="corpora.js?v=20260812a"></script>
-  <script src="chapter4.js?v=20261009-gradient-lab"></script>
+  <script src="chapter4.js?v=20261105-3d-lab-6"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
   <script>

@@ -111,6 +111,13 @@ const dom = {
   backpropStepButton: document.getElementById("backpropStepButton"),
   backpropResetButton: document.getElementById("backpropResetButton"),
   backpropSvg: document.getElementById("backpropSvg"),
+  backpropMotionBack: document.getElementById("backpropMotionBack"),
+  backpropMotionPlay: document.getElementById("backpropMotionPlay"),
+  backpropMotionNext: document.getElementById("backpropMotionNext"),
+  backpropMotionReplay: document.getElementById("backpropMotionReplay"),
+  backpropMotionCount: document.getElementById("backpropMotionCount"),
+  backpropMotionCaption: document.getElementById("backpropMotionCaption"),
+  backpropMotionNote: document.getElementById("backpropMotionNote"),
   backpropSummary: document.getElementById("backpropSummary"),
   backpropMetrics: document.getElementById("backpropMetrics"),
   backpropLossSpark: document.getElementById("backpropLossSpark"),
@@ -1967,8 +1974,114 @@ function cloneForwardWeights() {
 }
 
 function initBackpropLab() {
-  state.backprop = { weights: cloneForwardWeights(), focus: null, steps: 0, lossHistory: [], pTrueHistory: [] };
+  state.backprop = {
+    weights: cloneForwardWeights(), focus: null, steps: 0, lossHistory: [], pTrueHistory: [],
+    motionStep: 0, motionPlaying: false, motionTimer: null, motionAnimations: [],
+    motionPreference: window.matchMedia("(prefers-reduced-motion: reduce)")
+  };
+  state.backprop.motionPreference.addEventListener("change", () => setBackpropMotionStep(state.backprop.motionStep));
   restartBackpropRun();
+}
+
+function stopBackpropMotion() {
+  const motion = state.backprop;
+  window.clearTimeout(motion.motionTimer);
+  motion.motionTimer = null;
+  motion.motionPlaying = false;
+  motion.motionAnimations.forEach((animation) => animation.cancel());
+  motion.motionAnimations = [];
+  dom.backpropSvg.querySelectorAll(".backprop-particle").forEach((particle) => particle.remove());
+}
+
+function renderBackpropMotion() {
+  const motion = state.backprop;
+  const pass = computeBackpropPass();
+  const focus = motion.motionFocus;
+  const neuron = `h${focus + 1}`;
+  dom.backpropMotionBack.disabled = motion.motionStep === 0;
+  dom.backpropMotionNext.disabled = motion.motionStep === 2;
+  dom.backpropMotionPlay.disabled = motion.motionPreference.matches;
+  dom.backpropMotionPlay.textContent = motion.motionPlaying ? "Pause" : "Play";
+  dom.backpropMotionCount.textContent = `stage ${motion.motionStep + 1} of 3`;
+  dom.backpropMotionNote.textContent = motion.motionPreference.matches
+    ? "Reduced motion is on. Back and Next show each stage without animation. No weights change during this trace."
+    : "Play runs this trace once; Pause holds the current stage. Only Take a gradient step changes weights.";
+  const caption = dom.backpropMotionCaption;
+  caption.replaceChildren();
+  if (motion.motionStep === 0) {
+    caption.append(
+      createElement("strong", "", "1. Start at the loss"),
+      createElement("p", "", `The true word is ${pass.trueWord}, with probability about ${formatNumber(pass.q[pass.trueIndex], 3)}. L = -ln(q_true), about ${formatNumber(pass.loss, 3)} nats. Each output displays its loss gradient q - y, where y is 1 for the true word and 0 otherwise. Next follows those gradients toward ${neuron}.`)
+    );
+  } else if (motion.motionStep === 1) {
+    caption.append(createElement("strong", "", `2. Add the three contributions arriving at ${neuron}`));
+    caption.append(createElement("p", "", `Each forward logit adds weight x ${neuron} to its other terms. Its local slope with respect to ${neuron} is that weight. For loss L = -ln(q_true), the arriving logit gradient is q - y; multiply it by the local weight to follow each route backward.`));
+    const terms = createElement("ul", "backprop-motion-terms");
+    forwardCandidates.forEach((word, index) => {
+      const weight = motion.weights.w2[focus][index];
+      terms.append(createElement("li", "", `${word}: ${signedFixed(pass.dz2[index], 3)} (q - y) x ${signedFixed(weight, 3)} (output weight) = ${signedFixed(pass.dz2[index] * weight, 3)}`));
+    });
+    caption.append(
+      terms,
+      createElement("p", "", `Their sum is dL/d${neuron} = ${signedFixed(pass.dh[focus], 3)}. Each travelling circle carries that word's weighted contribution toward ${neuron}; larger circles mean larger magnitudes. Green means positive and red means negative. Zero contributions do not travel.`)
+    );
+  } else {
+    const slope = activationDerivative(pass.name, pass.z1[focus]);
+    caption.append(
+      createElement("strong", "", "3. Pass through the activation gate"),
+      createElement("p", "", `The forward equation was ${neuron} = ${pass.name}(r), where r = ${formatNumber(pass.z1[focus], 3)} is this neuron's pre-activation. The local slope is ${formatNumber(slope, 3)}.`),
+      createElement("p", "", `For loss L = -ln(q_true), the three routes just supplied dL/d${neuron} = ${signedFixed(pass.dh[focus], 3)}. Now dL/dr = dL/d${neuron} x the local slope = ${signedFixed(pass.dh[focus], 3)} x ${formatNumber(slope, 3)} = ${signedFixed(pass.dz1[focus], 3)}. This is the gradient displayed inside ${neuron}, not a weight update.`),
+      backpropGateNote(pass.name, slope)
+    );
+  }
+}
+
+function animateBackpropContributions() {
+  const motion = state.backprop;
+  if (motion.motionPreference.matches) return;
+  dom.backpropSvg.querySelectorAll("[data-backprop-contribution]").forEach((edge) => {
+    const contribution = Number(edge.dataset.backpropContribution);
+    if (contribution === 0) return;
+    const startX = Number(edge.getAttribute("x2"));
+    const startY = Number(edge.getAttribute("y2"));
+    const endX = Number(edge.getAttribute("x1"));
+    const endY = Number(edge.getAttribute("y1"));
+    const particle = createSvgElement("circle", {
+      class: `network-edge backprop-particle ${contribution > 0 ? "is-pos" : "is-neg"}`,
+      cx: 0, cy: 0, r: clamp(3 + Math.sqrt(Math.abs(contribution)) * 8, 3, 9),
+      "data-contribution": contribution, "aria-hidden": "true"
+    });
+    dom.backpropSvg.append(particle);
+    const animation = particle.animate([
+      { transform: `translate(${startX}px, ${startY}px)` },
+      { transform: `translate(${endX}px, ${endY}px)` }
+    ], { duration: 1400, easing: "linear", fill: "forwards" });
+    animation.onfinish = animation.oncancel = () => particle.remove();
+    motion.motionAnimations.push(animation);
+  });
+}
+
+function setBackpropMotionStep(step, animate = false) {
+  stopBackpropMotion();
+  state.backprop.motionStep = clamp(step, 0, 2);
+  renderBackpropMotion();
+  if (animate && state.backprop.motionStep === 1) animateBackpropContributions();
+}
+
+function toggleBackpropMotion() {
+  const motion = state.backprop;
+  if (motion.motionPlaying) {
+    stopBackpropMotion();
+    renderBackpropMotion();
+    return;
+  }
+  if (motion.motionPreference.matches) return;
+  stopBackpropMotion();
+  motion.motionStep = 1;
+  motion.motionPlaying = true;
+  renderBackpropMotion();
+  animateBackpropContributions();
+  motion.motionTimer = window.setTimeout(() => setBackpropMotionStep(2), 2600);
 }
 
 function computeBackpropPass() {
@@ -2027,6 +2140,8 @@ function backpropStep() {
 
 function renderBackprop() {
   const bp = state.backprop;
+  stopBackpropMotion();
+  bp.motionStep = 0;
   dom.backpropRateLabel.textContent = formatNumber(Number(dom.backpropRateSlider.value) / 100, 2);
   const pass = computeBackpropPass();
   let focus = bp.focus;
@@ -2035,8 +2150,10 @@ function renderBackprop() {
     focus = mags.indexOf(Math.max(...mags));
   }
   focus = clamp(focus, 0, pass.hidden.length - 1);
+  bp.motionFocus = focus;
   dom.backpropSummary.textContent = bp.steps === 0 ? "before training" : `${bp.steps} step${bp.steps === 1 ? "" : "s"}`;
   renderBackpropSvg(pass, focus);
+  renderBackpropMotion();
   renderBackpropMetrics(pass);
   renderBackpropSpark();
   dom.backpropTracePanel.replaceChildren(...buildBackpropBreakdown(pass, focus));
@@ -2104,17 +2221,12 @@ function renderBackpropSvg(pass, focus) {
   const edgeWidth = (magnitude) => clamp(1 + magnitude * 4, 1, 6).toFixed(2);
   const addEdge = (x1, y1, x2, y2, signed, focused) => {
     const sign = signed >= 0 ? "is-pos" : "is-neg";
-    svg.append(createSvgElement("line", {
+    const edge = createSvgElement("line", {
       class: focused ? `network-edge ${sign} is-focus` : "network-edge is-muted",
       x1, y1, x2, y2, "stroke-width": focused ? edgeWidth(Math.abs(signed)) : 1.4
-    }));
-    if (focused) {
-      const flow = createSvgElement("line", { class: "backprop-flow", x1, y1, x2, y2 });
-      flow.append(createSvgElement("animate", {
-        attributeName: "stroke-dashoffset", from: "0", to: "14", dur: "0.7s", repeatCount: "indefinite"
-      }));
-      svg.append(flow);
-    }
+    });
+    svg.append(edge);
+    return edge;
   };
   inputNodes.forEach((source, i) => {
     hiddenNodes.forEach((target, j) => {
@@ -2123,7 +2235,8 @@ function renderBackpropSvg(pass, focus) {
   });
   hiddenNodes.forEach((source, j) => {
     outputNodes.forEach((target, k) => {
-      addEdge(source.x + 24, source.y, target.x - 40, target.y, dz2[k] * w2[j][k], j === focus);
+      const edge = addEdge(source.x + 24, source.y, target.x - 40, target.y, dz2[k] * w2[j][k], j === focus);
+      if (j === focus) edge.dataset.backpropContribution = dz2[k] * w2[j][k];
     });
   });
   const drawNode = (node, kind) => {
@@ -3500,6 +3613,10 @@ function wireEvents() {
   dom.backpropRateSlider.addEventListener("input", renderBackprop);
   dom.backpropStepButton.addEventListener("click", backpropStep);
   dom.backpropResetButton.addEventListener("click", restartBackpropRun);
+  dom.backpropMotionBack.addEventListener("click", () => setBackpropMotionStep(state.backprop.motionStep - 1));
+  dom.backpropMotionNext.addEventListener("click", () => setBackpropMotionStep(state.backprop.motionStep + 1, true));
+  dom.backpropMotionPlay.addEventListener("click", toggleBackpropMotion);
+  dom.backpropMotionReplay.addEventListener("click", () => setBackpropMotionStep(0));
   if (dom.backpropNudgeLab) {
     dom.backpropNudgeButton.addEventListener("click", runBackpropNudge);
     dom.backpropNudgeResetButton.addEventListener("click", resetBackpropNudge);
@@ -3562,6 +3679,37 @@ function init() {
   renderCorpusPreview();
   resetNextWord();
   setupSectionSpy();
+  const open3D = document.getElementById("backprop3dOpen");
+  const app3D = document.getElementById("backprop3dApp");
+  const loadStatus3D = document.getElementById("backprop3dLoadStatus");
+  let loading3D = false;
+  open3D.addEventListener("click", async () => {
+    if (loading3D) return;
+    if (app3D.dataset.ready) {
+      app3D.dispatchEvent(new Event("bp3d:pause"));
+      app3D.hidden = !app3D.hidden;
+      open3D.setAttribute("aria-expanded", String(!app3D.hidden));
+      open3D.textContent = app3D.hidden ? "Open the 3D training-step lab" : "Close the 3D training-step lab";
+      return;
+    }
+    loading3D = true;
+    open3D.disabled = true;
+    loadStatus3D.textContent = "Loading the training-step lab...";
+    try {
+      const { mountBackprop3D } = await import("./chapter4-3d.js?v=20261105-6");
+      app3D.hidden = false;
+      await mountBackprop3D(app3D, byHandNetwork);
+      open3D.setAttribute("aria-expanded", "true");
+      open3D.textContent = "Close the 3D training-step lab";
+      loadStatus3D.textContent = "The lab is ready. Its model is independent of the worksheet and other live panels.";
+    } catch (error) {
+      app3D.hidden = true;
+      loadStatus3D.textContent = "The optional lab could not load. The worksheet above still works; press Open to retry.";
+    } finally {
+      loading3D = false;
+      open3D.disabled = false;
+    }
+  });
 }
 
 init();

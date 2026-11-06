@@ -854,7 +854,7 @@ body {
 }
 
 .gradient-proof-step {
-  padding: 18px 0;
+  padding: 26px 0;
   border-top: 1px solid var(--line);
 }
 
@@ -872,17 +872,52 @@ body {
 
 .gradient-proof-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
-  gap: 12px 24px;
-  margin: 14px 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 20px 0;
+  border-block: 1px solid var(--line);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+
+.gradient-proof-grid:has(> div:nth-child(3)) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .gradient-proof-grid > div {
   min-width: 0;
+  padding: 18px;
+}
+
+.gradient-proof-grid > div + div {
+  border-left: 1px solid var(--line);
 }
 
 .gradient-proof-grid p {
-  margin: 8px 0;
+  margin: 12px 0;
+  line-height: 1.65;
+}
+
+.gradient-proof-grid > div > :first-child {
+  margin-top: 0;
+}
+
+.gradient-proof-grid > div > :last-child {
+  margin-bottom: 0;
+}
+
+.gradient-subtotal-grid {
+  border-top: 3px double var(--muted);
+  background: color-mix(in srgb, var(--green) 5%, transparent);
+}
+
+.gradient-subtotal-grid > div > p:first-child,
+.gradient-subtotal-grid > div > p:last-child {
+  font-weight: 700;
+}
+
+.gradient-subtotal-grid > div > p:last-child {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .gradient-square-proof {
@@ -896,26 +931,48 @@ body {
 .gradient-number-ledger {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
-  gap: 16px 24px;
-  margin: 16px 0;
+  gap: 16px;
+  margin: 22px 0;
 }
 
 .gradient-number-ledger article {
   min-width: 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.gradient-number-ledger article h5 {
+  padding: 12px;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .gradient-number-ledger dl {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px 12px;
+  gap: 0;
   margin: 0;
+}
+
+.gradient-number-ledger dt,
+.gradient-number-ledger dd {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  line-height: 1.5;
 }
 
 .gradient-number-ledger dd {
   margin: 0;
+  border-left: 1px solid var(--line);
   font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-weight: 650;
+}
+
+.gradient-number-ledger dt:last-of-type,
+.gradient-number-ledger dd:last-of-type {
+  border-bottom: 0;
 }
 
 .gradient-derivation .katex-display,
@@ -924,10 +981,31 @@ body {
   font-size: 0.95rem;
 }
 
+.gradient-proof-grid .katex-display {
+  margin: 16px 0;
+  padding: 8px 0;
+}
+
+.gradient-proof-grid .katex-display + .katex-display {
+  border-top: 1px solid var(--line);
+}
+
 .gradient-derivation a {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+@media (max-width: 1000px) {
+  .gradient-proof-grid,
+  .gradient-proof-grid:has(> div:nth-child(3)) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gradient-proof-grid > div + div {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
 }
 
 @media (max-width: 600px) {
@@ -936,13 +1014,13 @@ body {
     font-size: 25px;
   }
 
-  .gradient-number-ledger dl {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
+  .gradient-proof-grid > div {
+    padding: 16px 10px;
   }
 
+  .gradient-number-ledger dt,
   .gradient-number-ledger dd {
-    margin-bottom: 8px;
+    padding: 10px 8px;
   }
 }
 
@@ -2851,13 +2929,30 @@ body {
   fill: var(--green);
 }
 
-.backprop-flow {
-  stroke: var(--gold);
-  stroke-width: 2.6;
-  stroke-dasharray: 5 9;
-  stroke-linecap: round;
-  opacity: 0.95;
+.backprop-particle {
+  fill: none;
+  stroke-width: 3;
   pointer-events: none;
+}
+
+.backprop-motion,
+.backprop-motion-caption {
+  border-left: 3px solid var(--line);
+  padding-left: 12px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+
+.backprop-motion .section-title-row {
+  flex-wrap: wrap;
+}
+
+.backprop-motion-terms {
+  padding-left: 20px;
+}
+
+.backprop-motion-terms li + li {
+  margin-top: 8px;
 }
 
 @media (max-width: 760px) {
