@@ -113,7 +113,7 @@ function createMapLens(graph){
 
 async function mount() {
   const {default:data}=await import('./chapter5-gpt2-trace.js?v=20261122-publish');
-  const {createTour,stops,stopNames}=await import('./chapter5-lessons.js?v=20261122-publish');
+  const {createTour,stops,stopNames}=await import('./chapter5-lessons.js?v=20261122-title');
   const {createInputStudy}=await import('./chapter5-inputs.js?v=20261122-publish');
   const graph=$('graph');
   function decode(s){return new Float32Array(Uint8Array.from(atob(s),c=>c.charCodeAt(0)).buffer);}
@@ -218,7 +218,7 @@ async function mount() {
     const panel=(x,w,label,sub,id)=>{
       return pick(`step:${id}`,`Inspect ${label}`,rect(x,9,w,41,C.paper,`class="outline" stroke="${C.line}"`)+txt(x+8,26,label,'heading')+txt(x+8,42,sub,'subhead'));
     };
-    let art=`<title>Inside a prediction for ${words[reader]}. Inspect head ${head+1} in block one.</title>`;
+    let art=`<title>The Transformer at work, reading at “${words[reader]}”. Inspect head ${head+1} in block one.</title>`;
     art+=rect(189,60,613,317,C.pale,'opacity=".5"')+rect(414,100,215,206,C.paper,`stroke="${C.line}"`);
     art+=panel(8,158,'Inputs','Token + position embeddings',1)+panel(187,185,'Three projections','Block 1 · normalize first',2)
       +panel(404,224,'Self-attention',`Query rows × source columns`,4)+panel(669,131,'12 heads','Join · project · add',6)

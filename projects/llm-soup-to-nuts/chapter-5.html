@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Transformers and Attention - LLM Soup to Nuts</title>
-  <meta name="description" content="Follow one real GPT-2 prediction all the way through a Transformer: tokens, embeddings, queries, keys, values, attention, feed-forward layers, twelve blocks and brand-new text.">
+  <title>The Transformer Architecture - LLM Soup to Nuts</title>
+  <meta name="description" content="Learn the Transformer architecture one piece at a time: tokens, token and position embeddings, queries, keys and values, attention heads, the feed-forward network and the stack of blocks, using the real numbers from one GPT-2 prediction.">
   <link rel="stylesheet" href="styles.css?v=20260726">
   <link rel="stylesheet" href="chapter5-walkthrough.css?v=20261122-publish">
 </head>
@@ -66,8 +66,8 @@
     <section class="band c5-header" aria-labelledby="page-title">
       <div class="section-shell">
         <p class="eyebrow">Chapter 5</p>
-        <h1 id="page-title">Transformers: follow one prediction all the way through.</h1>
-        <p class="lead">We’ll follow one real prediction by GPT-2 small (12 blocks, 12 attention heads in each block, 768 numbers for every token) from the first token all the way to brand-new text. Every number on this page comes from one saved run of that model, so there’s nothing to download.</p>
+        <h1 id="page-title">Transformers: the architecture inside today’s LLMs, one piece at a time.</h1>
+        <p class="lead">Time to open up the Transformer, the architecture inside GPT-2 and nearly every LLM you’ve heard of. We’ll meet its parts in the order your text flows through them: tokens, token and position embeddings, attention (queries, keys and values, across many heads), the feed-forward network, the stack of blocks, and the output that turns it all into a guess. And we won’t use a toy to do it. We’ll follow one real prediction by GPT-2 small (12 blocks, 12 attention heads in each block, 768 numbers for every token) through every part, all the way to brand-new text. Every number on this page comes from one saved run of that model, so there’s nothing to download.</p>
         <div class="example-note prereq-note">
           <p><em>Before we dive in, a few prerequisites are in order.</em></p>
           <ul>
@@ -81,7 +81,7 @@
       </div>
     </section>
 
-    <section id="walkthrough" class="band" aria-label="Interactive walkthrough of one GPT-2 prediction">
+    <section id="walkthrough" class="band" aria-label="Interactive tour of the Transformer architecture, using one real GPT-2 prediction" frozen="yes">
       <div id="c5w">
         <p id="loading" role="status">Opening the saved GPT-2 run…</p>
         <div id="work" hidden>
@@ -98,7 +98,7 @@
             <div class="legend" id="roleLegend"><b>Read left to right</b><span><i class="key" style="--swatch:var(--cp-link)"></i>Q asks</span><span><i class="key" style="--swatch:var(--cp-danger)"></i>K matches</span><span><i class="key" style="--swatch:var(--cp-success)"></i>V carries</span><span class="key-help">Wider ribbon = larger share.</span></div>
           </div>
           <div class="reading" id="reading">
-            <section class="instrument" aria-labelledby="measureTitle"><div class="kicker" id="lessonKicker">Worked math</div><h3 id="measureTitle"></h3><div id="measure"></div><section id="inputLab" aria-label="Inspect token occurrences" hidden></section><div id="inputMeasures" hidden></div>
+            <section class="instrument" aria-labelledby="measureTitle" frozen="yes"><div class="kicker" id="lessonKicker">Worked math</div><h3 id="measureTitle"></h3><div id="measure"></div><section id="inputLab" aria-label="Inspect token occurrences" hidden frozen="yes"></section><div id="inputMeasures" hidden></div>
               <details id="deeper"><summary>Look closer at the calculation</summary><div id="math"></div></details>
             </section>
             <aside class="note" aria-labelledby="guideTitle">
@@ -112,7 +112,7 @@
       </div>
     </section>
 
-    <section id="references" class="band">
+    <section id="references" class="band" frozen="yes">
       <div class="section-shell"><h2>Go deeper, with a map in hand.</h2><p>This chapter is my attempt to slow the machinery down until you can reconstruct it yourself. These sources go further; they are not substitutes for a missing step in the explanation above.</p><ul class="reference-list">
         <li><a href="https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf">Radford et al., Language Models are Unsupervised Multitask Learners</a>: the GPT-2 paper. Every number in this chapter comes from the GPT-2 small checkpoint (<a href="https://huggingface.co/openai-community/gpt2/tree/607a30d783dfa663caf39e06633721c8d4cfcd7e">Hugging Face revision 607a30d</a>, <a href="https://github.com/openai/gpt-2/blob/master/LICENSE">license</a>).</li>
         <li><a href="https://www.youtube.com/watch?v=bCz4OMemCcA">Umar Jamil, Attention Is All You Need</a>: our primary completeness companion. Start at notation (09:02), attention (20:08), multihead (28:30), normalization (37:55), decoder (40:13), training (44:59), or inference (52:09). <a href="https://github.com/hkproj/transformer-from-scratch-notes">Companion diagrams and notes</a>.</li>
@@ -127,7 +127,7 @@
       </ul></div>
     </section>
 
-    <section class="chapter-nav-band" aria-label="Chapter navigation">
+    <section class="chapter-nav-band" aria-label="Chapter navigation" frozen="yes">
       <div class="section-shell">
         <nav class="chapter-nav">
           <a class="chapter-nav-card" href="chapter-4.html">
@@ -145,7 +145,7 @@
     </section>
   </main>
 
-  <script type="module" src="chapter5-walkthrough.js?v=20261122-publish"></script>
+  <script type="module" src="chapter5-walkthrough.js?v=20261122-title"></script>
   <script src="site.js" defer></script>
 </body>
 </html>

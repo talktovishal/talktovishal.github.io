@@ -1,6 +1,6 @@
 # Chapter 5 work plan: follow one token through a Transformer
 
-**Status, November 22, 2026: published.** The author approved Option 1 below, and the GPT-2 walkthrough is now [Chapter 5](chapter-5.html). The earlier hand-designed draft, its exercises, notebooks and the previous implementation record (`chapter-5-work-plan-baseline.md`) are archived outside the published folder in `archive/chapter-5-draft-2026-11-22/` and remain in git history. Still open: the author's review of the two new stops (14 and 15), then freezing the chapter.
+**Status, November 22, 2026: published.** The author approved Option 1 below, and the GPT-2 walkthrough is now [Chapter 5](chapter-5.html). The earlier hand-designed draft, its exercises, notebooks and the previous implementation record (`chapter-5-work-plan-baseline.md`) are archived outside the published folder in `archive/chapter-5-draft-2026-11-22/` and remain in git history. Still open: the author's review of the architecture-first retitle (page title, lead, overview card and the opening of stop 1). Stops 14 and 15 are approved and the chapter's sections are frozen, except the title section, which stays editable until the retitle is approved. Delete this plan after that approval.
 
 ## Option 1 merge plan, simplified (approved and published)
 
