@@ -248,7 +248,165 @@
     // If neither is set, do nothing at all. No tracking, no network calls.
   }
 
+  // ---- Collapsible contents sidebar ------------------------------------------
+  // Auto-hidden by default: hovering the left edge or the tab (or clicking the
+  // tab) slides it out over the page. "Pin" docks it beside the page on wide
+  // screens; the choice is remembered across chapters and visits.
+  const TOC_PIN_KEY = "llmSoupTocPinned";
+  const TOC_DOCK_QUERY = "(min-width: 1181px)";
+  const LIST_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 3.5h11M2.5 8h11M2.5 12.5h11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  const PIN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M5.5 2h5M6.5 2v4.2L4.5 9h7l-2-2.8V2M8 9v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function readTocPinned() {
+    try {
+      return window.localStorage.getItem(TOC_PIN_KEY) === "1";
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function saveTocPinned(pinned) {
+    try {
+      window.localStorage.setItem(TOC_PIN_KEY, pinned ? "1" : "0");
+    } catch (error) {
+      // Private browsing can block storage; pinning still works for this page.
+    }
+  }
+
+  // Apply the remembered choice as early as possible to avoid a layout jump.
+  document.documentElement.classList.toggle("toc-pinned", readTocPinned());
+
+  function setupContentsSidebar() {
+    const toc = document.querySelector(".lesson-toc");
+    if (!toc || toc.querySelector(".toc-pin")) return;
+    const root = document.documentElement;
+    const dock = window.matchMedia(TOC_DOCK_QUERY);
+    let openTimer = 0;
+    let closeTimer = 0;
+    if (!toc.id) toc.id = "lesson-toc";
+
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "toc-handle";
+    handle.title = "Table of contents";
+    handle.setAttribute("aria-label", "Show table of contents");
+    handle.setAttribute("aria-controls", toc.id);
+    handle.setAttribute("aria-expanded", "false");
+    handle.innerHTML = LIST_ICON + '<span class="toc-handle-label">Contents</span>';
+
+    const edge = document.createElement("div");
+    edge.className = "toc-edge";
+    edge.setAttribute("aria-hidden", "true");
+
+    const pin = document.createElement("button");
+    pin.type = "button";
+    pin.className = "toc-pin";
+    toc.prepend(pin);
+    toc.after(handle, edge);
+
+    const isPinned = () => root.classList.contains("toc-pinned");
+    const isDocked = () => isPinned() && dock.matches;
+    const isOpen = () => root.classList.contains("toc-open");
+
+    function renderPin() {
+      const pinned = isPinned();
+      pin.setAttribute("aria-pressed", String(pinned));
+      pin.title = pinned ? "Unpin: hide the contents until you need them" : "Pin: keep the contents open beside the page";
+      pin.innerHTML = PIN_ICON + "<span>" + (pinned ? "Unpin" : "Pin") + "</span>";
+    }
+
+    function setOpen(open) {
+      root.classList.toggle("toc-open", open);
+      handle.setAttribute("aria-expanded", String(open));
+    }
+
+    function open() {
+      window.clearTimeout(openTimer);
+      window.clearTimeout(closeTimer);
+      if (!isDocked()) setOpen(true);
+    }
+
+    function close(returnFocus) {
+      window.clearTimeout(openTimer);
+      window.clearTimeout(closeTimer);
+      if (!isOpen()) return;
+      const hadFocus = toc.contains(document.activeElement);
+      setOpen(false);
+      if (returnFocus && hadFocus) handle.focus({ preventScroll: true });
+    }
+
+    function keyboardFocusInside() {
+      try {
+        return Boolean(toc.querySelector(":focus-visible"));
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function scheduleClose() {
+      window.clearTimeout(closeTimer);
+      closeTimer = window.setTimeout(() => {
+        // Keep it open while a keyboard user is working inside it.
+        if (!isDocked() && !keyboardFocusInside()) close(false);
+      }, 350);
+    }
+
+    const isMouse = (event) => event.pointerType === "mouse";
+
+    edge.addEventListener("pointerenter", (event) => {
+      if (!isMouse(event)) return;
+      window.clearTimeout(openTimer);
+      openTimer = window.setTimeout(open, 120);
+    });
+    edge.addEventListener("pointerleave", () => window.clearTimeout(openTimer));
+    handle.addEventListener("pointerenter", (event) => {
+      if (isMouse(event)) open();
+    });
+    handle.addEventListener("click", (event) => {
+      // Always opens: hovering may already have opened it a moment earlier.
+      open();
+      // Keyboard activation moves focus into the list; hovering and tapping do not.
+      if (event.detail === 0) {
+        const first = [pin, ...toc.querySelectorAll("a[href], summary")].find((el) => el.getClientRects().length > 0);
+        if (first) first.focus({ preventScroll: true });
+      }
+    });
+    toc.addEventListener("pointerenter", () => window.clearTimeout(closeTimer));
+    toc.addEventListener("pointerleave", (event) => {
+      if (isMouse(event) && isOpen()) scheduleClose();
+    });
+    toc.addEventListener("click", (event) => {
+      if (event.target.closest("a[href]") && !isDocked()) close(false);
+    });
+    toc.addEventListener("focusout", (event) => {
+      const next = event.relatedTarget;
+      if (isOpen() && next && !toc.contains(next) && next !== handle) close(false);
+    });
+    document.addEventListener("pointerdown", (event) => {
+      if (isOpen() && !toc.contains(event.target) && !handle.contains(event.target)) close(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && isOpen()) close(true);
+    });
+    pin.addEventListener("click", () => {
+      const pinned = !isPinned();
+      root.classList.toggle("toc-pinned", pinned);
+      saveTocPinned(pinned);
+      // Pinning docks it; unpinning leaves it open until the pointer moves away.
+      setOpen(!pinned);
+      renderPin();
+    });
+    const onDockChange = () => {
+      if (isDocked()) setOpen(false);
+    };
+    if (dock.addEventListener) dock.addEventListener("change", onDockChange);
+    else if (dock.addListener) dock.addListener(onDockChange);
+
+    renderPin();
+  }
+
   function init() {
+    setupContentsSidebar();
     injectFeedbackButton();
     injectAnalytics();
   }

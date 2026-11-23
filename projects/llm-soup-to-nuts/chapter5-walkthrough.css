@@ -389,9 +389,5 @@ html:has(#embeddingChapter:not([hidden])){scroll-padding-top:min(54vh,470px)}
 .chapter-acts :is(summary,a):hover{background:var(--cp-surface-soft)}
 .chapter-acts a{grid-template-columns:22px 1fr;padding:6px 4px 6px 24px;font-weight:550}
 .chapter-acts a[aria-current="step"]{font-weight:750;color:var(--cp-accent);background:var(--cp-accent-soft)}
-.chapter-acts .toc-extra{margin-top:10px;padding-left:8px}
-@media(max-width:1180px),(max-height:36rem){
-  .chapter-acts{display:block;position:static;width:auto;padding:16px 24px;overflow:visible;border-right:0;border-bottom:1px solid var(--cp-border)}
-  .chapter-acts nav{max-width:28rem}
-  .chapter-acts+main{margin-left:0}
-}
+.chapter-acts .toc-extra{display:block;margin-top:10px;padding-left:8px}
+/* Auto-hide, slide-out and pinning come from the shared styles.css and site.js. */
