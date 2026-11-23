@@ -1,138 +1,120 @@
-# Chapter 5 rewrite: work plan
+# Chapter 5 work plan: follow one token through a Transformer
 
-Living checklist for the Chapter 5 rewrite and the Chapter 6 split. Delete this file only
-after every item is approved, review markup is removed, and both chapters are frozen.
+**Status, November 22, 2026: published.** The author approved Option 1 below, and the GPT-2 walkthrough is now [Chapter 5](chapter-5.html). The earlier hand-designed draft, its exercises, notebooks and the previous implementation record (`chapter-5-work-plan-baseline.md`) are archived outside the published folder in `archive/chapter-5-draft-2026-11-22/` and remain in git history. Still open: the author's review of the two new stops (14 and 15), then freezing the chapter.
 
-Status legend: `todo` / `in review` / `approved`.
+## Option 1 merge plan, simplified (approved and published)
 
----
+The author chose Option 1: the GPT-2 walkthrough becomes the chapter. The current draft is archived as a backup, not merged back in. A future chapter will build a Transformer from scratch in notebooks. Guiding rule from the author: **add only what improves understanding; never make the approved walkthrough more complicated.**
 
-## Decisions already made
+### Frozen: the 13 approved stops
+- Their lessons, pictures, experiments, quick checks, the map, the sticky top-right Back/Next, the full-width layout and the light palette do not change.
+- Proof, not promise: [chapter5-baseline.py](../../../tmp/chapter5-baseline.py) recorded the visible text of every stop plus fingerprints of the map and every picture, at desktop and phone widths ([baseline](../../../tmp/chapter5-walkthrough-baseline.json)). After each step of work it must report "All approved stops unchanged", apart from the single sentence listed below.
+- The one intended edit: the last line of Prediction currently says "Press Replay to start over". Because two short stops will follow, it will say "Press Next" instead.
 
-- **Chapter 5** owns the attention *mechanism* and ends when a learner can hand-compute one
-  attention row and read a real GPT-2 attention map.
-- **Chapter 6** (new) owns *cost*: KV cache, GQA/MLA, sliding window, FlashAttention, MoE,
-  linear attention.
-- **Chapter 7** is the old Chapter 6 (pretraining and alignment), renumbered.
-- Companion Colab notebooks are **linked, not embedded**, so the HTML stays self-contained.
+### Added around the walkthrough (the chapter frame, outside the lessons)
+- Chapter title, a prerequisites box updated for GPT-2, chapter links at the top and bottom, matching the other chapters. The In Progress banner was dropped at publication.
+- The four-act sidebar lists the stops and highlights the current one: I Inputs (Overview, Tokens, Token embedding, Position, Add); II Attention (Query, Key, Attention, Value mixture, Combine heads); III Inside a block (Feed-forward, Blocks 2 to 12); IV Output (Prediction, Write the next word, Check yourself).
+- Old links keep working: `#qkv` opens Query, `#heatmap` Attention, `#multihead` Combine heads, `#onetoken` Write the next word, `#forward` Overview.
+- A short "Go deeper" reading list at the very end of the page, below the walkthrough (confirmed by the author; built from the draft's existing references).
 
-## The one running example
+### Added at the end: two short stops
+| Stop | Why it helps understanding | What it contains |
+| --- | --- | --- |
+| 14. Write the next word | Closes the loop: a prediction becomes text by appending a token and running the whole trip again. | GPT-2's real continuation of our sentence, one appended token at a time, with its top guesses at each step; one button; one quick check. Needs one small recapture from the pinned checkpoint. |
+| 15. Check yourself | Practice lives in one place, so the approved stops stay untouched. | Three by-hand exercises on real GPT-2 numbers (add one coordinate, compute one softmax share from three scores, blend one value number), each with a typed answer, hints and a reveal; then a short review quiz across the whole trip. |
 
-`Sarah fed the cat because it was hungry`, query token `it`, four channels
-`[subject, verb, function, animate]`, `d = 4` so the scale is `sqrt(4) = 2`.
+### Deliberately left out, to avoid extra complexity
+- Temperature, top-k and top-p controls; the training/loss stop; model families and modern variations; the optional in-browser model; collapsing lessons behind "Go deeper". These can be revisited later, most naturally in the generation, pretraining or build-from-scratch chapters.
 
-Verified in the browser on 2026-08-16 (`#qkvScores` and `#qkvMath`):
+### Archived, not merged (kept outside the published folder and in git history)
+- The hand-designed eight-number model and everything computed from it: 2D trace labs, the 3D block lab, the 46% demo, worksheets, code cells, the head-training lab, cross-attention and RoPE labs, the toy notebooks and fixture, and the unlinked `chapter-5-exercises.html`.
 
-| token   | key vector                 | q·k  | /2   | weight |
-|---------|----------------------------|------|------|--------|
-| Sarah   | `[1.60, 0.00, 0.00, 0.15]` | 0.43 | 0.22 | 11.4%  |
-| fed     | `[0.00, 1.60, 0.00, 0.00]` | 0.00 | 0.00 | 9.2%   |
-| the     | `[0.00, 0.00, 1.40, 0.00]` | 0.42 | 0.21 | 11.3%  |
-| **cat** | `[0.00, 0.00, 0.00, 1.80]` | 3.24 | 1.62 | **46.3%** |
-| because | `[0.00, 0.00, 1.20, 0.00]` | 0.36 | 0.18 | 11.0%  |
-| it      | `[0.00, 0.00, 0.50, 0.10]` | 0.33 | 0.17 | 10.8%  |
+### Order of work, each step reviewable
+1. Archive the draft. 2. Build "Write the next word" and "Check yourself" in the prototype. 3. Move the walkthrough into `chapter-5.html` with the frame, sidebar, links and reading list. 4. Run the frozen-stop check, then validate the new stops, mobile, keyboard and the Chapter 6/7 links. Done: the check reports only the intended Prediction sentence, and the chapter was published on November 22, 2026 with the author's approval.
+**Current review pass (voice and depth rewrite):** The author approved the connected map and the full-width token embedding lesson, then asked for one thorough pass over every stop: more depth (at least as elaborate as their Q/K/V explanation), their own warm first-person voice instead of robotic copy, and a purposeful picture wherever one helps. All 13 stops were rewritten from scratch in one batch. Each stop is independently reviewable through the "Author review" jump list at the top of the [prototype](../../../tmp/chapter5-flow.html). Do not replace or publish the draft until the author approves.
 
-Blended output: `[0.11, 0.09, 0.23, 0.53]`.
+| Stop | Question to resolve | Pictures and learner experiments |
+| --- | --- | --- |
+| Overview | What are we about to do, and which "percentages" are which? | Six-card journey; attention budget beside the vocabulary budget; real sneak peek (`she`/`he`/`it` after "because"); quick check. |
+| Tokens | Why can a word occupy two rows? | Word-to-token tree; `␣fed` vs `fed` IDs; `fed`/`overfed` seat-shift strips; quick check. |
+| Token embedding | Why one ID but 768 values? | Approved row/column explorer, voice pass only, plus a quick check on "changing the coordinate changes nothing in the model". |
+| Position | How can two identical tokens differ? | Seat fingerprint heatmap; two-cats strips plus their difference (287 of 768 signs flip); why not add the seat number; RoPE note; quick check. |
+| Add | What does adding two rows do? | Number-line walk; "team up" and "cancel" coordinate finders; whole-row strips; why add not concatenate; island callout; quick check. |
+| Query | What are Q, K and V, and how is a query built? | Three-role cards and the WHO/WHAT rule; real search diagram; four steps; library analogy picture; every token plays all three roles; LayerNorm before/after; real weighted-vote arithmetic; quick check. |
+| Key | What does a dot product measure? | 2D arrow sketch; 64 real products; every key's score; isolated key nudge with before/after share; quick check. |
+| Attention | How do scores become a budget? | Real ÷8 versus no-÷8 comparison (41.7% vs 99.3% on `Sarah`); masked grid; softmax ledger and allocation bar; attention-sink note; quick check. |
+| Values | What information actually moves? | Live share slider with real-vs-simulated blend; contribution ledger and waterfall; WHO-vs-WHAT value nudge; the author's 10-second memory test; "Query asks. Key matches. Value delivers."; one-line formula. |
+| Heads | Why twelve heads, and how are they combined? | 12-head attention heatmap with data-driven commentary; concatenation strip; residual add table; quick check. |
+| Feed-forward | What happens after attention? | Expand/bend/shrink/add diagram; real GELU dot (starts on the strongest saved unit); 16 detectors on an honest fixed scale; MLP-as-memory note; quick check. |
+| Later blocks | What do eleven more blocks do? | Real coordinate path through all 12 blocks; "deeper is not later" grid; quick check. |
+| Prediction | How does a row become a guess? | Honest 0-100% bars plus "everything else"; logit gap to odds; every row's top 3 guesses; seeded sampling dice; recap linking every stop; quick check. |
 
-**Every** new surface - stepper, worksheet, code cell, notebook - must reproduce these
-numbers exactly. Any change to the token vectors invalidates this table and the prose.
+## What the two references change
 
-## Verified numbers in Chapter 6
+| Source | What works | What to do in this chapter |
+| --- | --- | --- |
+| [Georgia Tech's Transformer Explainer](https://poloclub.github.io/transformer-explainer/) | A prompt, its token rows, the blocks, and the output distribution occupy one connected view. The embedding detail decomposes a row into token and position. | Keep the whole graph above a drill-down, with one highlighted stage and token. Use our own forward passes on a pinned trained checkpoint, not copied graphics or toy weights. |
+| [Author's QKV explanation](https://chatgpt.com/share/6b039f6d-87e8-83ea-ab1d-b0ff178c9a92) | A search request, a catalog entry and the content you take away do different jobs. The pronoun example, adjustable mixture and recall question let readers test the distinction. | Use original illustrations and the real `cat → it` trace; isolate a change to matching from a change to content. Do not import the example's illustrative percentages. |
 
-Checked live in the browser, 2026-08-16:
+## 1. The opening: a map the reader can use again
 
-- Cost panel: 8,192 tokens gives 33,558,528 scores (`n(n+1)/2`).
-- KV cache work: 32 generated tokens costs 528 units uncached vs 32 cached (16.5x).
-- KV cache memory (Llama-3-8B shape: 32 layers, 8 KV heads, `d_head` 128, 2 bytes):
-  128 KiB per token, **1.00 GiB** at 8,192 tokens, 8.00 GiB for eight concurrent users.
-- GQA: 32 query heads over 8 groups = 4 heads per set, 4.0x smaller cache.
-- Sliding window on the 8-token toy: 36 pairs full causal, 21 pairs at `w = 3` (42% skipped).
-- FlashAttention stepper: streamed denominator 1.7492 equals the one-shot value 1.7492.
-  This is the on-page proof of the "exact, not approximate" claim - do not break it.
-- MoE at 256 experts + 1 shared, top-8: 9 of 257 active = 3.5%, matching DeepSeek V3's
-  671B total / 37B active story.
+Open with the prefix **Sarah fed the cat because it** and a question: *The model has a list of words. How can information from `cat` reach `it` before the model guesses the next word?* Keep the short prerequisite links, but put the picture next to this question, before the model specification.
 
----
+| What the reader does | What the picture shows |
+| --- | --- |
+| Arrives, without pressing Play | A labeled path: token positions → one row per position → GPT-2’s 12 blocks → the final row scores possible next tokens. Fold repeated blocks, not their contributions, in the visualization. |
+| Chooses **Follow `it`** | The sixth row lights up. Three stops show its input numbers, information arriving from earlier rows, and its final vocabulary probabilities. A sentence at each stop says what changed and what did not. Back and Next reverse or advance one stop. |
+| Selects the `cat` connection | A local detail shows what is being compared, the share assigned to `cat`, and the content carried back to `it`. A separate output chart answers a different question: what token might come *next*? Never label the `cat` share as a prediction. |
+| Clicks a stage heading, a token or a connection | Keep the full map in place. Update the explanation below, preserving the prefix, token and head. No focus/return toggle. |
+| Tries a different supported prefix | Recompute from the same model. Distinguish selecting a row to inspect from changing the prefix. Undo restores the comparison. Isolate experimental weight edits from the baseline used in the prose and exercises. |
 
-## Phase A - scaffolding
+The prototype uses [GPT-2 small revision 607a30d](https://huggingface.co/openai-community/gpt2/tree/607a30d783dfa663caf39e06633721c8d4cfcd7e). The [capture script](../../../tmp/capture-chapter5-gpt2.py) verifies the source SHA-256, runs all 12 blocks with the checkpoint’s tokenizer, and exports compact traces. All 768 input coordinates are available. The graph shows just a labeled slice; output bars show the top eight probabilities from the 50,257-way softmax. In the base sentence ` was` leads at about 38.86%. The earlier hand-designed model (`chapter5-model.js`, now archived) belonged to the previous draft, exercises and notebook; do not import its numbers into the new path.
 
-| # | Item | Status |
-|---|------|--------|
-| A1 | Extract the four reference PDFs to `tmp/pdfs/`. `8 (1).pdf` turned out to be Jurafsky & Martin SLP3 ch.8 "Transformers"; `LLMs - chapter.pdf` is image-only and did not extract (the earlier `chapter5_source.txt` covers it). | approved |
-| A2 | Renumber Chapter 6 -> Chapter 7 (`chapter-7.html`, `chapter7.css`, `chapter7.js`), fix its brand, TOC, nav, script/style refs, and lead paragraph. | approved |
-| A3 | Move the KV-cache and "recent improvements" material out of Chapter 5; delete the orphaned JS and re-point the TOC, eyebrow numbering, and bottom nav. | approved |
-| A4 | Build Chapter 6 as a real chapter (not a stub): 9 sections, 7 quizzes, 8 reveal-gated panels, `chapter6.css`, `chapter6.js`. | approved |
-| A5 | Update the overview chapter map and the "still in progress" copy on `index.html`. | approved |
+## 2. Replace the zero-first experience in “Put the numbers in order”
 
-## Phase B - Chapter 5, the attention rewrite
+**Observed in the [current draft lab](chapter-5.html#inputs):** the one-hot rows made an artificial teaching choice look like a property of embeddings. The review prototype replaces those rows, not just the selected coordinate.
 
-Implement top to bottom, one reviewable item at a time.
+1. Keep GPT-2’s tokenization, including spaces, for `Sarah fed the cat because it` and the `overfed` variant.
+2. Inspect the real token row for `␣fed` (ID 11672). For coordinate 1 at position 2 the addition is approximately `−0.09520 + 0.02396 = −0.07124`. Allow inspecting any of 768 coordinates.
+3. In `The cat saw the cat`, both occurrences of `␣cat` are ID 3797. Hold a coordinate fixed and compare positions 2 and 5. Do not assume a word at the beginning and a word after a space have the same ID.
+4. Only then name the shape: six tokens × 768 coordinates for the base sentence, seven × 768 for the split variant. The input row is not contextual yet.
 
-| # | Item | Status |
-|---|------|--------|
-| B1 | Opener and prereqs: keep the coreference hook, forward-point to the real attention map as the payoff. | todo |
-| B2 | Motivate attention from Chapter 2's failure before naming it. | todo |
-| B3 | **Where Q, K, V come from.** Added the "One vector in, three vectors out" subsection: a `W_Q`/`W_K`/`W_V` fan-out diagram, the plain statement that the three roles are *questions asked of one vector* rather than properties of the token, a fully worked 4x4 projection `x_it = [0.2, 0.1, 0.5, 0.9]` -> `q_it = [0.1, 0.0, 0.3, 1.8]`, and a quick-check quiz. Verified in the browser. | in review |
-| B4 | **Reversible QKV stepper.** Six beats: embedding -> project to `q` -> raw scores -> scaled scores -> softmax weights -> value blend. Back/Next/Play/Replay, a step-pip track, one arithmetic operation per row, `prefers-reduced-motion` jumps to the final state instead of animating. All numbers derived live from `TOKENS`, so they cannot drift from the prose or the panels. Verified end to end in the browser. | in review |
-| B5 | **By-hand worksheet.** Four steps on a *different* query (`fed`, a verb hunting its object) so it is genuinely the learner's turn: raw dot product 2.52 -> scaled 1.26 -> weight 37.7% -> output animate channel 0.46. Feedback names which direction the answer is off, two progressive hints, reveal only after a try. Exact answers say "Correct"; tolerance-accepted ones say so explicitly. Empty and non-numeric input handled. | in review |
-| B6 | **Why divide by sqrt(d).** Prose that names the real failure (softmax saturates, then gradients through the flattened weights vanish) plus a live width slider: unscaled climbs 78.8% -> 99.995% -> 100.000% as `d` goes 4 -> 64 -> 512, while the scaled row holds at 46.3% at every width. | in review |
-| B7 | **Heatmap and causal mask.** Replaced the autoplaying `chapter5-causal-mask.gif` with "Self-attention, in motion": a six-stage drivable SVG scene (tokens -> q/k/v projection -> 36 scores -> mask -> softmax -> value blend) built on inline SVG plus the Web Animations API, no library. Particles are colour-coded by role and the blend sends more dots for heavier weights. Mask toggle is colocated and synced with the other two. Verified: the scene's `it` row reads 11/9/11/46/11/11, identical to the static heatmap, and the output vector matches the stepper. | in review |
+**Pass condition:** on the first instructed action, a novice can point to both addends and their sum without hunting through a selector. They can then predict what stays the same for a repeated word, and explain why adding a seventh token gives another row, not another feature.
 
-### Animation approach (settled)
+## 3. Make QKV the model lesson for conceptual depth
 
-No animation library. Inline SVG + `element.animate()` (WAAPI). Rationale: D3 is ~270 KB
-for data joins we do not need on a 6x6 matrix; WAAPI already gives cancellation, reversal,
-`currentTime` scrubbing and `playbackRate`. Pattern: build the scene once, one `renderSat(step)`
-sets the static state via classes and a `--shade` custom property, `satPlayStage(step)` spawns
-short-lived particles. Back re-renders statically rather than reversing, so it feels instant.
-All running animations are tracked in `state.satAnims` and cancelled on any step change.
-| B8 | Positional information: absolute vs RoPE as a rotation of `q` and `k` before the dot product. | todo |
-| B9 | Multi-head: three legible heads, plus the split -> concat -> output-projection shape bookkeeping. | todo |
-| B10 | **Live model.** See the finding below - a real in-browser attention map is impossible. Delivered instead: a real key/value tensor inspector (verified against distilGPT-2: 6 layers, 12 heads, d=64, 216 KiB for a 6-token prompt) plus an honest subsection explaining why the map is not here, pointing at the notebook. | in review |
-| B11 | Code cells: softmax and scaled dot-product attention, both gated behind predict-first quizzes. A third mask cell was dropped - the animated scene and the heatmap already teach masking interactively, and a code cell would have been a third copy. 14 quizzes on the page in total. | in review |
-| B12 | **Colab notebook** at `assets/downloads/chapter5-attention.ipynb`. 26 cells. Part 1 rebuilds the chapter in NumPy and *asserts* it reproduces `q_it = [0.1, 0, 0.3, 1.8]` and `46.3%`. Part 2 loads real GPT-2 with `output_attentions=True`, searches all 144 heads for the strongest `it` -> `cat`, and plots real attention maps. Math verified locally against the chapter. | in review |
-| B13 | **References.** Moved the ten efficiency papers (GQA, FlashAttention, MQA, sparse, RMSNorm, SwiGLU, Switch, Mixtral, speculative decoding) to Chapter 6 where they now belong. Added Transformer Explainer and the companion notebook to Chapter 5. | in review |
+Teach [weighted mixtures](chapter-5.html#attention-intuition), [Q/K/V](chapter-5.html#qkv), and [one attention row](chapter-5.html#attention-row) as one argument. The first owns *why equal shares are insufficient*, the second *how the model decides where to look versus what to take*, and the third *the complete arithmetic*. Do not make the reader start a new story in each section.
 
-### Finding: real attention maps cannot be shown in the browser
+| Teaching beat | Worked evidence or learner action |
+| --- | --- |
+| Why not average everybody equally? | Mix the same six value rows first with equal shares, then with the model's shares. Show each source's contribution to one output feature. A share alone is not the information received. |
+| Why learn three different projections? | Use the catalog analogy once, then retire it. Draw one normalized 768-coordinate row branching into Q, K and V. Work one coordinate of a 64-dimensional head with the stored weights and bias. |
+| What actually travels from `cat` to `it`? | Inspect the full 64-coordinate dot product, scale by 8, and normalize over all allowed keys. In block 1, head 1, `␣cat` gets about 22.50% at `␣it`. Multiply by the actual selected value coordinate and sum every source. The output is a vector, not a selected word. |
+| Can the reader tell routing from content? | In a future isolated experiment, edit just one value coordinate. Hold Q and K fixed and predict the change: attention share × value change. Keep experimental results distinct from unmodified checkpoint traces. |
+| Can they transfer it? | Ask which vector is compared and which supplies content for a different query position. Then work one masked row in the existing by-hand exercise. Only now compress the story into `softmax(mask(QKᵀ / sqrt(d_head))) V`. An attention weight is neither proof of coreference nor the probability that `cat` comes next. |
 
-Verified empirically, not assumed. `AutoModelForCausalLM` for `Xenova/distilgpt2` with
-`output_attentions: true` returns only:
+## 4. Carry the same standard through the four acts
 
-```
-logits, present.0.key, present.0.value, ... present.5.key, present.5.value
-```
+Keep the four expandable sidebar acts, stable section anchors, shared course palette, and short navigation labels. Each later mechanism needs a question the previous mechanism could not answer, one worked change, and an explicit handoff:
 
-No `attentions` key, and the ONNX session's `outputNames` confirms the graph simply does not
-export them. Attention weights are computed inside the graph and discarded. The same is true of
-fused attention kernels in PyTorch, which is why the notebook passes
-`attn_implementation="eager"`.
+| Act | Question to answer | Evidence the reader should see |
+| --- | --- | --- |
+| I. Inputs | How can the same token start differently at two positions? | Compare the two `␣cat` rows and locate their sums at the first block’s entrance. |
+| II. Attention | Who can contribute, in what proportion, and with what content? | Follow one route before expanding to the matrix. Change a future token and show an earlier row is unchanged. Compute two heads, then distinguish concatenating their features from averaging attention weights. |
+| III. Inside a block | Once information arrives, what happens to the token's original row? | Place original, branch update, and sum side by side. Show normalization on one row, then a feed-forward unit before/after GPT-2’s GELU. |
+| IV. Outputs and real models | How does one updated row turn into a token, and how does training differ? | Trace the last row to vocabulary logits and probabilities. Append a chosen ID and run again. Contrast this with scoring six known training targets in one pass. Use the existing notebook and opt-in real model for comparison; keep efficiency in Chapter 6 and pretraining at scale in Chapter 7. |
 
-Consequences, all of them deliberate:
-- Chapter 5 says this out loud in a subsection rather than quietly omitting the feature.
-- The real attention map lives in the Colab notebook, where PyTorch gives it up freely.
-- The browser gets what it genuinely *can* do: the real `present.N.key/value` tensors, which
-  doubles as a concrete hand-off into Chapter 6's KV cache section.
+## Review order and acceptance
 
-## Phase C - Chapter 6 polish
+All items below are **proposed**, not implemented. Start with the smallest useful experience and stop for author review after each item. Keep a clean reading view available; do not put the entire chapter back into redlines.
 
-| # | Item | Status |
-|---|------|--------|
-| C1 | Prose and structure for all nine sections. | in review |
-| C2 | Add a small SVG for the KV cache growing step by step (currently prose plus a table). | todo |
-| C3 | Add a diagram for MLA's compress-then-project-back path. | todo |
-| C4 | Colab notebook 2: KV-cache timing on a real small model, GQA memory math, tiled softmax checked against the naive version. | todo |
-| C5 | Decide whether `chapter-5-exercises.html` folds into the main pages or is retired. | todo |
+- [ ] **R1. Opening map and its first destination.** The author confirmed the [connected flow study](../../../tmp/chapter5-flow.html) and clickable stage headings are the right direction. Retain that design, review one focused stage at a time, and keep chapter integration and the round trip to the input lesson pending.
+  - **First-minute review:** Click the `cat → it` ribbon, then switch heads. The share changes, but the vocabulary bars stay still. Switching the sentence, in contrast, loads a different forward pass.
+- [ ] **R2. Inputs and shape.** Replace the default zero-only inspection with the aligned addition and repeated-word comparison. Pass the first-action and transfer checks in section 2 before expanding the rest of the map.
+  - **Inputs prototype awaiting author review:** [Open the full flow at “fed”](../../../tmp/chapter5-flow.html?at=2). Press Next and watch Inputs widen to about 40% of that same graph. Token rows, Q/K/V routes, matrix cells, ribbons and prediction bars stay connected and selectable. Through Tokens → Token embedding → Position embedding → Add, only the emphasis on the selected row changes. The math stays below on the left; the explanation and Back/Next stay on the right. Test the two `␣cat` occurrences before proceeding to the projections review. The original chapter lab has not been replaced.
+- [ ] **R3. Attention and QKV.** Connect the map to the worked route and the two isolated edits. Check that resetting exactly restores the fixture, value-only edits leave this head's weights unchanged, and all allowed shares sum to one. Have a reader explain *why* the value, not the key, is carried back.
+  - **Depth and layout gate passed for the prototype:** the author approved [Inputs 2: Token embedding](../../../tmp/chapter5-flow.html?stage=inputs&detail=embedding) as the format. The twelve other stops are now proposed individually in the review queue. Start the attention sequence at [Query](../../../tmp/chapter5-flow.html?lesson=query). Try the isolated key and value edits; only the local simulation changes. The larger integration and exercise items remain open.
+- [ ] **R4. Remaining block and output handoffs.** Connect the existing 2D, 3D, and code exercises to the same example. Keep their useful arithmetic; remove a duplicate display only when its teaching job is demonstrably covered. Return from each detail to the correct point on the map.
+- [ ] **R5. Read-through and regression.** Have a first-time reader narrate the path from `it` to a next-token score and predict a change before pressing a control. Record where they hesitate. Separately run the existing model/fixture tests and verify desktop and 375px mobile, keyboard-only use, reduced motion, direct section links, and an offline core with no pretrained download. Numerical tests cannot substitute for that read-through.
 
----
-
-## Testing notes specific to these chapters
-
-- Preview at `http://127.0.0.1:8765/personal-site/projects/llm-soup-to-nuts/chapter-6.html?v=N`
-  with a cache-busting query; the in-app browser caches aggressively.
-- Always `page.setViewportSize` **before** measuring overflow, or `clientWidth` reports 0 and
-  every number is garbage. Check 1200x900 and 375x800.
-- `.arch-table-wrap` and `.math-formal` legitimately scroll internally; that is not a bug.
-  What matters is `document.documentElement.scrollWidth - clientWidth === 0`.
-- After any container restructure, assert `[...section.children].map(c => c.className)` rather
-  than eyeballing. All 15 Chapter 5 sections must have exactly one direct child.
-- Grep for `Section [0-9]` and stale `chapter-6` links after any renumbering.
+The original chapter integration, exercises and publication remain separate decisions. The current deliverable is the independently reviewable prototype sequence above.
